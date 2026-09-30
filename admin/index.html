@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Admin — DEAD OR ALIVE</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="desk admin">
+      <p class="kicker">Back room</p>
+      <h1 class="name">THE DESK</h1>
+      <p class="usp" id="queue"></p>
+
+      <form id="unlock" class="unlock">
+        <label class="label">Admin key
+          <input name="key" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="submit" type="submit">Open the desk</button>
+        <p class="alert" role="alert" hidden></p>
+      </form>
+
+      <section id="board" class="section" hidden>
+        <div class="bar">
+          <h2 class="kicker">Orders</h2>
+          <div class="tabs" role="tablist">
+            <button type="button" data-view="open" aria-pressed="true">Open</button>
+            <button type="button" data-view="done" aria-pressed="false">Done</button>
+            <button type="button" data-view="all" aria-pressed="false">All</button>
+          </div>
+          <button type="button" class="link" id="refresh">Refresh</button>
+          <button type="button" class="link" id="lock">Lock</button>
+        </div>
+        <p class="alert" id="board-alert" role="alert" hidden></p>
+        <ul class="orders" id="orders"></ul>
+      </section>
+
+      <section id="composer" class="section" hidden>
+        <h2 class="kicker">Stamp <span id="c-target"></span></h2>
+        <p class="usp">Paste, drop, or pick a first-screen screenshot. Drag on it to draw the circle.</p>
+        <label class="drop" id="drop">
+          <input id="file" type="file" accept="image/*" hidden />
+          <span>Drop screenshot here, paste it, or click to pick one.</span>
+        </label>
+        <canvas id="canvas" hidden></canvas>
+
+        <fieldset class="verdicts">
+          <legend class="label">Stamp</legend>
+          <label><input type="radio" name="verdict" value="DEAD" checked /><span class="word dead">DEAD</span></label>
+          <label><input type="radio" name="verdict" value="COPE" /><span class="word cope">COPE</span></label>
+          <label><input type="radio" name="verdict" value="ALIVE" /><span class="word alive">ALIVE</span></label>
+        </fieldset>
+        <label class="label">One sentence
+          <input id="sentence" type="text" />
+        </label>
+
+        <div class="actions">
+          <button type="button" class="submit" id="download">Download PNG</button>
+          <button type="button" class="submit ghost" id="email">Draft email</button>
+          <button type="button" class="submit ghost" id="done">Mark done</button>
+          <button type="button" class="link" id="clear-ring">Clear circle</button>
+        </div>
+      </section>
+    </main>
+    <script src="/desk.js"></script>
+    <script src="/admin/admin.js"></script>
+  </body>
+</html>
