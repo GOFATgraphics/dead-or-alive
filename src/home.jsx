@@ -13,7 +13,7 @@ const still = reducedMotion();
 function Reveal({ children, delay = 0 }) {
   if (still) return children;
   return (
-    <AnimatedContent distance={40} duration={0.7} delay={delay} threshold={0.12}>
+    <AnimatedContent distance={24} duration={0.9} delay={delay} threshold={0.1} scale={0.98} ease="power3.out">
       {children}
     </AnimatedContent>
   );
@@ -24,7 +24,7 @@ function Word({ text, className = "" }) {
   return (
     <DecryptedText
       text={text}
-      animateOn="inViewHover"
+      animateOn="view"
       sequential
       speed={70}
       characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -124,17 +124,25 @@ function NoteCard() {
   );
 }
 
-function Hero({ closed }) {
+function Hero({ closed, stage }) {
+  const frame = useRef(null);
+  // Cards shift a few pixels with the pointer, each at its own depth.
+  function onPointerMove(e) {
+    if (still || e.pointerType !== "mouse") return;
+    const r = frame.current.getBoundingClientRect();
+    frame.current.style.setProperty("--mx", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
+    frame.current.style.setProperty("--my", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
+  }
+  function onPointerLeave() {
+    frame.current.style.setProperty("--mx", 0);
+    frame.current.style.setProperty("--my", 0);
+  }
   return (
-    <section className="hero-wrap">
-      <div className="hero-frame">
+    <section className="hero-wrap" id="top">
+      <div className="hero-frame" ref={frame} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave}>
         <div className="hero-sun" />
         <Hills />
         <div className="hero-copy">
-          <a className="badge" href="#how">
-            <span className="dot" aria-hidden="true">▣</span>
-            First screen. Five seconds. <span className="soft">One stamp.</span> ›
-          </a>
           <h1 className="hero-title" aria-label="Is your page dead or alive?">
             {still ? (
               <>Is your page<br /><span className="grad">dead or alive?</span></>
@@ -146,16 +154,16 @@ function Hero({ closed }) {
             )}
           </h1>
           <p className="hero-sub">A stranger gives your first screen five seconds. We stamp whether they got the offer before they scroll.</p>
-          <div className="hero-cta">
+          <div className="hero-form">
             {closed ? (
-              <span className="closed">Queue is full. New stamps open when the desk is clear.</span>
+              <p className="closed">Queue is full. New stamps open when the desk is clear.</p>
             ) : (
-              <InkButton as="a" href="#judge">Judge my page — $1</InkButton>
+              <JudgeForm stage={stage} />
             )}
-            <span className="price-chip"><b>$1</b><span><strong>per page</strong>stamped the same day</span></span>
           </div>
         </div>
         <div className="float-stage">
+          <div className="hero-box"><BoxStage closed={closed} control={stage} /></div>
           <RingCard />
           <VerdictCard />
           <DeskCard />
@@ -250,18 +258,31 @@ function JudgeForm({ stage }) {
     location.assign(dest.toString());
   }
   return (
-    <form id="judge-form" noValidate onSubmit={submit} onInput={onType} onFocus={home} onBlur={onBlur} onPointerOver={onPointerOver}>
-      <label className="label">Page URL
-        <input id="page_url" name="page_url" type="text" inputMode="url" autoComplete="url" required placeholder="https://yourpage.com" />
-      </label>
-      <label className="label">Email for the stamp
-        <input id="email" name="email" type="email" autoComplete="email" required placeholder="you@company.com" />
-      </label>
-      <InkButton type="submit">Judge this page — $1</InkButton>
+    <form id="judge-form" className="inline-form" noValidate onSubmit={submit} onInput={onType} onFocus={home} onBlur={onBlur} onPointerOver={onPointerOver}>
+      <div className="inline-fields">
+        <label className="field">
+          <span className="sr-only">Page URL</span>
+          <input id="page_url" name="page_url" type="text" inputMode="url" autoComplete="url" required placeholder="Your page URL" />
+        </label>
+        <label className="field">
+          <span className="sr-only">Email for the stamp</span>
+          <input id="email" name="email" type="email" autoComplete="email" required placeholder="Email for the stamp" />
+        </label>
+        <InkButton type="submit">Judge my page — $1</InkButton>
+      </div>
       <p className="alert" role="alert" hidden={!error}>{error}</p>
-      <p className="fine">Secure checkout by Polar. One page per stamp.</p>
+      <p className="form-note"><span>$1 per page</span><span>Stamped the same day</span><span>Secure checkout by Polar</span></p>
     </form>
   );
+}
+
+// Jump to the hero form and put the cursor in the URL field.
+function focusForm(e) {
+  const input = document.getElementById("page_url");
+  if (!input) return;
+  e.preventDefault();
+  window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+  setTimeout(() => input.focus({ preventScroll: true }), still ? 0 : 450);
 }
 
 function Home() {
@@ -277,10 +298,10 @@ function Home() {
           <a href="#examples">Examples</a>
         </nav>
         <span className="price">$1 per page</span>
-        <a className="btn small" href="#judge">Judge my page</a>
+        <a className="btn small" href="#top" onClick={focusForm}>Judge my page</a>
       </header>
 
-      <Hero closed={closed} />
+      <Hero closed={closed} stage={stage} />
 
       <main className="home-main">
         <section className="home-section" id="verdicts">
@@ -348,23 +369,15 @@ function Home() {
             <div className="judge-left">
               <p className="kicker brand">Get a stamp</p>
               <h2>Send a page. <span className="grad">{NAME} will look.</span></h2>
-              <p>First screen. Five seconds. One stamp. $1.</p>
               <ul className="judge-list">
                 <li>A circled screenshot of your first screen</li>
                 <li>One sentence on what a stranger misses</li>
                 <li>DEAD, COPE, or ALIVE. Same day.</li>
               </ul>
-              <p className="companion-say">
-                {closed ? (
-                  <><strong>{NAME}</strong> is busy. The box opens again when the desk is clear.</>
-                ) : (
-                  <>This is <strong>{NAME}</strong>. Dead or alive, nobody knows until {NAME} looks.</>
-                )}
-              </p>
-              <BoxStage closed={closed} control={stage} />
             </div>
-            <div className="judge-form">
-              {closed ? <p className="closed">Queue is full. New stamps open when the desk is clear.</p> : <JudgeForm stage={stage} />}
+            <div className="judge-cta">
+              <BoxCat state="idle" />
+              <InkButton as="a" href="#top" onClick={focusForm}>{closed ? "See the desk" : "Judge my page — $1"}</InkButton>
             </div>
           </div>
         </section>
