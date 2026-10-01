@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <main class="desk admin">
@@ -62,15 +62,17 @@
           <input id="sentence" type="text" />
         </label>
 
+        <label class="check"><input id="send-email" type="checkbox" checked /> Email the customer their link</label>
+
         <div class="actions">
-          <button type="button" class="submit" id="download">Download PNG</button>
+          <button type="button" class="submit" id="publish">Publish verdict</button>
+          <button type="button" class="submit ghost" id="download">Download PNG</button>
           <button type="button" class="submit ghost" id="email">Draft email</button>
-          <button type="button" class="submit ghost" id="done">Mark done</button>
           <button type="button" class="link" id="clear-ring">Clear circle</button>
         </div>
+        <p class="published" id="published" aria-live="polite" hidden></p>
       </section>
     </main>
-    <script src="/desk.js"></script>
-    <script src="/admin/admin.js"></script>
+    <script type="module" src="/admin/admin.js"></script>
   </body>
 </html>

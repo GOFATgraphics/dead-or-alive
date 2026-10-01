@@ -1,22 +1,25 @@
-// Admin-only. Lists paid Polar orders for the stamp desk.
-// Env: ADMIN_KEY, POLAR_ACCESS_TOKEN. Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID.
-const crypto = require("crypto");
+// Admin-only. Lists paid Polar orders for the stamp desk, with any stamp already published.
+// Env: ADMIN_KEY, POLAR_ACCESS_TOKEN, BLOB_READ_WRITE_TOKEN.
+// Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID, SITE_URL.
+import { list } from "@vercel/blob";
+import { requireAdmin, resultId, siteOrigin } from "./_lib.js";
 
-function same(a, b) {
-  const x = crypto.createHash("sha256").update(String(a)).digest();
-  const y = crypto.createHash("sha256").update(String(b)).digest();
-  return crypto.timingSafeEqual(x, y);
+async function published() {
+  const found = new Map();
+  let cursor;
+  do {
+    const page = await list({ prefix: "verdicts/", limit: 1000, cursor });
+    for (const b of page.blobs) if (b.pathname.endsWith(".json")) found.set(b.pathname.slice(9, -5), b.url);
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return found;
 }
 
-module.exports = async (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("X-Robots-Tag", "noindex");
+export default async function handler(req, res) {
+  if (!requireAdmin(req, res)) return;
   if (req.method !== "GET") return res.status(405).json({ error: "GET only." });
-
-  const adminKey = process.env.ADMIN_KEY;
   const token = process.env.POLAR_ACCESS_TOKEN;
-  if (!adminKey || !token) return res.status(500).json({ error: "ADMIN_KEY or POLAR_ACCESS_TOKEN is not set." });
-  if (!same(req.headers["x-admin-key"] || "", adminKey)) return res.status(401).json({ error: "Wrong key." });
+  if (!token) return res.status(500).json({ error: "POLAR_ACCESS_TOKEN is not set." });
 
   const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
   const url = new URL(base + "/v1/orders/");
@@ -33,16 +36,39 @@ module.exports = async (req, res) => {
     return res.status(502).json({ error: "Polar did not answer." });
   }
 
-  const orders = (body.items || []).map((o) => ({
-    id: o.id,
-    createdAt: o.created_at,
-    status: o.status || (o.paid ? "paid" : ""),
-    product: (o.product && o.product.name) || "",
-    amount: o.total_amount ?? o.amount ?? null,
-    currency: o.currency || "usd",
-    email: (o.customer && o.customer.email) || (o.user && o.user.email) || "",
-    pageUrl: (o.custom_field_data && o.custom_field_data.page_url) || "",
-  }));
+  let stamps = new Map();
+  let warning = "";
+  try {
+    stamps = await published();
+  } catch (_) {
+    warning = "Could not read published stamps. Is Vercel Blob connected?";
+  }
 
-  res.status(200).json({ orders });
-};
+  const origin = siteOrigin(req);
+  const orders = await Promise.all(
+    (body.items || []).map(async (o) => {
+      const id = resultId(o.id);
+      const jsonUrl = stamps.get(id);
+      let verdict = "";
+      if (jsonUrl) {
+        try {
+          verdict = (await (await fetch(jsonUrl, { cache: "no-store" })).json()).verdict || "";
+        } catch (_) {}
+      }
+      return {
+        id: o.id,
+        createdAt: o.created_at,
+        status: o.status || (o.paid ? "paid" : ""),
+        product: (o.product && o.product.name) || "",
+        amount: o.total_amount ?? o.amount ?? null,
+        currency: o.currency || "usd",
+        email: (o.customer && o.customer.email) || (o.user && o.user.email) || "",
+        pageUrl: (o.custom_field_data && o.custom_field_data.page_url) || "",
+        resultUrl: jsonUrl ? `${origin}/v/${id}` : "",
+        verdict,
+      };
+    })
+  );
+
+  res.status(200).json({ orders, warning });
+}

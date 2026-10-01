@@ -1,3 +1,5 @@
+import { DESK } from "../src/config.js";
+
 (() => {
   const $ = (id) => document.getElementById(id);
   const COLORS = { DEAD: "#9d1c1c", COPE: "#8a5a00", ALIVE: "#1d6b3a" };
@@ -7,10 +9,6 @@
     ALIVE: "A stranger can name the product, the buyer, and the reason to pay before they scroll.",
   };
 
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
-  };
   const session = {
     get() { try { return sessionStorage.getItem("doa.key") || ""; } catch (_) { return ""; } },
     set(v) { try { v ? sessionStorage.setItem("doa.key", v) : sessionStorage.removeItem("doa.key"); } catch (_) {} },
@@ -22,9 +20,8 @@
   let current = null;
   let image = null;
   let ring = null;
-  let done = store.get("doa.done", {});
 
-  $("queue").textContent = window.DESK && window.DESK.queueOpen
+  $("queue").textContent = DESK.queueOpen
     ? "Queue is open. To close it, set queueOpen to false in desk.js and deploy."
     : "Queue is closed. To open it, set queueOpen to true in desk.js and deploy.";
 
@@ -68,7 +65,9 @@
     orders = data.orders || [];
     unlock.hidden = true;
     $("board").hidden = false;
-    $("board-alert").hidden = true;
+    $("board-alert").hidden = !data.warning;
+    $("board-alert").textContent = data.warning || "";
+    if (current) current = orders.find((o) => o.id === current.id) || current;
     render();
   }
 
@@ -90,7 +89,7 @@
   function render() {
     const list = $("orders");
     const shown = orders.filter((o) =>
-      view === "all" ? true : view === "done" ? done[o.id] : !done[o.id] && o.status !== "refunded"
+      view === "all" ? true : view === "done" ? o.resultUrl : !o.resultUrl && o.status !== "refunded"
     );
     list.replaceChildren();
     if (!shown.length) {
@@ -104,7 +103,7 @@
       const li = document.createElement("li");
       li.className = "order" + (current && current.id === o.id ? " on" : "");
       const when = o.createdAt ? new Date(o.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
-      const stamp = done[o.id] ? `<span class="word ${done[o.id].toLowerCase()}">${done[o.id]}</span>` : "";
+      const stamp = o.verdict ? `<a class="word ${o.verdict.toLowerCase()}" href="${o.resultUrl}" target="_blank" rel="noopener">${o.verdict}</a>` : "";
       li.innerHTML = `
         <div class="meta"><span></span><span></span>${stamp}</div>
         <a class="page" target="_blank" rel="noopener noreferrer"></a>
@@ -138,7 +137,8 @@
     canvas.hidden = true;
     $("drop").hidden = false;
     $("c-target").textContent = "— " + (o.pageUrl || o.email || o.id);
-    const v = done[o.id] || "DEAD";
+    const v = o.verdict || "DEAD";
+    showPublished(o.resultUrl ? { url: o.resultUrl, note: "Already published. Publishing again replaces it." } : null);
     document.querySelector(`input[name=verdict][value=${v}]`).checked = true;
     sentence.value = SENTENCES[v];
     $("composer").hidden = false;
@@ -297,15 +297,77 @@
     if (!current) return;
     const v = verdict();
     const subject = `${v} — ${slug()}`;
-    const body = `${current.pageUrl}\n\n${v}. ${sentence.value.trim()}\n\nThe circled screenshot is attached.\n\n— DEAD OR ALIVE`;
+    const tail = current.resultUrl ? `See your stamp: ${current.resultUrl}` : "The circled screenshot is attached.";
+    const body = `${current.pageUrl}\n\n${v}. ${sentence.value.trim()}\n\n${tail}\n\n— DEAD OR ALIVE`;
     location.href = `mailto:${encodeURIComponent(current.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   });
 
-  $("done").addEventListener("click", () => {
+  function showPublished(info) {
+    const el = $("published");
+    el.hidden = !info;
+    if (!info) return;
+    el.replaceChildren();
+    if (info.url) {
+      const a = document.createElement("a");
+      a.href = info.url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = info.url;
+      el.append(a, document.createElement("br"));
+    }
+    const note = document.createElement("span");
+    note.textContent = info.note;
+    note.className = info.error ? "alert" : "";
+    el.append(note);
+  }
+
+  // JPEG keeps the upload under the server's size limit.
+  function jpeg() {
+    for (const q of [0.88, 0.8, 0.7, 0.6]) {
+      const data = canvas.toDataURL("image/jpeg", q);
+      if (data.length < 5_000_000) return data;
+    }
+    return canvas.toDataURL("image/jpeg", 0.5);
+  }
+
+  const publishBtn = $("publish");
+  publishBtn.addEventListener("click", async () => {
     if (!current) return;
-    done[current.id] = verdict();
-    store.set("doa.done", done);
-    render();
+    if (!image) return alertComposer("Add a screenshot first.");
+    if (!sentence.value.trim()) return showPublished({ note: "Write the sentence first.", error: true });
+    publishBtn.disabled = true;
+    publishBtn.textContent = "Publishing…";
+    try {
+      const r = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        body: JSON.stringify({
+          orderId: current.id,
+          email: current.email,
+          pageUrl: current.pageUrl,
+          verdict: verdict(),
+          sentence: sentence.value.trim(),
+          image: jpeg(),
+          sendEmail: $("send-email").checked,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+      current.resultUrl = data.url;
+      current.verdict = verdict();
+      const note = data.emailed
+        ? `Published. Emailed ${current.email}.`
+        : $("send-email").checked
+          ? `Published. Not emailed: ${data.emailError || "no email on the order."} Use Draft email.`
+          : "Published. Not emailed.";
+      showPublished({ url: data.url, note, error: !data.emailed && $("send-email").checked });
+      render();
+    } catch (err) {
+      showPublished({ note: err.message || "Could not publish.", error: true });
+    } finally {
+      publishBtn.disabled = false;
+      publishBtn.textContent = "Publish verdict";
+    }
   });
 
   function alertComposer(message) {
