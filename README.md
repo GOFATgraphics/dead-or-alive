@@ -18,7 +18,7 @@ Later links, not linked from this page:
 | Resurrection | `/paid/resurrection` |
 | Stay Alive | `/paid/alive` |
 
-When the queue is full, set `queueOpen` to `false` in `src/config.js`. The button is replaced with: “Queue is full. New stamps open when the desk is clear.”
+The homepage closes the form by itself when `QUEUE_LIMIT` paid pages are waiting for a stamp (it asks `/api/queue` on load and again before checkout). To close it by hand, set `queueOpen` to `false` in `src/config.js`. The button is replaced with: “Queue is full. New stamps open when the desk is clear.”
 
 Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `dist/`. Locally: `npm install`, then `npm run dev`. Do not use the Polar organization storefront as the homepage. It lists every product.
 
@@ -30,12 +30,13 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
 2. In Polar, create an organization access token with `orders:read`.
 3. In [Resend](https://resend.com), verify your sending domain and create an API key.
 4. In Vercel project env vars, set:
-   - `ADMIN_KEY`: a long random string. The password for `/admin`.
+   - `ADMIN_KEY`: the password for `/admin`. At least 32 characters, random. Make one with `openssl rand -base64 36`. Without it (or if it's shorter), the admin API answers 503.
    - `POLAR_ACCESS_TOKEN`: the token from step 2.
    - `RESEND_API_KEY` and `MAIL_FROM` (for example `Box <box@yourdomain.com>`).
    - `SITE_URL`: your domain, for example `https://deadoralive.xyz`. Emails, canonical links, share tags, robots.txt, and the sitemap use it. Without it, the build falls back to Vercel's production domain.
    - `CONTACT_EMAIL`: the address shown on the privacy and terms pages for deletion requests and questions.
-   - Optional: `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
+   - `QUEUE_LIMIT`: how many paid pages may wait for a stamp before the homepage closes the form (default 10).
+   - Optional: `POLAR_VERDICT_PRODUCT_ID`, so only Verdict orders count toward the queue; `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
 5. Redeploy. Open `/admin` and enter the key.
 
 Per order: **Stamp**, paste or drop the first-screen screenshot, mark it up, pick DEAD / COPE / ALIVE, write one sentence, **Publish verdict**.
@@ -51,7 +52,8 @@ Stamped screenshots and verdicts are public files in Blob storage. Customer emai
 - Security headers (CSP, frame blocking, nosniff, referrer and permissions policies) are in `vercel.json`. The CSP allows only this site, plus stamped images from Vercel Blob. Fonts are self-hosted in `public/fonts`, so no third party is involved.
 - Page URLs are checked by `src/url.js` in the form, the admin desk, and the publish API. It rejects credentials, IP addresses, ports, and non-public names, and keeps only origin plus path.
 - The homepage is plain HTML, so crawlers read the whole page. Its script is about 6 KB gzipped. React loads only on the result and payment pages.
-- `robots.txt` and `sitemap.xml` are generated at build. Preview deployments disallow all crawling.
+- `robots.txt` and `sitemap.xml` are generated at build. Preview deployments disallow all crawling. Private pages are not listed in robots.txt; `/admin`, `/paid`, and `/v/` send `noindex` headers instead.
+- The admin API blocks an IP for 15 minutes after 5 wrong keys, and slows every wrong guess. The count is kept per server instance, so for a hard global limit add a Vercel Firewall rate-limit rule on `/api/orders` and `/api/publish`.
 - Hashed assets and fonts are cached for a year.
 - `/privacy` and `/terms` are short, plain pages. Review them before launch: the refund line and the "keep until you ask" retention are policy choices for you to confirm.
 

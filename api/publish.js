@@ -12,7 +12,7 @@ function emailHtml({ verdict, sentence, host, image, link }) {
   return `<!doctype html><html><body style="margin:0;background:#f6f5fc;color:#12132a;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:560px" cellpadding="0" cellspacing="0">
-<tr><td style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#5d6180">Box looked at ${e(host)}</td></tr>
+<tr><td style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#5d6180">We looked at ${e(host)}</td></tr>
 <tr><td style="padding-top:12px;font-size:56px;font-weight:800;letter-spacing:-2px;line-height:1;color:${COLOR[verdict]}">${verdict}</td></tr>
 <tr><td style="padding-top:16px;font-size:15px;line-height:1.5">${e(sentence)}</td></tr>
 <tr><td style="padding-top:24px"><a href="${e(link)}"><img src="${e(image)}" width="560" alt="Your first screen, circled and stamped ${verdict}." style="display:block;width:100%;height:auto;border:1px solid #e6e3f1;border-radius:12px"></a></td></tr>
@@ -31,7 +31,7 @@ async function sendEmail(to, data) {
     body: JSON.stringify({
       from,
       to: [to],
-      subject: `${data.verdict}. Box looked at ${data.host}.`,
+      subject: `${data.verdict}. We looked at ${data.host}.`,
       html: emailHtml(data),
       text: `${data.verdict}.\n\n${data.sentence}\n\nSee your stamp: ${data.link}\n\nDEAD OR ALIVE`,
     }),
@@ -41,7 +41,7 @@ async function sendEmail(to, data) {
 }
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
 
   const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};

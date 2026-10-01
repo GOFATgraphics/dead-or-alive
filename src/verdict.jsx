@@ -2,7 +2,6 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { DESK } from "./config.js";
-import { NAME } from "./mascot.js";
 import { BoxCat, INK, InkButton, Logo, VERDICT_COLOR, reducedMotion } from "./ui.jsx";
 import BlurText from "./bits/BlurText.jsx";
 import DecryptedText from "./bits/DecryptedText.jsx";
@@ -66,7 +65,7 @@ function CopyLink() {
   }
   return (
     <button type="button" className="link" onClick={copy} aria-live="polite">
-      {copied ? "Link copied" : "Copy link"}
+      {copied ? "Link copied. Post it." : "Copy link to post"}
     </button>
   );
 }
@@ -89,7 +88,7 @@ function Result({ r }) {
     <main className={"desk result v-" + v.toLowerCase()}>
       <Logo />
       <div className="result-card">
-      <p className="kicker brand">{NAME} looked at {r.host}{when ? ` · ${when}` : ""}</p>
+      <p className="kicker brand">We looked at {r.host}{when ? ` · ${when}` : ""}</p>
       <h1 className="verdict-word" style={{ color: VERDICT_COLOR[v] }}>
         {still ? v : (
           <DecryptedText text={v} animateOn="view" sequential speed={90} characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" encryptedClassName="scrambled" />

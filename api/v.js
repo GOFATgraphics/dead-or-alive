@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
   const r = await readResult(id);
   if (r) {
-    const title = `${r.verdict}. Box looked at ${r.host}.`;
+    const title = `${r.verdict}. We looked at ${r.host}.`;
     const tags = [
       `<meta name="description" content="${escapeHtml(r.sentence)}" />`,
       `<meta property="og:title" content="${escapeHtml(title)}" />`,

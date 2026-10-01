@@ -1,53 +1,31 @@
 // Admin-only. Lists paid Polar orders for the stamp desk, with any stamp already published.
 // Env: ADMIN_KEY, POLAR_ACCESS_TOKEN, BLOB_READ_WRITE_TOKEN.
 // Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID, SITE_URL.
-import { list } from "@vercel/blob";
-import { requireAdmin, resultId, siteOrigin } from "./_lib.js";
+import { fetchPolarOrders, publishedStamps, requireAdmin, resultId, siteOrigin } from "./_lib.js";
 import { checkPageUrl } from "../src/url.js";
 
-async function published() {
-  const found = new Map();
-  let cursor;
-  do {
-    const page = await list({ prefix: "verdicts/", limit: 1000, cursor });
-    for (const b of page.blobs) if (b.pathname.endsWith(".json")) found.set(b.pathname.slice(9, -5), b.url);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return found;
-}
-
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   if (req.method !== "GET") return res.status(405).json({ error: "GET only." });
-  const token = process.env.POLAR_ACCESS_TOKEN;
-  if (!token) return res.status(500).json({ error: "POLAR_ACCESS_TOKEN is not set." });
 
-  const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
-  const url = new URL(base + "/v1/orders/");
-  url.searchParams.set("limit", "100");
-  url.searchParams.set("sorting", "-created_at");
-  if (process.env.POLAR_ORGANIZATION_ID) url.searchParams.set("organization_id", process.env.POLAR_ORGANIZATION_ID);
-
-  let body;
+  let items;
   try {
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
-    body = await r.json().catch(() => ({}));
-    if (!r.ok) return res.status(502).json({ error: `Polar said ${r.status}.` });
-  } catch (_) {
-    return res.status(502).json({ error: "Polar did not answer." });
+    items = await fetchPolarOrders();
+  } catch (err) {
+    return res.status(err.message.includes("not set") ? 500 : 502).json({ error: err.message });
   }
 
   let stamps = new Map();
   let warning = "";
   try {
-    stamps = await published();
+    stamps = await publishedStamps();
   } catch (_) {
     warning = "Could not read published stamps. Is Vercel Blob connected?";
   }
 
   const origin = siteOrigin(req);
   const orders = await Promise.all(
-    (body.items || []).map(async (o) => {
+    items.map(async (o) => {
       const id = resultId(o.id);
       const raw = String((o.custom_field_data && o.custom_field_data.page_url) || "").slice(0, 500);
       const jsonUrl = stamps.get(id);

@@ -11,20 +11,42 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 if (!still) document.documentElement.classList.add("motion");
 
-// Queue
+// Queue: closed by hand in src/config.js, or automatically when too many paid pages are waiting.
 
-const closed = !DESK.queueOpen;
-if (closed) {
+let closed = false;
+const stage = createStage($("#stage"));
+const ctaBox = $("#cta-box");
+Box.mount(ctaBox, { state: "idle" });
+
+function closeQueue() {
+  if (closed) return;
+  closed = true;
   $("#judge-form").hidden = true;
   $("#queue-closed").hidden = false;
+  $("#post-line").hidden = true;
+  $("#trust-line").hidden = true;
+  stage.stop();
+  createStage($("#stage"), { closed: true });
+  Box.mount(ctaBox, { state: "closed" });
+  $$("[data-focus-form]").forEach((a) => (a.textContent = "Queue is full"));
 }
 
-// Box
+async function queueOpen() {
+  if (!DESK.queueOpen) return false;
+  try {
+    const r = await fetch("/api/queue", { headers: { Accept: "application/json" } });
+    if (!r.ok) return true;
+    return (await r.json()).open !== false;
+  } catch (_) {
+    return true;
+  }
+}
 
-const stage = createStage($("#stage"), { closed });
-stage.start();
-Box.mount($("#note-box"), { state: "idle" });
-Box.mount($("#cta-box"), { state: closed ? "closed" : "idle" });
+if (!DESK.queueOpen) closeQueue();
+else {
+  stage.start();
+  queueOpen().then((open) => open || closeQueue());
+}
 
 // Form
 
@@ -50,7 +72,7 @@ form.addEventListener("focusout", (e) => {
 form.addEventListener("pointerover", (e) => {
   if (e.target.closest(".submit")) stage.home();
 });
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
   alertEl.hidden = true;
   const urlField = $("#page_url");
@@ -59,6 +81,8 @@ form.addEventListener("submit", (e) => {
   if (!page.url) return fail(page.error, urlField);
   const email = emailField.value.trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("That is not an email.", emailField);
+  // Check once more, so nobody pays for a slot that filled up while they typed.
+  if (!(await queueOpen())) return closeQueue();
   const base = (DESK.polarVerdictUrl || "").trim();
   if (!base) return fail("The Polar checkout link is not connected yet.");
   const dest = new URL(base);
@@ -67,16 +91,42 @@ form.addEventListener("submit", (e) => {
   location.assign(dest.toString());
 });
 
-// Buttons that jump to the form put the cursor in the URL field.
+// Buttons that jump to the form land the cursor in the URL field, after the scroll finishes.
+function focusForm({ smooth = !still } = {}) {
+  const input = $("#page_url");
+  const box = $("#hero-form");
+  if (closed || !input) return;
+  const land = () => {
+    input.focus({ preventScroll: true });
+    box.classList.remove("flash");
+    void box.offsetWidth;
+    box.classList.add("flash");
+  };
+  if (!smooth || scrollY < 4) {
+    window.scrollTo({ top: 0 });
+    return land();
+  }
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("scrollend", finish);
+    land();
+  };
+  window.addEventListener("scrollend", finish);
+  setTimeout(finish, 1200); // browsers without scrollend
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 $$("[data-focus-form]").forEach((a) =>
   a.addEventListener("click", (e) => {
-    const input = $("#page_url");
-    if (closed || !input) return;
+    if (closed) return;
     e.preventDefault();
-    window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
-    setTimeout(() => input.focus({ preventScroll: true }), still ? 0 : 450);
+    history.replaceState(null, "", "#top");
+    focusForm();
   })
 );
+// Arriving from another page at /#top lands in the form too.
+if (location.hash === "#top") requestAnimationFrame(() => focusForm({ smooth: false }));
 
 // Hero cards follow the pointer a little, each at its own depth.
 const frame = $(".hero-frame");

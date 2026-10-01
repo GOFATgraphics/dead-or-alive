@@ -30,10 +30,11 @@ function siteInfo() {
       return html.replaceAll("%SITE_URL%", SITE).replaceAll("%CONTACT%", contactHtml);
     },
     closeBundle() {
-      // Preview deployments stay out of search results.
+      // Preview deployments stay out of search results. Private pages are not listed here (that would
+      // point people at them); they carry noindex headers from vercel.json instead.
       const robots = isPreview
         ? "User-agent: *\nDisallow: /\n"
-        : `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /paid\nDisallow: /v/\n\nSitemap: ${SITE}/sitemap.xml\n`;
+        : `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`;
       const urls = ["/", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
       writeFileSync(resolve(outDir, "robots.txt"), robots);
       writeFileSync(resolve(outDir, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
