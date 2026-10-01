@@ -12,4 +12,6 @@ Components copied unchanged from [React Bits](https://reactbits.dev) ([source](h
 | ClickSpark | Ink sparks on click. |
 | StatusMark | "Box is looking" status after checkout and while a stamp loads. |
 
+The homepage does not load these; it uses plain-JavaScript ports in `src/home.js` to keep its bundle small.
+
 Update one by copying the new file over it. Do not edit these files. Style them from `src/styles.css`.

@@ -111,8 +111,10 @@ import { createEditor } from "./editor.js";
       whenEl.textContent = when;
       productEl.textContent = [o.product, o.status && o.status !== "paid" ? o.status : ""].filter(Boolean).join(" · ");
       const a = li.querySelector(".page");
-      a.textContent = o.pageUrl || "(no page URL)";
-      if (/^https?:\/\//i.test(o.pageUrl)) a.href = o.pageUrl;
+      // Only a checked URL becomes a link. Anything else is shown as plain text to look at, not click.
+      a.textContent = o.pageUrl || (o.pageUrlRaw ? `Unusable URL: ${o.pageUrlRaw}` : "(no page URL)");
+      if (o.pageUrl) a.href = o.pageUrl;
+      else a.removeAttribute("target");
       li.querySelector(".who span").textContent = o.email || "(no email)";
       li.querySelector(".who button").addEventListener("click", () => open(o));
       list.append(li);

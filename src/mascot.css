@@ -13,6 +13,9 @@
 .box-cat .lid .tape { fill: var(--paper); opacity: 0.8; }
 .box-cat .sign rect { fill: var(--paper); stroke: currentColor; stroke-width: 3; }
 .box-cat .sign text { fill: currentColor; stroke: none; font-family: var(--mono); font-weight: 500; font-size: 11px; letter-spacing: 0.14em; text-anchor: middle; }
+.box-cat .sign.dead { color: var(--dead); }
+.box-cat .sign.cope { color: var(--cope); }
+.box-cat .sign.alive { color: var(--alive); }
 .box-cat .sign { transform: rotate(-8deg); transform-origin: 80px 74px; }
 .box-cat .ghost path { fill: none; stroke-width: 1.5; opacity: 0.55; }
 .box-cat .ghost path:first-child { fill: var(--paper); }

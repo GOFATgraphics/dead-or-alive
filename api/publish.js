@@ -2,6 +2,7 @@
 // Env: ADMIN_KEY, BLOB_READ_WRITE_TOKEN. Email: RESEND_API_KEY, MAIL_FROM. Optional: SITE_URL, RESULT_SECRET.
 import { put } from "@vercel/blob";
 import { VERDICTS, escapeHtml, paths, requireAdmin, resultId, siteOrigin } from "./_lib.js";
+import { checkPageUrl } from "../src/url.js";
 
 const COLOR = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
 const MAX_IMAGE = 4 * 1024 * 1024;
@@ -48,13 +49,9 @@ export default async function handler(req, res) {
   const sentence = String(b.sentence || "").trim().slice(0, 400);
   const email = String(b.email || "").trim();
   const sendMail = b.sendEmail !== false;
-  let pageUrl;
-  try {
-    pageUrl = new URL(String(b.pageUrl || ""));
-    if (!/^https?:$/.test(pageUrl.protocol)) throw 0;
-  } catch (_) {
-    return res.status(400).json({ error: "The order has no valid page URL." });
-  }
+  const checked = checkPageUrl(b.pageUrl);
+  if (!checked.url) return res.status(400).json({ error: `The order's page URL is not usable: ${checked.error}` });
+  const pageUrl = new URL(checked.url);
   if (!b.orderId) return res.status(400).json({ error: "Missing order." });
   if (!VERDICTS.includes(verdict)) return res.status(400).json({ error: "Pick DEAD, COPE, or ALIVE." });
   if (!sentence) return res.status(400).json({ error: "Write the sentence." });

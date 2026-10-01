@@ -1,7 +1,6 @@
 // Box, the desk cat. Schrödinger's: dead or alive until someone looks.
 // Usage: Box.mount(el, { state: "idle" | "looking" | "closed" | "verdict", verdict: "DEAD" | "COPE" | "ALIVE" })
 export const NAME = "Box";
-const COLORS = { DEAD: "var(--dead)", COPE: "var(--cope)", ALIVE: "var(--alive)" };
 
 function eyes(verdict) {
   if (verdict === "DEAD")
@@ -18,7 +17,7 @@ function eyes(verdict) {
 
 function sign(verdict) {
   if (!verdict) return "";
-  return `<g class="sign" style="color:${COLORS[verdict]}">
+  return `<g class="sign ${verdict.toLowerCase()}">
     <rect x="52" y="64" width="56" height="20" />
     <text x="80" y="78.5">${verdict}</text>
   </g>`;

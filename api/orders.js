@@ -3,6 +3,7 @@
 // Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID, SITE_URL.
 import { list } from "@vercel/blob";
 import { requireAdmin, resultId, siteOrigin } from "./_lib.js";
+import { checkPageUrl } from "../src/url.js";
 
 async function published() {
   const found = new Map();
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
   const orders = await Promise.all(
     (body.items || []).map(async (o) => {
       const id = resultId(o.id);
+      const raw = String((o.custom_field_data && o.custom_field_data.page_url) || "").slice(0, 500);
       const jsonUrl = stamps.get(id);
       let verdict = "";
       if (jsonUrl) {
@@ -63,7 +65,9 @@ export default async function handler(req, res) {
         amount: o.total_amount ?? o.amount ?? null,
         currency: o.currency || "usd",
         email: (o.customer && o.customer.email) || (o.user && o.user.email) || "",
-        pageUrl: (o.custom_field_data && o.custom_field_data.page_url) || "",
+        // Customers can edit this field on the checkout page, so check it again here.
+        pageUrl: checkPageUrl(raw).url || "",
+        pageUrlRaw: raw,
         resultUrl: jsonUrl ? `${origin}/v/${id}` : "",
         verdict,
       };

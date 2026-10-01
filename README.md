@@ -33,7 +33,8 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
    - `ADMIN_KEY`: a long random string. The password for `/admin`.
    - `POLAR_ACCESS_TOKEN`: the token from step 2.
    - `RESEND_API_KEY` and `MAIL_FROM` (for example `Box <box@yourdomain.com>`).
-   - `SITE_URL`: your domain, for example `https://deadoralive.xyz`. Links in emails use it.
+   - `SITE_URL`: your domain, for example `https://deadoralive.xyz`. Emails, canonical links, share tags, robots.txt, and the sitemap use it. Without it, the build falls back to Vercel's production domain.
+   - `CONTACT_EMAIL`: the address shown on the privacy and terms pages for deletion requests and questions.
    - Optional: `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
 5. Redeploy. Open `/admin` and enter the key.
 
@@ -45,8 +46,17 @@ Result-page buttons come from `offers` in `src/config.js`: Resurrection and Kill
 
 Stamped screenshots and verdicts are public files in Blob storage. Customer emails are not stored there.
 
+## Security, SEO, and speed
+
+- Security headers (CSP, frame blocking, nosniff, referrer and permissions policies) are in `vercel.json`. The CSP allows only this site, plus stamped images from Vercel Blob. Fonts are self-hosted in `public/fonts`, so no third party is involved.
+- Page URLs are checked by `src/url.js` in the form, the admin desk, and the publish API. It rejects credentials, IP addresses, ports, and non-public names, and keeps only origin plus path.
+- The homepage is plain HTML, so crawlers read the whole page. Its script is about 6 KB gzipped. React loads only on the result and payment pages.
+- `robots.txt` and `sitemap.xml` are generated at build. Preview deployments disallow all crawling.
+- Hashed assets and fonts are cached for a year.
+- `/privacy` and `/terms` are short, plain pages. Review them before launch: the refund line and the "keep until you ask" retention are policy choices for you to confirm.
+
 ## Box and React Bits
 
 Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there. On the homepage Box jumps out of the box, walks the desk, sits, and hops back in (`src/roam.js`). When a visitor clicks into the form, types, or reaches for the button, Box runs home and watches. Box wanders off again a few seconds after they leave the form.
 
-Animations and micro-interactions use [React Bits](https://reactbits.dev) components, copied into `src/bits/`. See [src/bits/README.md](src/bits/README.md) for which does what. Everything holds still for visitors with reduced motion turned on.
+The result and payment pages use [React Bits](https://reactbits.dev) components, copied into `src/bits/`. See [src/bits/README.md](src/bits/README.md). The homepage uses small plain-JavaScript ports of the same effects (decrypt, magnet, click spark) in `src/home.js` to stay light. Everything holds still for visitors with reduced motion turned on, and all content is visible without scrolling or JavaScript animation.

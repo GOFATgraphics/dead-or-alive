@@ -3,27 +3,227 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DEAD OR ALIVE</title>
-    <meta
-      name="description"
-      content="First screen. Five seconds. One stamp. $1. We stamp whether a stranger gets the offer before they scroll."
-    />
+    <title>DEAD OR ALIVE: is your first screen clear to a stranger?</title>
+    <meta name="description" content="A stranger gives your first screen five seconds. We stamp whether they got the offer before they scroll: DEAD, COPE, or ALIVE. One page, $1, same day." />
     <meta name="theme-color" content="#f6f5fc" />
-    <meta property="og:title" content="DEAD OR ALIVE" />
-    <meta property="og:description" content="First screen. Five seconds. One stamp. $1." />
-    <meta property="og:image" content="/og.jpg" />
+    <link rel="canonical" href="%SITE_URL%/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DEAD OR ALIVE" />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:title" content="Is your page dead or alive?" />
+    <meta property="og:description" content="A stranger gives your first screen five seconds. We stamp whether they got the offer. One page, $1, same day." />
+    <meta property="og:image" content="%SITE_URL%/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="DEAD OR ALIVE, one dollar." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Is your page dead or alive?" />
+    <meta name="twitter:description" content="A stranger gives your first screen five seconds. We stamp whether they got the offer. One page, $1, same day." />
+    <meta name="twitter:image" content="%SITE_URL%/og.jpg" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-      </head>
+    <link rel="preload" href="/fonts/plus-jakarta-sans-latin-v12.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/mascot.css" />
+  </head>
   <body>
-    <div id="root"></div>
-    <noscript><main class="desk"><h1 class="name">DEAD<br />OR ALIVE</h1><p class="lede">First screen. Five seconds. One stamp. $1. Turn on JavaScript to send a page.</p></main></noscript>
-    <script type="module" src="/src/home.jsx"></script>
+    <header class="topbar">
+      <a class="logo" href="/" aria-label="DEAD OR ALIVE home">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a7dff" /><stop offset="1" stop-color="#4b2ee0" /></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="url(#logo-g)" /><path d="M9 21v-9l4 3.2a8.6 8.6 0 0 1 6 0l4-3.2v9a7 7 0 0 1-14 0z" fill="#fff" /><circle cx="13.3" cy="20" r="1.3" fill="#3b2bc2" /><circle cx="18.7" cy="20" r="1.3" fill="#3b2bc2" /><rect x="6" y="22.5" width="20" height="5" rx="1.5" fill="#e4c69c" stroke="#12132a" stroke-width="1.2" /></svg>
+        <span>Dead or Alive</span>
+      </a>
+      <span class="price">$1 per page</span>
+      <a class="btn small" href="#top" data-focus-form>Judge my page</a>
+    </header>
+
+    <section class="hero-wrap" id="top">
+      <div class="hero-frame">
+        <div class="hero-sun"></div>
+        <svg class="hills" viewBox="0 0 1440 520" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="h1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9c9f4" /><stop offset="1" stop-color="#c6b4ee" /></linearGradient>
+            <linearGradient id="h2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#efc9dc" /><stop offset="1" stop-color="#c9b0ea" /></linearGradient>
+            <linearGradient id="h3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a2ea" /><stop offset="1" stop-color="#8f76db" /></linearGradient>
+            <linearGradient id="h4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a68ce6" /><stop offset="1" stop-color="#7559cf" /></linearGradient>
+            <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0" /><stop offset="1" stop-color="#fff" stop-opacity="0.35" /></linearGradient>
+          </defs>
+          <path d="M0 250 C180 180 300 150 470 190 C620 225 700 120 880 110 C1040 100 1180 170 1300 150 C1370 140 1410 120 1440 110 V520 H0Z" fill="url(#h1)" opacity="0.75" />
+          <path d="M0 300 C160 250 330 230 520 280 C700 330 820 250 980 240 C1150 230 1290 290 1440 250 V520 H0Z" fill="url(#h2)" />
+          <path d="M0 370 C200 320 360 330 560 370 C760 410 900 330 1100 330 C1250 330 1350 360 1440 350 V520 H0Z" fill="url(#h3)" opacity="0.9" />
+          <path d="M0 440 C220 400 420 420 640 440 C860 460 1060 400 1260 410 C1350 415 1410 425 1440 430 V520 H0Z" fill="url(#h4)" />
+          <rect x="0" y="200" width="1440" height="320" fill="url(#haze)" />
+        </svg>
+
+        <div class="hero-copy">
+          <h1 class="hero-title">
+            <span class="line"><span class="w">Is</span> <span class="w">your</span> <span class="w">page</span></span>
+            <span class="line grad"><span class="w">dead</span> <span class="w">or</span> <span class="w">alive?</span></span>
+          </h1>
+          <p class="hero-sub">A stranger gives your first screen five seconds. We stamp whether they got the offer before they scroll.</p>
+
+          <div class="hero-form">
+            <p class="closed" id="queue-closed" hidden>Queue is full. New stamps open when the desk is clear.</p>
+            <form id="judge-form" class="inline-form" novalidate>
+              <div class="inline-fields">
+                <label class="field">
+                  <span class="sr-only">Page URL</span>
+                  <input id="page_url" name="page_url" type="text" inputmode="url" autocomplete="url" required placeholder="Your page URL" aria-describedby="form-alert" />
+                </label>
+                <label class="field">
+                  <span class="sr-only">Email for the stamp</span>
+                  <input id="email" name="email" type="email" autocomplete="email" required placeholder="Email for the stamp" aria-describedby="form-alert" />
+                </label>
+                <span class="spark-wrap"><button class="submit" type="submit" data-magnet>Judge my page — $1</button></span>
+              </div>
+              <p class="alert" id="form-alert" role="alert" hidden></p>
+              <p class="form-note"><span>$1 per page</span><span>Stamped the same day</span><span>Secure checkout by Polar</span></p>
+              <p class="privacy-note">We use your page URL and email only to stamp the page and send you the result. <a href="/privacy">Privacy</a></p>
+            </form>
+          </div>
+        </div>
+
+        <div class="float-stage">
+          <div class="hero-box"><div id="stage"></div></div>
+
+          <div class="fcard fc-ring">
+            <div class="fcard-head"><p class="fc-title">A stranger's read</p></div>
+            <div class="ringwrap">
+              <svg viewBox="0 0 72 72" aria-hidden="true">
+                <defs><linearGradient id="rg" x1="0" x2="1"><stop offset="0" stop-color="#9a7dff" /><stop offset="1" stop-color="#5b3df5" /></linearGradient></defs>
+                <circle cx="36" cy="36" r="30" fill="none" stroke="#ece8fb" stroke-width="8" />
+                <circle cx="36" cy="36" r="30" fill="none" stroke="url(#rg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="135.7 188.5" transform="rotate(-90 36 36)" />
+              </svg>
+              <div><div class="big">5s</div><div class="small">First screen.<br />Before they scroll.</div></div>
+            </div>
+          </div>
+
+          <div class="fcard fc-verdict">
+            <div class="fcard-head"><p class="fc-title">Verdict</p><span class="tag">Sample</span></div>
+            <div class="mini-shot" aria-hidden="true">
+              <div class="bar3"><i></i><i></i><i></i></div>
+              <div class="sk h"></div>
+              <div class="sk w92"></div>
+              <div class="sk w60"></div>
+              <div class="sk cta"></div>
+              <span class="mring"></span>
+              <span class="mstamp">DEAD</span>
+            </div>
+            <p>A stranger cannot tell what is being sold before they scroll.</p>
+          </div>
+
+          <div class="fcard fc-desk">
+            <div class="fcard-head"><p class="fc-title">Today's desk</p><span class="tag">Sample</span></div>
+            <ul>
+              <li><span class="tick" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M3 6.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span><span>Payroll for studios</span><span class="pill alive">ALIVE</span></li>
+              <li><span class="tick" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M3 6.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span><span>CRM for agencies</span><span class="pill cope">COPE</span></li>
+              <li><span class="tick" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M3 6.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span><span>AI meeting notes</span><span class="pill dead">DEAD</span></li>
+              <li><span class="tick wait" aria-hidden="true"></span><span>Your page</span><span class="waiting">waiting</span></li>
+            </ul>
+          </div>
+
+          <div class="fcard fc-note">
+            <div class="av"><div id="note-box"></div></div>
+            <div><p class="fc-title">Looking at your page</p><span>Circled screenshot. Same day.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <main class="home-main">
+      <section class="home-section" id="verdicts">
+        <div class="section-head">
+          <p class="kicker brand">Three stamps</p>
+          <h2>One word. No audit. No essay.</h2>
+          <p>We don't audit your site. We stamp whether a stranger gets the offer before they scroll.</p>
+        </div>
+        <ul class="grid3">
+          <li class="reveal"><div class="vcard dead"><span class="big-word dead" data-decrypt>DEAD</span><h3>The offer is missing</h3><p>Offer, who, and why are not obvious on the first screen.</p></div></li>
+          <li class="reveal"><div class="vcard cope"><span class="big-word cope" data-decrypt>COPE</span><h3>It looks real. It isn't clear.</h3><p>Looks like a real page. The buyer still has to decode it.</p></div></li>
+          <li class="reveal"><div class="vcard alive"><span class="big-word alive" data-decrypt>ALIVE</span><h3>A stranger gets it</h3><p>Product, buyer, and reason to pay are clear before scroll.</p></div></li>
+        </ul>
+      </section>
+
+      <section class="home-section" id="how">
+        <div class="section-head">
+          <p class="kicker brand">How it works</p>
+          <h2>Five seconds is all a stranger gives you.</h2>
+        </div>
+        <ol class="grid3">
+          <li class="reveal"><div class="step"><span class="num">1</span><h3>Send the page</h3><p>Paste the URL and pay $1. No call, no brief, no account.</p></div></li>
+          <li class="reveal"><div class="step"><span class="num">2</span><h3>We look for five seconds</h3><p>First screen only, the way a stranger sees it. No scrolling, no clicking around.</p></div></li>
+          <li class="reveal"><div class="step"><span class="num">3</span><h3>Get the stamp</h3><p>A circled screenshot, one sentence, and DEAD, COPE, or ALIVE. By email, same day.</p></div></li>
+        </ol>
+      </section>
+
+      <section class="home-section" id="examples">
+        <div class="section-head">
+          <p class="kicker brand">Specimens. Not clients.</p>
+          <h2>What a stamp looks like</h2>
+        </div>
+        <ul class="cards">
+          <li class="reveal">
+            <figure class="card">
+              <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="shot">
+                <div class="nav" aria-hidden="true"><span>Product</span><span>Pricing</span><span class="end">Login</span></div>
+                <div class="hero"><span class="ring" aria-hidden="true"></span><p class="h">We help teams do better</p><p>The all-in-one platform for what's next.</p></div>
+                <span class="fake" aria-hidden="true">Get started</span>
+                <p class="stamp dead">DEAD</p>
+              </div>
+              <figcaption class="sentence">A stranger cannot tell what is being sold before they scroll.</figcaption>
+            </figure>
+          </li>
+          <li class="reveal">
+            <figure class="card">
+              <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="shot">
+                <div class="nav" aria-hidden="true"><span class="brand">North</span><span>Product</span><span>Customers</span><span class="end">Pricing</span></div>
+                <div class="hero"><span class="ring" aria-hidden="true"></span><p class="h">The operating system for modern teams</p><p>Ship faster with one workspace.</p></div>
+                <div class="chips" aria-hidden="true"><span>Acme</span><span>Orbit</span><span>Field</span></div>
+                <span class="fake" aria-hidden="true">Book a demo</span>
+                <p class="stamp cope">COPE</p>
+              </div>
+              <figcaption class="sentence">A stranger cannot tell if this is for founders or agencies before they scroll.</figcaption>
+            </figure>
+          </li>
+          <li class="reveal">
+            <figure class="card">
+              <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="shot">
+                <p class="kicker alive shot-kicker">For studios under 20 people</p>
+                <div class="hero"><span class="ring ok" aria-hidden="true"></span><p class="h">Payroll without a finance hire.</p><p>Run payday for a studio. Not a spreadsheet.</p></div>
+                <span class="fake" aria-hidden="true">See how it works</span>
+                <p class="stamp alive">ALIVE</p>
+              </div>
+              <figcaption class="sentence">A stranger can name the product, the buyer, and the reason to pay before they scroll.</figcaption>
+            </figure>
+          </li>
+        </ul>
+      </section>
+
+      <section class="home-section" id="judge">
+        <div class="judge">
+          <div class="judge-left">
+            <p class="kicker brand">Get a stamp</p>
+            <h2>Send a page. <span class="grad">Get the stamp today.</span></h2>
+            <ul class="judge-list">
+              <li>A circled screenshot of your first screen</li>
+              <li>One sentence on what a stranger misses</li>
+              <li>DEAD, COPE, or ALIVE. Same day.</li>
+            </ul>
+          </div>
+          <div class="judge-cta">
+            <div id="cta-box"></div>
+            <span class="spark-wrap"><a class="submit" href="#top" data-focus-form data-magnet>Judge my page — $1</a></span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>DEAD OR ALIVE. One page, one stamp, $1.</span>
+      <nav class="legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
+    </footer>
+
+    <script type="module" src="/src/home.js"></script>
   </body>
 </html>
