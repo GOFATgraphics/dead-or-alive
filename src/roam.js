@@ -51,6 +51,12 @@ export function createStage(el, { closed = false } = {}) {
   const at = (x, y, o = 1) => ({ transform: `translate(${x}px, ${y}px)`, opacity: o });
 
   async function play(keyframes, opts, myGen) {
+    if (still) {
+      // Reduced motion: no travel. Fade out where Box is, fade in where Box is going.
+      const a = keyframes[0], b = keyframes[keyframes.length - 1];
+      keyframes = [a, { transform: a.transform, opacity: 0, offset: 0.45 }, { transform: b.transform, opacity: 0, offset: 0.55 }, b];
+      opts = { duration: 500, easing: "linear" };
+    }
     anim = cat.animate(keyframes, { fill: "forwards", ...opts });
     try {
       await anim.finished;
@@ -78,6 +84,7 @@ export function createStage(el, { closed = false } = {}) {
     await sleep(280);
     if (myGen !== gen) throw new Abort();
     out = true;
+    cat.classList.add("out");
     face(false);
     cat.classList.add("jump");
     const land = g.B + 12;
@@ -105,7 +112,7 @@ export function createStage(el, { closed = false } = {}) {
 
   async function jumpIn(myGen, fast) {
     const g = geo();
-    await walkTo(g.B + 10, fast ? 260 : 70, myGen);
+    if (!still) await walkTo(g.B + 10, fast ? 260 : 70, myGen);
     face(true);
     cat.classList.add("jump");
     await play(
@@ -115,12 +122,15 @@ export function createStage(el, { closed = false } = {}) {
     );
     cat.classList.remove("jump");
     out = false;
+    cat.classList.remove("out");
     popUp();
   }
 
-  async function wander(myGen) {
+  async function wander(myGen, firstDelay = rand(3000, 5000)) {
+    let delay = firstDelay;
     while (myGen === gen) {
-      await sleep(rand(3500, 6500));
+      await sleep(delay);
+      delay = rand(3000, 5000);
       if (myGen !== gen) return;
       await jumpOut(myGen);
       const g = geo();
@@ -148,14 +158,23 @@ export function createStage(el, { closed = false } = {}) {
     cat.classList.remove("walking", "sitting", "jump");
   }
 
+  holder.addEventListener("click", () => {
+    if (closed || out || homing) return;
+    api.start(0);
+  });
+  cat.addEventListener("click", () => {
+    api.home().then(() => api.resume(4000));
+  });
+
   const api = {
     get out() {
       return out;
     },
-    start() {
-      if (closed || still) return;
+    // Box comes out about a second after the page opens.
+    start(firstDelay = 1200) {
+      if (closed) return;
       const myGen = ++gen;
-      wander(myGen).catch((e) => {
+      wander(myGen, firstDelay).catch((e) => {
         if (!(e instanceof Abort)) throw e;
       });
     },
@@ -192,7 +211,7 @@ export function createStage(el, { closed = false } = {}) {
     },
     // Wander again after a quiet spell.
     resume(delay = 6000) {
-      if (closed || still) return;
+      if (closed) return;
       const myGen = ++gen;
       sleep(delay).then(() => {
         if (myGen !== gen) return;

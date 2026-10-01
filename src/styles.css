@@ -148,8 +148,9 @@ input:focus { outline: none; border-color: var(--ink); }
 
 /* Box roaming the desk */
 .stage { position: relative; height: 7.25rem; margin-top: 0.5rem; border-bottom: 1px solid var(--line); }
-.stage-box { position: absolute; left: 0; bottom: -0.3rem; width: 7.5rem; z-index: 1; }
-.roamer { position: absolute; left: 0; bottom: -0.1rem; width: 5.25rem; opacity: 0; pointer-events: none; will-change: transform; z-index: 2; }
+.stage-box { position: absolute; left: 0; bottom: -0.3rem; width: 7.5rem; z-index: 1; cursor: pointer; }
+.roamer { position: absolute; left: 0; bottom: -0.1rem; width: 5.25rem; opacity: 0; pointer-events: none; cursor: pointer; will-change: transform; z-index: 2; }
+.roamer.out { pointer-events: auto; }
 .roamer-flip { transition: transform 0.18s; }
 .roamer-flip.left { transform: scaleX(-1); }
 .roamer svg { display: block; width: 100%; height: auto; overflow: visible; }
@@ -234,6 +235,6 @@ a.link { display: inline-block; }
 
 @media (prefers-reduced-motion: reduce) {
   .stamp { transform: none; }
-  .box-cat *, .box-cat svg { animation: none !important; transition: none !important; }
+  .box-cat *, .box-cat svg, .roamer *, .roamer svg { animation: none !important; transition: none !important; }
   .box-cat.is-looking .dots circle { opacity: 0.6; }
 }
