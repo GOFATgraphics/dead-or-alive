@@ -1,4 +1,5 @@
 import { DESK } from "../src/config.js";
+import { createEditor } from "./editor.js";
 
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -18,12 +19,10 @@ import { DESK } from "../src/config.js";
   let orders = [];
   let view = "open";
   let current = null;
-  let image = null;
-  let ring = null;
 
   $("queue").textContent = DESK.queueOpen
-    ? "Queue is open. To close it, set queueOpen to false in desk.js and deploy."
-    : "Queue is closed. To open it, set queueOpen to true in desk.js and deploy.";
+    ? "Queue is open. To close it, set queueOpen to false in src/config.js and deploy."
+    : "Queue is closed. To open it, set queueOpen to true in src/config.js and deploy.";
 
   // Unlock
 
@@ -132,8 +131,7 @@ import { DESK } from "../src/config.js";
 
   function open(o) {
     current = o;
-    image = null;
-    ring = null;
+    editor.reset();
     canvas.hidden = true;
     $("drop").hidden = false;
     $("c-target").textContent = "— " + (o.pageUrl || o.email || o.id);
@@ -149,10 +147,10 @@ import { DESK } from "../src/config.js";
   document.querySelectorAll("input[name=verdict]").forEach((r) =>
     r.addEventListener("change", () => {
       if (Object.values(SENTENCES).includes(sentence.value.trim()) || !sentence.value.trim()) sentence.value = SENTENCES[verdict()];
-      draw();
+      editor.draw();
     })
   );
-  sentence.addEventListener("input", draw);
+  sentence.addEventListener("input", () => editor.draw());
 
   $("file").addEventListener("change", (e) => e.target.files[0] && loadImage(e.target.files[0]));
   const drop = $("drop");
@@ -174,123 +172,54 @@ import { DESK } from "../src/config.js";
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = async () => {
-      image = img;
-      ring = null;
       try { await Promise.all([document.fonts.load('500 20px "IBM Plex Mono"'), document.fonts.load('20px "IBM Plex Mono"')]); } catch (_) {}
       drop.hidden = true;
       canvas.hidden = false;
-      draw();
+      editor.setImage(img);
     };
     img.src = url;
   }
 
-  // Layout: the screenshot scaled to width W, then a strip with the sentence.
-  const W = 1200;
-  function layout() {
-    const s = W / image.naturalWidth;
-    const shotH = Math.round(image.naturalHeight * s);
-    const pad = 32;
-    const font = 26;
-    ctx.font = `${font}px "IBM Plex Mono", ui-monospace, monospace`;
-    const lines = wrap(sentence.value.trim(), W - pad * 2);
-    const stripH = pad * 2 + lines.length * font * 1.5;
-    return { shotH, pad, font, lines, stripH, h: shotH + stripH };
+  const editor = createEditor(canvas, { verdict, sentence: () => sentence.value, onChange: syncTools });
+
+  function syncTools() {
+    $("undo").disabled = !editor.canUndo;
+    $("redo").disabled = !editor.canRedo;
+    $("remove").disabled = !editor.hasSelection;
+    $("tools").hidden = !editor.hasImage;
   }
-
-  function wrap(text, max) {
-    const words = text.split(/\s+/).filter(Boolean);
-    const lines = [];
-    let line = "";
-    for (const w of words) {
-      const t = line ? line + " " + w : w;
-      if (ctx.measureText(t).width > max && line) { lines.push(line); line = w; } else line = t;
-    }
-    if (line) lines.push(line);
-    return lines.length ? lines : [""];
-  }
-
-  function draw() {
-    if (!image) return;
-    const L = layout();
-    canvas.width = W;
-    canvas.height = L.h;
-    const v = verdict();
-    const color = COLORS[v];
-
-    ctx.fillStyle = "#f3efe6";
-    ctx.fillRect(0, 0, W, L.h);
-    ctx.drawImage(image, 0, 0, W, L.shotH);
-
-    if (ring) {
-      const x = Math.min(ring.x0, ring.x1), y = Math.min(ring.y0, ring.y1);
-      const w = Math.abs(ring.x1 - ring.x0), h = Math.abs(ring.y1 - ring.y0);
-      ctx.strokeStyle = v === "ALIVE" ? COLORS.ALIVE : COLORS.DEAD;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.ellipse(x + w / 2, y + h / 2, Math.max(w / 2, 1), Math.max(h / 2, 1), 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Stamp, bottom right of the screenshot, tilted like the specimens.
-    const size = 44;
-    ctx.save();
-    ctx.font = `500 ${size}px "IBM Plex Mono", ui-monospace, monospace`;
-    const spacing = size * 0.14;
-    const textW = [...v].reduce((a, ch) => a + ctx.measureText(ch).width, 0) + spacing * (v.length - 1);
-    const bw = textW + size * 0.9, bh = size * 1.5;
-    ctx.translate(W - bw / 2 - 36, L.shotH - bh / 2 - 36);
-    ctx.rotate((-8 * Math.PI) / 180);
-    ctx.fillStyle = "rgba(243, 239, 230, 0.85)";
-    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.strokeStyle = ctx.fillStyle = color;
-    ctx.lineWidth = 8;
-    ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.textBaseline = "middle";
-    let cx = -textW / 2;
-    for (const ch of v) { ctx.fillText(ch, cx, 2); cx += ctx.measureText(ch).width + spacing; }
-    ctx.restore();
-
-    // Sentence strip.
-    ctx.fillStyle = "#d9d2c5";
-    ctx.fillRect(0, L.shotH, W, 2);
-    ctx.fillStyle = "#1a1814";
-    ctx.font = `${L.font}px "IBM Plex Mono", ui-monospace, monospace`;
-    ctx.textBaseline = "top";
-    L.lines.forEach((line, i) => ctx.fillText(line, L.pad, L.shotH + L.pad + i * L.font * 1.5));
-  }
-
-  function point(e) {
-    const r = canvas.getBoundingClientRect();
-    return { x: ((e.clientX - r.left) / r.width) * canvas.width, y: ((e.clientY - r.top) / r.height) * canvas.height };
-  }
-  canvas.addEventListener("pointerdown", (e) => {
-    const p = point(e);
-    ring = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
-    canvas.setPointerCapture(e.pointerId);
-    draw();
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (!ring || !canvas.hasPointerCapture(e.pointerId)) return;
-    const p = point(e);
-    ring.x1 = p.x;
-    ring.y1 = p.y;
-    draw();
-  });
-  $("clear-ring").addEventListener("click", () => { ring = null; draw(); });
+  document.querySelectorAll("[data-tool]").forEach((b) =>
+    b.addEventListener("click", () => {
+      editor.setTool(b.dataset.tool);
+      document.querySelectorAll("[data-tool]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    })
+  );
+  document.querySelectorAll("[data-size]").forEach((b) =>
+    b.addEventListener("click", () => {
+      editor.setSize(Number(b.dataset.size));
+      document.querySelectorAll("[data-size]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    })
+  );
+  $("undo").addEventListener("click", () => editor.undo());
+  $("redo").addEventListener("click", () => editor.redo());
+  $("remove").addEventListener("click", () => editor.remove());
+  $("clear-ring").addEventListener("click", () => editor.clear());
+  $("replace").addEventListener("click", () => $("file").click());
+  canvas.addEventListener("pointerup", syncTools);
 
   function slug() {
     try { return new URL(current.pageUrl).hostname.replace(/^www\./, ""); } catch (_) { return current ? current.id : "stamp"; }
   }
 
   $("download").addEventListener("click", () => {
-    if (!image) return alertComposer("Add a screenshot first.");
-    canvas.toBlob((blob) => {
+    if (!editor.hasImage) return alertComposer("Add a screenshot first.");
+    editor.exportWith((c) => c.toBlob((blob) => {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `${slug()}-${verdict().toLowerCase()}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }, "image/png");
+    }, "image/png"));
   });
 
   $("email").addEventListener("click", () => {
@@ -323,17 +252,19 @@ import { DESK } from "../src/config.js";
 
   // JPEG keeps the upload under the server's size limit.
   function jpeg() {
-    for (const q of [0.88, 0.8, 0.7, 0.6]) {
-      const data = canvas.toDataURL("image/jpeg", q);
-      if (data.length < 5_000_000) return data;
-    }
-    return canvas.toDataURL("image/jpeg", 0.5);
+    return editor.exportWith((c) => {
+      for (const q of [0.88, 0.8, 0.7, 0.6]) {
+        const data = c.toDataURL("image/jpeg", q);
+        if (data.length < 5_000_000) return data;
+      }
+      return c.toDataURL("image/jpeg", 0.5);
+    });
   }
 
   const publishBtn = $("publish");
   publishBtn.addEventListener("click", async () => {
     if (!current) return;
-    if (!image) return alertComposer("Add a screenshot first.");
+    if (!editor.hasImage) return alertComposer("Add a screenshot first.");
     if (!sentence.value.trim()) return showPublished({ note: "Write the sentence first.", error: true });
     publishBtn.disabled = true;
     publishBtn.textContent = "Publishing…";

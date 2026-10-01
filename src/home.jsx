@@ -1,9 +1,9 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { DESK } from "./config.js";
 import { NAME } from "./mascot.js";
-import { BoxCat, InkButton, reducedMotion } from "./ui.jsx";
+import { BoxStage, InkButton, reducedMotion } from "./ui.jsx";
 import BlurText from "./bits/BlurText.jsx";
 import DecryptedText from "./bits/DecryptedText.jsx";
 import AnimatedContent from "./bits/AnimatedContent.jsx";
@@ -94,7 +94,19 @@ const SPECIMENS = [
   },
 ];
 
-function JudgeForm({ onType }) {
+function JudgeForm({ stage }) {
+  // Box heads home the moment someone is about to act, and wanders off again when they leave.
+  const home = () => stage.current?.home();
+  const onType = () => {
+    home();
+    stage.current?.look();
+  };
+  const onBlur = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) stage.current?.resume(6000);
+  };
+  const onPointerOver = (e) => {
+    if (e.target.closest(".submit")) home();
+  };
   const [error, setError] = useState("");
   function submit(event) {
     event.preventDefault();
@@ -117,7 +129,7 @@ function JudgeForm({ onType }) {
     location.assign(dest.toString());
   }
   return (
-    <form id="judge" noValidate onSubmit={submit} onInput={onType}>
+    <form id="judge" noValidate onSubmit={submit} onInput={onType} onFocus={home} onBlur={onBlur} onPointerOver={onPointerOver}>
       <label className="label">Page URL
         <input id="page_url" name="page_url" type="text" inputMode="url" autoComplete="url" required placeholder="https://" />
       </label>
@@ -132,7 +144,7 @@ function JudgeForm({ onType }) {
 
 function Home() {
   const closed = new URLSearchParams(location.search).get("desk") === "full" || !DESK.queueOpen;
-  const [look, setLook] = useState(0);
+  const stage = useRef(null);
   return (
     <main className="desk">
       <p className="kicker">A stranger. Five seconds.</p>
@@ -165,21 +177,19 @@ function Home() {
         </ul>
       </section>
 
-      <div className="companion">
-        <BoxCat state={closed ? "closed" : "idle"} lookKey={look} />
-        <p>
-          {closed ? (
-            <><strong>{NAME}</strong> is busy. The box opens again when the desk is clear.</>
-          ) : (
-            <>This is <strong>{NAME}</strong>. Dead or alive, nobody knows until {NAME} looks. Five seconds. One stamp.</>
-          )}
-        </p>
-      </div>
+      <p className="companion-say">
+        {closed ? (
+          <><strong>{NAME}</strong> is busy. The box opens again when the desk is clear.</>
+        ) : (
+          <>This is <strong>{NAME}</strong>. Dead or alive, nobody knows until {NAME} looks. Five seconds. One stamp.</>
+        )}
+      </p>
+      <BoxStage closed={closed} control={stage} />
 
       {closed ? (
         <p className="closed">Queue is full. New stamps open when the desk is clear.</p>
       ) : (
-        <JudgeForm onType={() => setLook((n) => n + 1)} />
+        <JudgeForm stage={stage} />
       )}
       <p className="fine">A circled screenshot. One sentence. The stamp. Same day.</p>
     </main>

@@ -45,12 +45,31 @@
 
       <section id="composer" class="section" hidden>
         <h2 class="kicker">Stamp <span id="c-target"></span></h2>
-        <p class="usp">Paste, drop, or pick a first-screen screenshot. Drag on it to draw the circle.</p>
+        <p class="usp">Paste, drop, or pick a first-screen screenshot. Then circle what a stranger misses.</p>
         <label class="drop" id="drop">
           <input id="file" type="file" accept="image/*" hidden />
           <span>Drop screenshot here, paste it, or click to pick one.</span>
         </label>
+        <div class="tools" id="tools" role="toolbar" aria-label="Marker tools" hidden>
+          <div class="seg">
+            <button type="button" data-tool="circle" aria-pressed="true" title="Drag to draw a circle">Circle</button>
+            <button type="button" data-tool="pen" aria-pressed="false" title="Draw freehand">Pen</button>
+          </div>
+          <div class="seg" aria-label="Marker size">
+            <button type="button" data-size="4" aria-pressed="false" title="Thin">S</button>
+            <button type="button" data-size="6" aria-pressed="true" title="Medium">M</button>
+            <button type="button" data-size="10" aria-pressed="false" title="Thick">L</button>
+          </div>
+          <div class="seg">
+            <button type="button" id="undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+            <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+            <button type="button" id="remove" title="Delete selected (Delete)" disabled>Delete</button>
+          </div>
+          <button type="button" class="link" id="clear-ring">Clear marks</button>
+          <button type="button" class="link" id="replace">Replace screenshot</button>
+        </div>
         <canvas id="canvas" hidden></canvas>
+        <p class="hint" id="hint">Drag to draw. Click a mark to select it, drag to move, pull a corner to resize. Drag the stamp to move it.</p>
 
         <fieldset class="verdicts">
           <legend class="label">Stamp</legend>
@@ -68,7 +87,6 @@
           <button type="button" class="submit" id="publish">Publish verdict</button>
           <button type="button" class="submit ghost" id="download">Download PNG</button>
           <button type="button" class="submit ghost" id="email">Draft email</button>
-          <button type="button" class="link" id="clear-ring">Clear circle</button>
         </div>
         <p class="published" id="published" aria-live="polite" hidden></p>
       </section>

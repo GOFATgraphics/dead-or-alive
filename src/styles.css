@@ -134,6 +134,9 @@ input:focus { outline: none; border-color: var(--ink); }
 .box-cat.is-looking .dots circle:nth-child(3) { animation-delay: 0.4s; }
 .box-cat.is-looking .dots { transform: translateY(-14px); }
 .box-cat.is-looking svg { animation: box-wobble 3s infinite; transform-origin: 50% 100%; }
+.box-cat.is-empty .cat { transform: translateY(58px); }
+.box-cat.is-empty .paws { opacity: 0; transform: translateY(10px); }
+.box-cat.is-empty .cat, .box-cat.is-empty .paws { transition-duration: 0.25s; }
 .box-cat.is-verdict .paws { transform: translateY(-4px); }
 .box-cat .ghost { animation: box-float 3.5s ease-in-out infinite; }
 
@@ -142,6 +145,36 @@ input:focus { outline: none; border-color: var(--ink); }
 @keyframes box-dots { 0%, 100% { opacity: 0.15; } 40% { opacity: 1; } }
 @keyframes box-wobble { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(-2deg); } 92% { transform: rotate(2deg); } 95% { transform: rotate(-1deg); } }
 @keyframes box-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* Box roaming the desk */
+.stage { position: relative; height: 7.25rem; margin-top: 0.5rem; border-bottom: 1px solid var(--line); }
+.stage-box { position: absolute; left: 0; bottom: -0.3rem; width: 7.5rem; z-index: 1; }
+.roamer { position: absolute; left: 0; bottom: -0.1rem; width: 5.25rem; opacity: 0; pointer-events: none; will-change: transform; z-index: 2; }
+.roamer-flip { transition: transform 0.18s; }
+.roamer-flip.left { transform: scaleX(-1); }
+.roamer svg { display: block; width: 100%; height: auto; overflow: visible; }
+.roamer svg * { stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.roamer .body, .roamer .skull, .roamer .ear, .roamer .leg { fill: var(--paper); }
+.roamer .leg.far { fill: var(--chip); }
+.roamer .tail { fill: none; stroke-width: 5; }
+.roamer .eyes circle, .roamer .nose { fill: var(--ink); stroke: none; }
+.roamer .whisker { fill: none; stroke-width: 1.1; }
+.roamer .leg { transform-box: fill-box; transform-origin: 50% 12%; }
+.roamer .tail { transform-box: fill-box; transform-origin: 100% 100%; animation: roam-tail 2.4s ease-in-out infinite; }
+.roamer .eyes { transform-box: fill-box; transform-origin: center; animation: box-blink 4s infinite; }
+.roamer.walking .leg.near.f, .roamer.walking .leg.far.b { animation: roam-step 0.42s ease-in-out infinite; }
+.roamer.walking .leg.near.b, .roamer.walking .leg.far.f { animation: roam-step 0.42s ease-in-out infinite reverse; }
+.roamer.walking svg { animation: roam-bob 0.21s ease-in-out infinite alternate; }
+.roamer.jump .leg.f { transform: rotate(-38deg); }
+.roamer.jump .leg.b { transform: rotate(38deg); }
+.roamer.sitting .head { transform-box: view-box; transform-origin: 95px 40px; animation: roam-look 2.6s ease-in-out infinite; }
+@keyframes roam-step { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
+@keyframes roam-bob { from { transform: translateY(0); } to { transform: translateY(-1.5px); } }
+@keyframes roam-tail { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-10deg); } }
+@keyframes roam-look { 0%, 35%, 100% { transform: rotate(0); } 50%, 80% { transform: rotate(-8deg); } }
+.companion-say { margin: 3rem 0 0; font-size: 0.875rem; line-height: 1.5; }
+.companion-say strong { font-weight: 500; }
+.stage + form, .stage + .closed { margin-top: 1.5rem; }
 
 .companion { display: flex; align-items: flex-end; gap: 1rem; margin-top: 3rem; }
 .companion .box-cat { flex: 0 0 7.5rem; }
@@ -180,6 +213,17 @@ a.link { display: inline-block; }
 
 .paid .stack h1, .paid .stack .paid-title { max-width: 28rem; margin: 0;  color: var(--ink); justify-content: center; text-align: center; font-family: var(--serif); font-size: clamp(1.8rem, 6vw, 2.25rem); font-weight: 400; line-height: 1.2; }
 .paid .status-mark { color: var(--ink); }
+
+/* Admin editor */
+.tools { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+.seg { display: flex; border: 1px solid var(--line); }
+.seg button { border: 0; border-right: 1px solid var(--line); background: none; color: var(--ink); font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 0.45rem 0.7rem; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.seg button:disabled { color: var(--muted); opacity: 0.5; }
+#canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.hint { margin: 0.5rem 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--muted); }
+#canvas[hidden] + .hint { display: none; }
 
 /* Admin publish */
 .check { flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.875rem; }

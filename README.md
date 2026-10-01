@@ -37,7 +37,9 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
    - Optional: `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
 5. Redeploy. Open `/admin` and enter the key.
 
-Per order: **Stamp**, paste or drop the first-screen screenshot, drag to circle the problem, pick DEAD / COPE / ALIVE, write one sentence, **Publish verdict**. Publishing again replaces the stamp at the same link. Without Resend set up, publishing still works; use **Draft email** to send the link yourself.
+Per order: **Stamp**, paste or drop the first-screen screenshot, mark it up, pick DEAD / COPE / ALIVE, write one sentence, **Publish verdict**.
+
+The editor: **Circle** draws a marker ring, **Pen** draws freehand, S / M / L sets the marker size. Click a mark to select it, drag to move it, pull a corner to resize a circle. Drag the stamp to move it. Undo with Ctrl+Z, redo with Ctrl+Shift+Z, Delete removes the selected mark. Publishing again replaces the stamp at the same link. Without Resend set up, publishing still works; use **Draft email** to send the link yourself.
 
 Result-page buttons come from `offers` in `src/config.js`: Resurrection and Kill Sheet for DEAD, Kill Sheet for COPE, Stay Alive for ALIVE. An empty link hides its button.
 
@@ -45,6 +47,6 @@ Stamped screenshots and verdicts are public files in Blob storage. Customer emai
 
 ## Box and React Bits
 
-Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there.
+Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there. On the homepage Box jumps out of the box, walks the desk, sits, and hops back in (`src/roam.js`). When a visitor clicks into the form, types, or reaches for the button, Box runs home and watches. Box wanders off again a few seconds after they leave the form.
 
 Animations and micro-interactions use [React Bits](https://reactbits.dev) components, copied into `src/bits/`. See [src/bits/README.md](src/bits/README.md) for which does what. Everything holds still for visitors with reduced motion turned on.

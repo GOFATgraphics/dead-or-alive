@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Box } from "./mascot.js";
+import { createStage } from "./roam.js";
 import Magnet from "./bits/Magnet.jsx";
 import ClickSpark from "./bits/ClickSpark.jsx";
 
@@ -21,6 +22,18 @@ export function BoxCat({ state = "idle", verdict = "", lookKey = 0, className = 
   useEffect(() => {
     if (lookKey) api.current?.look();
   }, [lookKey]);
+  return <div ref={el} />;
+}
+
+// Box roaming the desk. `control` receives { home, resume, look }.
+export function BoxStage({ closed = false, control }) {
+  const el = useRef(null);
+  useEffect(() => {
+    const stage = createStage(el.current, { closed });
+    if (control) control.current = stage;
+    stage.start();
+    return () => stage.stop();
+  }, [closed, control]);
   return <div ref={el} />;
 }
 
