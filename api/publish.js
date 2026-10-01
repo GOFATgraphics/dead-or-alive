@@ -3,20 +3,20 @@
 import { put } from "@vercel/blob";
 import { VERDICTS, escapeHtml, paths, requireAdmin, resultId, siteOrigin } from "./_lib.js";
 
-const COLOR = { DEAD: "#9d1c1c", COPE: "#8a5a00", ALIVE: "#1d6b3a" };
+const COLOR = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
 const MAX_IMAGE = 4 * 1024 * 1024;
 
 function emailHtml({ verdict, sentence, host, image, link }) {
   const e = escapeHtml;
-  return `<!doctype html><html><body style="margin:0;background:#f3efe6;color:#1a1814;font-family:ui-monospace,Menlo,monospace">
+  return `<!doctype html><html><body style="margin:0;background:#f6f5fc;color:#12132a;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:560px" cellpadding="0" cellspacing="0">
-<tr><td style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#6f6a60">Box looked at ${e(host)}</td></tr>
-<tr><td style="padding-top:12px;font-family:Georgia,serif;font-size:56px;line-height:1;color:${COLOR[verdict]}">${verdict}</td></tr>
+<tr><td style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#5d6180">Box looked at ${e(host)}</td></tr>
+<tr><td style="padding-top:12px;font-size:56px;font-weight:800;letter-spacing:-2px;line-height:1;color:${COLOR[verdict]}">${verdict}</td></tr>
 <tr><td style="padding-top:16px;font-size:15px;line-height:1.5">${e(sentence)}</td></tr>
-<tr><td style="padding-top:24px"><a href="${e(link)}"><img src="${e(image)}" width="560" alt="Your first screen, circled and stamped ${verdict}." style="display:block;width:100%;height:auto;border:1px solid #d9d2c5"></a></td></tr>
-<tr><td style="padding-top:24px"><a href="${e(link)}" style="display:inline-block;background:#1a1814;color:#f3efe6;text-decoration:none;font-size:13px;letter-spacing:.14em;text-transform:uppercase;padding:14px 20px">See your stamp</a></td></tr>
-<tr><td style="padding-top:32px;font-size:12px;color:#6f6a60">DEAD OR ALIVE. First screen. Five seconds. One stamp.</td></tr>
+<tr><td style="padding-top:24px"><a href="${e(link)}"><img src="${e(image)}" width="560" alt="Your first screen, circled and stamped ${verdict}." style="display:block;width:100%;height:auto;border:1px solid #e6e3f1;border-radius:12px"></a></td></tr>
+<tr><td style="padding-top:24px"><a href="${e(link)}" style="display:inline-block;background:#12132a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;border-radius:12px;padding:14px 22px">See your stamp</a></td></tr>
+<tr><td style="padding-top:32px;font-size:12px;color:#5d6180">DEAD OR ALIVE. First screen. Five seconds. One stamp.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 

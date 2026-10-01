@@ -3,7 +3,7 @@ import { createEditor } from "./editor.js";
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const COLORS = { DEAD: "#9d1c1c", COPE: "#8a5a00", ALIVE: "#1d6b3a" };
+  const COLORS = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
   const SENTENCES = {
     DEAD: "A stranger cannot tell what is being sold before they scroll.",
     COPE: "A stranger cannot tell who this is for before they scroll.",
@@ -172,7 +172,7 @@ import { createEditor } from "./editor.js";
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = async () => {
-      try { await Promise.all([document.fonts.load('500 20px "IBM Plex Mono"'), document.fonts.load('20px "IBM Plex Mono"')]); } catch (_) {}
+      try { await Promise.all([document.fonts.load('500 20px "IBM Plex Mono"'), document.fonts.load('500 20px "Plus Jakarta Sans"')]); } catch (_) {}
       drop.hidden = true;
       canvas.hidden = false;
       editor.setImage(img);

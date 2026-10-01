@@ -1,12 +1,13 @@
 // The stamp editor: screenshot, marker circles and scribbles, the stamp, and the sentence strip.
 // Marks can be selected, moved, resized, deleted, undone. The stamp can be dragged.
 
-const COLORS = { DEAD: "#9d1c1c", COPE: "#8a5a00", ALIVE: "#1d6b3a" };
-const PAPER = "#f3efe6";
-const INK = "#1a1814";
+const COLORS = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
+const PAPER = "#ffffff";
+const INK = "#12132a";
 const W = 1200;
 const HANDLE = 12;
 const FONT = '"IBM Plex Mono", ui-monospace, monospace';
+const SANS = '"Plus Jakarta Sans", system-ui, sans-serif';
 
 export function createEditor(canvas, { verdict, sentence, onChange = () => {} }) {
   const ctx = canvas.getContext("2d");
@@ -41,7 +42,7 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
     const shotH = Math.round(image.naturalHeight * (W / image.naturalWidth));
     const pad = 32;
     const font = 26;
-    ctx.font = `${font}px ${FONT}`;
+    ctx.font = `500 ${font}px ${SANS}`;
     const lines = wrap(sentence().trim(), W - pad * 2);
     return { shotH, pad, font, lines, h: shotH + pad * 2 + lines.length * font * 1.5 };
   }
@@ -115,7 +116,7 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate((-8 * Math.PI) / 180);
-    ctx.fillStyle = "rgba(243, 239, 230, 0.85)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.fillRect(-s.w / 2, -s.h / 2, s.w, s.h);
     ctx.strokeStyle = ctx.fillStyle = COLORS[s.v];
     ctx.lineWidth = 8;
@@ -174,10 +175,10 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
 
     drawStamp(L);
 
-    ctx.fillStyle = "#d9d2c5";
+    ctx.fillStyle = "#e6e3f1";
     ctx.fillRect(0, L.shotH, W, 2);
     ctx.fillStyle = INK;
-    ctx.font = `${L.font}px ${FONT}`;
+    ctx.font = `500 ${L.font}px ${SANS}`;
     ctx.textBaseline = "top";
     L.lines.forEach((line, i) => ctx.fillText(line, L.pad, L.shotH + L.pad + i * L.font * 1.5));
 

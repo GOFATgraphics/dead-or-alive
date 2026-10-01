@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { DESK } from "./config.js";
 import { NAME } from "./mascot.js";
-import { BoxCat, INK, InkButton, VERDICT_COLOR, reducedMotion } from "./ui.jsx";
+import { BoxCat, INK, InkButton, Logo, VERDICT_COLOR, reducedMotion } from "./ui.jsx";
 import BlurText from "./bits/BlurText.jsx";
 import DecryptedText from "./bits/DecryptedText.jsx";
 import AnimatedContent from "./bits/AnimatedContent.jsx";
@@ -78,7 +78,7 @@ function Result({ r }) {
   const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
 
   const shot = (
-    <GlareHover width="100%" height="auto" background="var(--paper)" borderColor="var(--line)" borderRadius="0" glareColor="#ffffff" glareOpacity={0.35} glareSize={300} transitionDuration={900} className="result-shot">
+    <GlareHover width="100%" height="auto" background="#fff" borderColor="var(--line)" borderRadius="14px" glareColor="#ffffff" glareOpacity={0.45} glareSize={300} transitionDuration={900} className="result-shot">
       <a href={r.image} target="_blank" rel="noopener noreferrer">
         <img src={r.image} alt={`First screen of ${r.host}, circled and stamped ${v}.`} />
       </a>
@@ -87,7 +87,9 @@ function Result({ r }) {
 
   return (
     <main className={"desk result v-" + v.toLowerCase()}>
-      <p className="kicker">{NAME} looked at {r.host}{when ? ` · ${when}` : ""}</p>
+      <Logo />
+      <div className="result-card">
+      <p className="kicker brand">{NAME} looked at {r.host}{when ? ` · ${when}` : ""}</p>
       <h1 className="verdict-word" style={{ color: VERDICT_COLOR[v] }}>
         {still ? v : (
           <DecryptedText text={v} animateOn="view" sequential speed={90} characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" encryptedClassName="scrambled" />
@@ -107,9 +109,10 @@ function Result({ r }) {
           <a href={r.pageUrl} target="_blank" rel="noopener noreferrer">{r.pageUrl}</a>
         </p>
       </section>
+      </div>
 
       <section className="section next">
-        <h2 className="kicker">Next</h2>
+        <h2 className="kicker brand">Next</h2>
         <p className="lede">{next.line}</p>
         {offers.length > 0 && (
           <div className="offer-list">
