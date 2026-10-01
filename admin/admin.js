@@ -1,5 +1,6 @@
 import { DESK } from "../src/config.js";
 import { createEditor } from "./editor.js";
+import { renderAnalytics } from "./analytics.js";
 
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -30,40 +31,120 @@ import { createEditor } from "./editor.js";
   unlock.addEventListener("submit", (e) => {
     e.preventDefault();
     key = String(new FormData(unlock).get("key") || "");
-    load();
+    openDesk();
   });
   $("lock").addEventListener("click", () => {
     key = "";
     session.set("");
     orders = [];
-    $("board").hidden = true;
-    $("composer").hidden = true;
+    $("desk-nav").hidden = true;
+    document.querySelectorAll(".pane, #board, #composer").forEach((p) => (p.hidden = true));
     unlock.hidden = false;
   });
+
+  // The key alone opens the desk. Orders, analytics, and email each work once their service is connected.
+  let setup = {};
+  async function openDesk() {
+    const alert = unlock.querySelector("[role=alert]");
+    alert.hidden = true;
+    try {
+      const r = await fetch("/api/session", { headers: { "x-admin-key": key }, cache: "no-store" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+      setup = data.setup || {};
+    } catch (err) {
+      alert.hidden = false;
+      alert.textContent = err.message === "Not available." ? "The desk is off: the admin key isn't set up in Vercel yet." : err.message || "Could not open the desk.";
+      if (/key/i.test(String(err.message))) session.set("");
+      return;
+    }
+    session.set(key);
+    unlock.hidden = true;
+    $("desk-nav").hidden = false;
+    renderSetup();
+    showPane(pane);
+  }
+
+  let pane = "orders";
+  function showPane(name) {
+    pane = name;
+    document.querySelectorAll(".desk-tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pane === name)));
+    $("board").hidden = name !== "orders";
+    $("composer").hidden = name !== "orders" || !current;
+    $("pane-analytics").hidden = name !== "analytics";
+    $("pane-setup").hidden = name !== "setup";
+    if (name === "orders") load();
+    if (name === "analytics") loadAnalytics();
+  }
+  document.querySelectorAll(".desk-tabs button").forEach((b) => b.addEventListener("click", () => showPane(b.dataset.pane)));
+
+  // Analytics
+
+  let days = 30;
+  document.querySelectorAll(".range-tabs button").forEach((b) =>
+    b.addEventListener("click", () => {
+      days = Number(b.dataset.days);
+      document.querySelectorAll(".range-tabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      loadAnalytics();
+    })
+  );
+  $("an-refresh").addEventListener("click", () => loadAnalytics());
+  async function loadAnalytics() {
+    const body = $("an-body");
+    body.classList.add("loading"); // keep the last render while new numbers load
+    try {
+      const r = await fetch(`/api/analytics?days=${days}`, { headers: { "x-admin-key": key }, cache: "no-store" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+      const notes = $("an-notes");
+      notes.replaceChildren(...(data.notes || []).map((n) => Object.assign(document.createElement("li"), { textContent: n })));
+      renderAnalytics(body, data);
+    } catch (err) {
+      body.replaceChildren(Object.assign(document.createElement("p"), { className: "alert", textContent: err.message || "Could not load analytics." }));
+    } finally {
+      body.classList.remove("loading");
+    }
+  }
+
+  // Setup
+
+  function renderSetup() {
+    const items = [
+      ["Admin key", true, "Set. You're in."],
+      ["Polar", setup.polar, setup.polar ? "Orders and revenue load from Polar." : "Add POLAR_ACCESS_TOKEN (Polar → Settings → Developers, scope orders:read)."],
+      ["Checkout link", !!(DESK.polarVerdictUrl || "").trim(), (DESK.polarVerdictUrl || "").trim() ? "The homepage form sends people to Polar." : "Paste the Polar checkout link into polarVerdictUrl in src/config.js."],
+      ["Stamp storage", setup.blob, setup.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
+      ["Email", setup.email, setup.email ? "Customers get their link by email." : "Add RESEND_API_KEY and MAIL_FROM. Until then, use Draft email."],
+      ["Visitor analytics", setup.analytics, setup.analytics ? "Visits and clicks are being counted." : "Add Upstash Redis from the Vercel Marketplace (Storage → Upstash). It adds KV_REST_API_URL and KV_REST_API_TOKEN."],
+      ["Site address", setup.siteUrl, setup.siteUrl ? "Links and share previews use SITE_URL." : "Optional: set SITE_URL to your domain. Vercel's production domain is used until then."],
+      ["Contact email", setup.contact, setup.contact ? "Shown on the privacy and terms pages." : "Set CONTACT_EMAIL so the privacy and terms pages show it."],
+      ["Queue limit", true, `The form closes when ${setup.queueLimit || 10} paid pages are waiting. Change with QUEUE_LIMIT.`],
+    ];
+    $("setup-list").replaceChildren(
+      ...items.map(([name, ok, text]) => {
+        const li = document.createElement("li");
+        li.className = ok ? "ok" : "todo";
+        const badge = Object.assign(document.createElement("span"), { className: "setup-badge", textContent: ok ? "Connected" : "Missing" });
+        const title = Object.assign(document.createElement("strong"), { textContent: name });
+        const p = Object.assign(document.createElement("p"), { textContent: text });
+        li.append(badge, title, p);
+        return li;
+      })
+    );
+  }
   $("refresh").addEventListener("click", load);
 
   async function load() {
-    const alert = unlock.querySelector("[role=alert]");
-    alert.hidden = true;
     let data;
     try {
       const r = await fetch("/api/orders", { headers: { "x-admin-key": key }, cache: "no-store" });
       data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
     } catch (err) {
-      if ($("board").hidden) {
-        alert.hidden = false;
-        alert.textContent = err.message || "Could not load orders.";
-      } else {
-        showBoardError(err.message || "Could not load orders.");
-      }
-      if (/key/i.test(String(err.message))) session.set("");
+      showBoardError(err.message || "Could not load orders.");
       return;
     }
-    session.set(key);
     orders = data.orders || [];
-    unlock.hidden = true;
-    $("board").hidden = false;
     $("board-alert").hidden = !data.warning;
     $("board-alert").textContent = data.warning || "";
     if (current) current = orders.find((o) => o.id === current.id) || current;
@@ -77,10 +158,10 @@ import { createEditor } from "./editor.js";
 
   // Order list
 
-  document.querySelectorAll(".tabs button").forEach((b) =>
+  document.querySelectorAll(".view-tabs button").forEach((b) =>
     b.addEventListener("click", () => {
       view = b.dataset.view;
-      document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      document.querySelectorAll(".view-tabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
       render();
     })
   );
@@ -307,5 +388,5 @@ import { createEditor } from "./editor.js";
     drop.querySelector("span").textContent = message;
   }
 
-  if (key) load();
+  if (key) openDesk();
 })();

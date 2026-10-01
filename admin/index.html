@@ -26,16 +26,44 @@
         <p class="alert" role="alert" hidden></p>
       </form>
 
+      <nav class="desk-nav" id="desk-nav" aria-label="Desk" hidden>
+        <div class="tabs desk-tabs">
+          <button type="button" data-pane="orders" aria-pressed="true">Orders</button>
+          <button type="button" data-pane="analytics" aria-pressed="false">Analytics</button>
+          <button type="button" data-pane="setup" aria-pressed="false">Setup</button>
+        </div>
+        <button type="button" class="link" id="lock">Lock</button>
+      </nav>
+
+      <section id="pane-analytics" class="section pane" hidden>
+        <div class="bar">
+          <h2 class="kicker">Analytics</h2>
+          <div class="tabs range-tabs" role="group" aria-label="Date range">
+            <button type="button" data-days="7" aria-pressed="false">7 days</button>
+            <button type="button" data-days="30" aria-pressed="true">30 days</button>
+            <button type="button" data-days="90" aria-pressed="false">90 days</button>
+          </div>
+          <button type="button" class="link" id="an-refresh">Refresh</button>
+        </div>
+        <ul class="an-notes" id="an-notes"></ul>
+        <div class="an-body" id="an-body"><p class="an-empty">Loading…</p></div>
+      </section>
+
+      <section id="pane-setup" class="section pane" hidden>
+        <h2 class="kicker">Setup</h2>
+        <p class="usp">What the desk is connected to. Add missing pieces in Vercel → your project → Settings → Environment Variables, then redeploy.</p>
+        <ul class="setup-list" id="setup-list"></ul>
+      </section>
+
       <section id="board" class="section" hidden>
         <div class="bar">
           <h2 class="kicker">Orders</h2>
-          <div class="tabs" role="tablist">
+          <div class="tabs view-tabs" role="group" aria-label="Show">
             <button type="button" data-view="open" aria-pressed="true">Open</button>
             <button type="button" data-view="done" aria-pressed="false">Done</button>
             <button type="button" data-view="all" aria-pressed="false">All</button>
           </div>
           <button type="button" class="link" id="refresh">Refresh</button>
-          <button type="button" class="link" id="lock">Lock</button>
         </div>
         <p class="alert" id="board-alert" role="alert" hidden></p>
         <ul class="orders" id="orders"></ul>

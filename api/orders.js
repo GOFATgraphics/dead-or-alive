@@ -1,12 +1,17 @@
 // Admin-only. Lists paid Polar orders for the stamp desk, with any stamp already published.
 // Env: ADMIN_KEY, POLAR_ACCESS_TOKEN, BLOB_READ_WRITE_TOKEN.
 // Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID, SITE_URL.
-import { fetchPolarOrders, publishedStamps, requireAdmin, resultId, siteOrigin } from "./_lib.js";
+import { fetchPolarOrders, polarReady, publishedStamps, requireAdmin, resultId, siteOrigin } from "./_lib.js";
 import { checkPageUrl } from "../src/url.js";
 
 export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return;
   if (req.method !== "GET") return res.status(405).json({ error: "GET only." });
+
+  // The desk opens without Polar; it just has no orders to show yet.
+  if (!polarReady()) {
+    return res.status(200).json({ orders: [], warning: "Polar isn't connected yet. Add POLAR_ACCESS_TOKEN in Vercel to load orders. See the Setup tab." });
+  }
 
   let items;
   try {

@@ -8,6 +8,7 @@ import DecryptedText from "./bits/DecryptedText.jsx";
 import AnimatedContent from "./bits/AnimatedContent.jsx";
 import GlareHover from "./bits/GlareHover.jsx";
 import StatusMark from "./bits/StatusMark.jsx";
+import { track, trackView } from "./track.js";
 
 const still = reducedMotion();
 
@@ -52,10 +53,11 @@ function Missing() {
   );
 }
 
-function CopyLink() {
+function CopyLink({ verdict }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
+      track("share_copy", { v: verdict });
       await navigator.clipboard.writeText(location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
@@ -123,8 +125,8 @@ function Result({ r }) {
           </div>
         )}
         <div className="share">
-          <CopyLink />
-          <a className="link" href="/">Judge another page — $1</a>
+          <CopyLink verdict={v} />
+          <a className="link" href="/" onClick={() => track("result_cta", { v })}>Judge another page — $1</a>
         </div>
       </section>
     </main>
@@ -141,6 +143,7 @@ function App() {
       .then((r) => {
         if (!NEXT[r.verdict]) throw new Error("bad verdict");
         document.title = `${r.verdict} — ${r.host} — DEAD OR ALIVE`;
+        trackView("result", { v: r.verdict });
         setState({ status: "ready", r });
       })
       .catch(() => setState({ status: "missing" }));

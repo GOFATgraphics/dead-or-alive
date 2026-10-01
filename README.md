@@ -37,7 +37,19 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
    - `CONTACT_EMAIL`: the address shown on the privacy and terms pages for deletion requests and questions.
    - `QUEUE_LIMIT`: how many paid pages may wait for a stamp before the homepage closes the form (default 10).
    - Optional: `POLAR_VERDICT_PRODUCT_ID`, so only Verdict orders count toward the queue; `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
+   - Optional: Upstash Redis from the Vercel Marketplace (Storage → Upstash) for visitor analytics. It adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 5. Redeploy. Open `/admin` and enter the key.
+
+Only `ADMIN_KEY` is needed to open the desk. Everything else lights up as it's connected; the **Setup** tab shows what's in and what's missing.
+
+### Analytics
+
+The desk's **Analytics** tab covers the last 7, 30, or 90 days:
+
+- **Traffic** (needs Upstash Redis): visitors (once per day), page views, the funnel from homepage to form to checkout, form errors, countries, devices, sites sending visitors (add `?ref=name` to links you post), where stamps get opened, links copied to post, and people coming back from a stamp.
+- **Business** (needs Polar; verdicts and turnaround also need Blob): paid orders, revenue after refunds, refunds, average order, verdict mix, and time from payment to published stamp.
+
+Counting is anonymous and cookieless: no IPs are stored, a visitor is a hash that changes daily, visitors with Global Privacy Control or Do Not Track aren't counted, and counts expire after about a year. The privacy page says so. `/api/track` accepts events from anyone, so treat counts as a guide, not an audit.
 
 Per order: **Stamp**, paste or drop the first-screen screenshot, mark it up, pick DEAD / COPE / ALIVE, write one sentence, **Publish verdict**.
 

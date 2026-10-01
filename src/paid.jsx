@@ -4,6 +4,7 @@ import "./styles.css";
 import { BoxCat, INK } from "./ui.jsx";
 import BlurText from "./bits/BlurText.jsx";
 import StatusMark from "./bits/StatusMark.jsx";
+import { trackView } from "./track.js";
 
 function Paid() {
   return (
@@ -17,6 +18,8 @@ function Paid() {
     </main>
   );
 }
+
+trackView("paid");
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

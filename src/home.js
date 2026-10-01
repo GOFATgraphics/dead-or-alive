@@ -4,12 +4,15 @@ import { DESK } from "./config.js";
 import { Box } from "./mascot.js";
 import { createStage } from "./roam.js";
 import { checkPageUrl } from "./url.js";
+import { track, trackView } from "./track.js";
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = matchMedia("(pointer: fine)").matches;
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 if (!still) document.documentElement.classList.add("motion");
+
+trackView("home");
 
 // Queue: closed by hand in src/config.js, or automatically when too many paid pages are waiting.
 
@@ -21,6 +24,7 @@ Box.mount(ctaBox, { state: "idle" });
 function closeQueue() {
   if (closed) return;
   closed = true;
+  track("queue_closed");
   $("#judge-form").hidden = true;
   $("#queue-closed").hidden = false;
   $("#post-line").hidden = true;
@@ -52,7 +56,8 @@ else {
 
 const form = $("#judge-form");
 const alertEl = $("#form-alert");
-function fail(message, field) {
+function fail(message, field, code = "other") {
+  track("submit_error", { err: code });
   alertEl.hidden = false;
   alertEl.textContent = message;
   if (field) {
@@ -65,7 +70,14 @@ form.addEventListener("input", (e) => {
   stage.home();
   stage.look();
 });
-form.addEventListener("focusin", () => stage.home());
+let started = false;
+form.addEventListener("focusin", () => {
+  stage.home();
+  if (!started) {
+    started = true;
+    track("form_start");
+  }
+});
 form.addEventListener("focusout", (e) => {
   if (!form.contains(e.relatedTarget)) stage.resume(6000);
 });
@@ -75,19 +87,21 @@ form.addEventListener("pointerover", (e) => {
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   alertEl.hidden = true;
+  track("submit_try");
   const urlField = $("#page_url");
   const emailField = $("#email");
   const page = checkPageUrl(urlField.value);
-  if (!page.url) return fail(page.error, urlField);
+  if (!page.url) return fail(page.error, urlField, page.code);
   const email = emailField.value.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("That is not an email.", emailField);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("That is not an email.", emailField, "email");
   // Check once more, so nobody pays for a slot that filled up while they typed.
   if (!(await queueOpen())) return closeQueue();
   const base = (DESK.polarVerdictUrl || "").trim();
-  if (!base) return fail("The Polar checkout link is not connected yet.");
+  if (!base) return fail("The Polar checkout link is not connected yet.", null, "no_checkout_link");
   const dest = new URL(base);
   dest.searchParams.set("customer_email", email);
   dest.searchParams.set("custom_field_data.page_url", page.url);
+  track("checkout");
   location.assign(dest.toString());
 });
 
@@ -121,6 +135,7 @@ $$("[data-focus-form]").forEach((a) =>
   a.addEventListener("click", (e) => {
     if (closed) return;
     e.preventDefault();
+    track("cta_click");
     history.replaceState(null, "", "#top");
     focusForm();
   })
