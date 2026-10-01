@@ -7,10 +7,18 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="paid"><h1>Paid. You'll get the stamp by email. Same day.</h1></main>
+    <main class="paid">
+      <div class="stack">
+        <div id="box"></div>
+        <h1>Paid. Box is in the box with your page.</h1>
+        <p>Five seconds of looking, then the stamp. It comes by email today.</p>
+      </div>
+    </main>
+    <script src="/mascot.js"></script>
+    <script>Box.mount(document.getElementById("box"), { state: "looking" });</script>
   </body>
 </html>

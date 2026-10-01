@@ -83,13 +83,19 @@
         </ul>
       </section>
 
+      <div class="companion"><div id="box"></div><p id="box-say"></p></div>
       <div id="desk"></div>
       <p class="fine">A circled screenshot. One sentence. The stamp. Same day.</p>
     </main>
     <script src="/desk.js"></script>
+    <script src="/mascot.js"></script>
     <script>
       const mount = document.getElementById("desk");
       const closed = new URLSearchParams(location.search).get("desk") === "full" || !window.DESK.queueOpen;
+      const box = Box.mount(document.getElementById("box"), { state: closed ? "closed" : "idle" });
+      document.getElementById("box-say").innerHTML = closed
+        ? `<strong>${Box.NAME}</strong> is busy. The box opens again when the desk is clear.`
+        : `This is <strong>${Box.NAME}</strong>. Dead or alive, nobody knows until ${Box.NAME} looks. Five seconds. One stamp.`;
       if (closed) {
         mount.outerHTML = '<p class="closed">Queue is full. New stamps open when the desk is clear.</p>';
       } else {
@@ -106,6 +112,7 @@
           </form>`;
         const form = document.getElementById("judge");
         const alert = form.querySelector("[role=alert]");
+        form.addEventListener("input", () => box.look());
         form.addEventListener("submit", (event) => {
           event.preventDefault();
           const data = new FormData(form);
