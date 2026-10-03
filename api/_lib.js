@@ -138,10 +138,15 @@ export async function publishedStamps() {
 }
 
 // An order still waiting on its stamp: paid, not refunded, nothing published.
+// True for orders of the Verdict product, or for every order when POLAR_VERDICT_PRODUCT_ID isn't set.
+// Keeps other products in the same Polar organization out of the desk, the queue, and analytics.
+export function isVerdictOrder(order) {
+  const product = process.env.POLAR_VERDICT_PRODUCT_ID;
+  return !product || order.product_id === product || order.product?.id === product;
+}
+
 export function isWaiting(order, stamps) {
   const status = order.status || (order.paid ? "paid" : "");
-  if (status !== "paid") return false;
-  const product = process.env.POLAR_VERDICT_PRODUCT_ID;
-  if (product && order.product_id !== product && order.product?.id !== product) return false;
+  if (status !== "paid" || !isVerdictOrder(order)) return false;
   return !stamps.has(resultId(order.id));
 }

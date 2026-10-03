@@ -1,7 +1,7 @@
 // Admin-only. Lists paid Polar orders for the stamp desk, with any stamp already published.
 // Env: ADMIN_KEY, POLAR_ACCESS_TOKEN, BLOB_READ_WRITE_TOKEN.
 // Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID, SITE_URL.
-import { fetchPolarOrders, polarReady, publishedStamps, requireAdmin, resultId, siteOrigin } from "./_lib.js";
+import { fetchPolarOrders, isVerdictOrder, polarReady, publishedStamps, requireAdmin, resultId, siteOrigin } from "./_lib.js";
 import { checkPageUrl } from "../src/url.js";
 
 export default async function handler(req, res) {
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   let items;
   try {
-    items = await fetchPolarOrders();
+    items = (await fetchPolarOrders()).filter(isVerdictOrder);
   } catch (err) {
     return res.status(err.message.includes("not set") ? 500 : 502).json({ error: err.message });
   }

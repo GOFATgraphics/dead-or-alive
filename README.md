@@ -38,7 +38,7 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
    - `SITE_URL`: your domain, for example `https://stampmypage.com`. Emails, canonical links, share tags, robots.txt, and the sitemap use it. Without it, the build falls back to Vercel's production domain.
    - `CONTACT_EMAIL`: the address shown on the privacy and terms pages for deletion requests and questions.
    - `QUEUE_LIMIT`: how many paid pages may wait for a stamp before the homepage closes the form (default 10).
-   - Optional: `POLAR_VERDICT_PRODUCT_ID`, so only Verdict orders count toward the queue; `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
+   - `POLAR_VERDICT_PRODUCT_ID`: the Verdict product's ID, so only its orders show in the desk, queue, and analytics (other products in the same Polar organization are ignored); `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
    - Optional: Upstash Redis from the Vercel Marketplace (Storage → Upstash) for visitor analytics. It adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 5. Redeploy. Open `/admin` and enter the key.
 

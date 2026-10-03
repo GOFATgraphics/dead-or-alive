@@ -1,7 +1,7 @@
 // Admin-only. Everything the Analytics tab shows, for the last 7, 30, or 90 days.
 // Traffic comes from the anonymous counters in Redis; orders, revenue, and stamps from Polar and Blob.
 // Each half works on its own: whatever isn't connected yet comes back as null with a note.
-import { fetchPolarOrders, isWaiting, polarReady, publishedStamps, requireAdmin, resultId } from "./_lib.js";
+import { fetchPolarOrders, isVerdictOrder, isWaiting, polarReady, publishedStamps, requireAdmin, resultId } from "./_lib.js";
 import { pipeline, redisReady } from "./_redis.js";
 
 const COUNTERS = [
@@ -76,8 +76,7 @@ async function mapLimit(items, limit, fn) {
 async function business(days, notes) {
   const from = new Date(days[0] + "T00:00:00Z");
   const all = await fetchPolarOrders({ since: from });
-  const product = process.env.POLAR_VERDICT_PRODUCT_ID;
-  const inRange = all.filter((o) => new Date(o.created_at) >= from && (!product || o.product_id === product || o.product?.id === product));
+  const inRange = all.filter((o) => new Date(o.created_at) >= from && isVerdictOrder(o));
 
   let stamps = new Map();
   try {
