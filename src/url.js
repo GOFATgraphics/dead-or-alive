@@ -40,5 +40,8 @@ export function checkPageUrl(input) {
   }
 
   // Keep only what identifies the page: no credentials, query, or fragment.
-  return { url: `${url.protocol}//${host}${url.pathname}` };
+  // Google Play is the exception: the app is named by ?id=, so keep just that.
+  const appId = host === "play.google.com" ? url.searchParams.get("id") : "";
+  const query = appId && /^[\w.]{1,150}$/.test(appId) ? `?id=${appId}` : "";
+  return { url: `${url.protocol}//${host}${url.pathname}${query}` };
 }

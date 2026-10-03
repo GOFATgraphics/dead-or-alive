@@ -47,7 +47,7 @@ function Missing() {
         <BoxCat state="closed" />
         <h1>No stamp here.</h1>
         <p>This link is wrong or the stamp was taken down. Check the link in your email.</p>
-        <a className="link" href="/">Judge a page — $1</a>
+        <a className="link" href="/">Judge yours — $1</a>
       </div>
     </main>
   );
@@ -126,7 +126,7 @@ function Result({ r }) {
         )}
         <div className="share">
           <CopyLink verdict={v} />
-          <a className="link" href="/" onClick={() => track("result_cta", { v })}>Judge another page — $1</a>
+          <a className="link" href="/" onClick={() => track("result_cta", { v })}>Judge another link — $1</a>
         </div>
       </section>
     </main>

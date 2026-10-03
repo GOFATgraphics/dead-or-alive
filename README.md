@@ -1,6 +1,6 @@
 # Stamp My Page
 
-Is your page dead or alive? We stamp it: DEAD, COPE, or ALIVE.
+Is your page dead or alive? Website, web app, SaaS, or app store listing: we stamp its first screen DEAD, COPE, or ALIVE.
 
 First screen. Five seconds. One stamp. $1.
 
@@ -64,7 +64,7 @@ Stamped screenshots and verdicts are public files in Blob storage. Customer emai
 ## Security, SEO, and speed
 
 - Security headers (CSP, frame blocking, nosniff, referrer and permissions policies) are in `vercel.json`. The CSP allows only this site, plus stamped images from Vercel Blob. Fonts are self-hosted in `public/fonts`, so no third party is involved.
-- Page URLs are checked by `src/url.js` in the form, the admin desk, and the publish API. It rejects credentials, IP addresses, ports, and non-public names, and keeps only origin plus path.
+- Page URLs are checked by `src/url.js` in the form, the admin desk, and the publish API. It rejects credentials, IP addresses, ports, and non-public names, and keeps only origin plus path (plus the `?id=` on Google Play links).
 - The homepage is plain HTML, so crawlers read the whole page. Its script is about 6 KB gzipped. React loads only on the result and payment pages.
 - `robots.txt` and `sitemap.xml` are generated at build. Preview deployments disallow all crawling. Private pages are not listed in robots.txt; `/admin`, `/paid`, and `/v/` send `noindex` headers instead.
 - The admin API blocks an IP for 15 minutes after 5 wrong keys, and slows every wrong guess. The count is kept per server instance, so for a hard global limit add a Vercel Firewall rate-limit rule on `/api/orders` and `/api/publish`.
