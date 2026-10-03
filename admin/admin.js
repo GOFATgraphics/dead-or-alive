@@ -310,7 +310,7 @@ import { renderAnalytics } from "./analytics.js";
     const v = verdict();
     const subject = `${v} — ${slug()}`;
     const tail = current.resultUrl ? `See your stamp: ${current.resultUrl}` : "The circled screenshot is attached.";
-    const body = `${current.pageUrl}\n\n${v}. ${sentence.value.trim()}\n\n${tail}\n\n— DEAD OR ALIVE`;
+    const body = `${current.pageUrl}\n\n${v}. ${sentence.value.trim()}\n\n${tail}\n\n— Stamp My Page`;
     location.href = `mailto:${encodeURIComponent(current.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   });
 

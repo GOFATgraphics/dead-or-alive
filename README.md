@@ -1,4 +1,6 @@
-# DEAD OR ALIVE
+# Stamp My Page
+
+Is your page dead or alive? We stamp it: DEAD, COPE, or ALIVE.
 
 First screen. Five seconds. One stamp. $1.
 
@@ -32,8 +34,8 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
 4. In Vercel project env vars, set:
    - `ADMIN_KEY`: the password for `/admin`. At least 32 characters, random. Make one with `openssl rand -base64 36`. Without it (or if it's shorter), the admin API answers 503.
    - `POLAR_ACCESS_TOKEN`: the token from step 2.
-   - `RESEND_API_KEY` and `MAIL_FROM` (for example `Box <box@yourdomain.com>`).
-   - `SITE_URL`: your domain, for example `https://deadoralive.xyz`. Emails, canonical links, share tags, robots.txt, and the sitemap use it. Without it, the build falls back to Vercel's production domain.
+   - `RESEND_API_KEY` and `MAIL_FROM` (for example `Stamp My Page <stamps@stampmypage.com>`).
+   - `SITE_URL`: your domain, for example `https://stampmypage.com`. Emails, canonical links, share tags, robots.txt, and the sitemap use it. Without it, the build falls back to Vercel's production domain.
    - `CONTACT_EMAIL`: the address shown on the privacy and terms pages for deletion requests and questions.
    - `QUEUE_LIMIT`: how many paid pages may wait for a stamp before the homepage closes the form (default 10).
    - Optional: `POLAR_VERDICT_PRODUCT_ID`, so only Verdict orders count toward the queue; `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.

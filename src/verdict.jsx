@@ -142,7 +142,7 @@ function App() {
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
       .then((r) => {
         if (!NEXT[r.verdict]) throw new Error("bad verdict");
-        document.title = `${r.verdict} — ${r.host} — DEAD OR ALIVE`;
+        document.title = `${r.verdict} — ${r.host} — Stamp My Page`;
         trackView("result", { v: r.verdict });
         setState({ status: "ready", r });
       })

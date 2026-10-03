@@ -55,7 +55,7 @@ export function InkButton({ as: Tag = "button", color = INK, className = "", chi
 // Brand mark: Box's ears peeking over a violet tile.
 export function Logo({ href = "/" }) {
   return (
-    <a className="logo" href={href} aria-label="DEAD OR ALIVE home">
+    <a className="logo" href={href} aria-label="Stamp My Page home">
       <svg viewBox="0 0 32 32" aria-hidden="true">
         <defs>
           <linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#9a7dff" /><stop offset="1" stopColor="#4b2ee0" /></linearGradient>
@@ -66,7 +66,7 @@ export function Logo({ href = "/" }) {
         <circle cx="18.7" cy="20" r="1.3" fill="#3b2bc2" />
         <rect x="6" y="22.5" width="20" height="5" rx="1.5" fill="#e4c69c" stroke="#12132a" strokeWidth="1.2" />
       </svg>
-      <span>Dead or Alive</span>
+      <span>Stamp My Page</span>
     </a>
   );
 }

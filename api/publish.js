@@ -17,7 +17,7 @@ function emailHtml({ verdict, sentence, host, image, link }) {
 <tr><td style="padding-top:16px;font-size:15px;line-height:1.5">${e(sentence)}</td></tr>
 <tr><td style="padding-top:24px"><a href="${e(link)}"><img src="${e(image)}" width="560" alt="Your first screen, circled and stamped ${verdict}." style="display:block;width:100%;height:auto;border:1px solid #e6e3f1;border-radius:12px"></a></td></tr>
 <tr><td style="padding-top:24px"><a href="${e(link)}" style="display:inline-block;background:#12132a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;border-radius:12px;padding:14px 22px">See your stamp</a></td></tr>
-<tr><td style="padding-top:32px;font-size:12px;color:#5d6180">DEAD OR ALIVE. First screen. Five seconds. One stamp.</td></tr>
+<tr><td style="padding-top:32px;font-size:12px;color:#5d6180">Stamp My Page. First screen. Five seconds. One stamp.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -33,7 +33,7 @@ async function sendEmail(to, data) {
       to: [to],
       subject: `${data.verdict}. We looked at ${data.host}.`,
       html: emailHtml(data),
-      text: `${data.verdict}.\n\n${data.sentence}\n\nSee your stamp: ${data.link}\n\nDEAD OR ALIVE`,
+      text: `${data.verdict}.\n\n${data.sentence}\n\nSee your stamp: ${data.link}\n\nStamp My Page`,
     }),
   }).catch(() => null);
   if (!r || !r.ok) return { emailed: false, emailError: `Resend said ${r ? r.status : "nothing"}.` };

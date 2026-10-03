@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       `<meta property="og:url" content="${escapeHtml(`${origin}/v/${r.id}`)}" />`,
       `<meta name="twitter:card" content="summary_large_image" />`,
     ].join("\n    ");
-    html = html.replace("<!--result-meta-->", tags).replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)} — DEAD OR ALIVE</title>`);
+    html = html.replace("<!--result-meta-->", tags).replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)} — Stamp My Page</title>`);
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", r ? "public, s-maxage=60, stale-while-revalidate=600" : "no-store");
