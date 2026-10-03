@@ -1,6 +1,6 @@
 # Stamp My Page
 
-Is your page dead or alive? Website, web app, SaaS, or app store listing: we stamp its first screen DEAD, COPE, or ALIVE.
+Is your page dead or alive? Website, web app, SaaS, or app store page: we stamp its first screen DEAD, COPE, or ALIVE.
 
 First screen. Five seconds. One stamp. $1.
 

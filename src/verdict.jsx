@@ -126,7 +126,7 @@ function Result({ r }) {
         )}
         <div className="share">
           <CopyLink verdict={v} />
-          <a className="link" href="/" onClick={() => track("result_cta", { v })}>Judge another link — $1</a>
+          <a className="link" href="/" onClick={() => track("result_cta", { v })}>Judge another page — $1</a>
         </div>
       </section>
     </main>
