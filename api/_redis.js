@@ -1,9 +1,19 @@
 // Minimal Upstash Redis client over its REST API (no SDK). Connect Upstash from the Vercel
 // Marketplace; it sets KV_REST_API_URL and KV_REST_API_TOKEN (or the UPSTASH_REDIS_REST_* pair).
 
+// Vercel lets you pick a prefix when connecting Upstash (KV_, STORAGE_, ...), so match on the ending.
+// The read-only token is skipped: counting needs to write.
+function pick(endings) {
+  for (const end of endings) {
+    const key = Object.keys(process.env).find((k) => k.endsWith(end) && !k.includes("READ_ONLY") && process.env[k]);
+    if (key) return process.env[key];
+  }
+  return "";
+}
+
 function config() {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = pick(["KV_REST_API_URL", "REDIS_REST_URL"]);
+  const token = pick(["KV_REST_API_TOKEN", "REDIS_REST_TOKEN"]);
   return url && token ? { url: url.replace(/\/$/, ""), token } : null;
 }
 
