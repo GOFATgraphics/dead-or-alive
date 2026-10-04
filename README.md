@@ -119,9 +119,15 @@ Stamped screenshots and verdicts are public files in Blob storage. Customer emai
 - Hashed assets and fonts are cached for a year.
 - `/privacy` and `/terms` are short, plain pages. Review them before launch: the refund line and the "keep until you ask" retention are policy choices for you to confirm.
 
+## Homepage design
+
+The homepage has its own stylesheet, `src/home.css`: warm paper (`#f4f1ea`), black ink, verdict red as the one accent, and IBM Plex Mono for labels. Two corner radii (4px, 12px), borders instead of shadows, and four text sizes (14, 16, 20, 48+). The other pages still use `src/styles.css`.
+
+The hero and before-and-after images in `public/samples/` are real outputs: screenshots of our own homepage (the previous design and this one) drawn with the production stamp code (`api/_render.js`). Replace them with a real customer stamp once there is one to show, with permission.
+
 ## Box and React Bits
 
-Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there. On the homepage Box jumps out of the box, walks the desk, sits, and hops back in (`src/roam.js`). When a visitor clicks into the form, types, or reaches for the button, Box runs home and watches. Box wanders off again a few seconds after they leave the form.
+Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there. On the homepage Box sits small in the footer; the roaming version (`src/roam.js`) is used by the result and payment pages.
 
 The result and payment pages use [React Bits](https://reactbits.dev) components, copied into `src/bits/`. See [src/bits/README.md](src/bits/README.md). The homepage uses small plain-JavaScript ports of the same effects (decrypt, magnet, click spark) in `src/home.js` to stay light. Everything holds still for visitors with reduced motion turned on, and all content is visible without scrolling or JavaScript animation.
 
