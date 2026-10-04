@@ -66,7 +66,7 @@ Write one sentence for the customer in the stranger's own voice, first person, t
 - COPE: "Clear headline, but five buttons fight over what I should click first."
 - ALIVE: "In five seconds I know what it does, who it's for, and what to click."
 
-Mark one to three regions on the screenshot that justify the stamp (usually the headline, and whatever is missing or confusing). Give each as a box in thousandths of the screenshot's width and height (0 to 1000), with a short reason.
+Mark one to three regions on the desktop screenshot that justify the stamp (usually the headline, and whatever is missing or confusing). Give each as a box in pixels of the desktop screenshot (x and y of the top-left corner, then width and height), fully inside the image, with a label of a few words.
 
 If there is a phone screenshot, say whether the first screen works on a phone: nothing cut off or overflowing sideways, text readable, the main button visible. Note what breaks, in a few words.
 
@@ -94,13 +94,13 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["x", "y", "w", "h", "why"],
+        required: ["x", "y", "w", "h", "label"],
         properties: {
-          x: { type: "integer" },
-          y: { type: "integer" },
-          w: { type: "integer" },
-          h: { type: "integer" },
-          why: { type: "string" },
+          x: { type: "integer", description: "Left edge, pixels from the left of the desktop screenshot." },
+          y: { type: "integer", description: "Top edge, pixels from the top." },
+          w: { type: "integer", description: "Width in pixels." },
+          h: { type: "integer", description: "Height in pixels." },
+          label: { type: "string", description: "A few words: what this region shows or lacks." },
         },
       },
     },
@@ -128,59 +128,114 @@ const KIND_NOTE = {
   login: "This page may sit behind a login. Judge exactly what a logged-out stranger sees here; if it's only a login form, say so in problem. ",
 };
 
-const clamp = (n) => Math.min(1000, Math.max(0, Math.round(Number(n) || 0)));
+// Width and height of a JPEG, read from its header, so boxes are checked against the real image.
+export function jpegSize(buf) {
+  let i = 2;
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xff) return null;
+    const marker = buf[i + 1];
+    const len = buf.readUInt16BE(i + 2);
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
 
-export async function judge(jpg, pageUrl, phoneJpg = null) {
-  const client = new Anthropic();
-  const response = await client.beta.messages.create({
+const MIN_BOX = 8;
+const MAX_BOXES = 3;
+
+// Checks the AI's answer. Returns the problems found; empty means usable as is.
+function problemsWith(out, size) {
+  if (!out || typeof out !== "object") return ["the answer was not JSON"];
+  const found = [];
+  if (!VERDICTS.includes(out.verdict)) found.push("verdict must be DEAD, COPE, or ALIVE");
+  if (!String(out.sentence || "").trim()) found.push("sentence is empty");
+  const marks = Array.isArray(out.marks) ? out.marks : [];
+  if (marks.length > MAX_BOXES) found.push(`give at most ${MAX_BOXES} boxes`);
+  marks.forEach((m, i) => {
+    const [x, y, w, h] = [m.x, m.y, m.w, m.h].map(Number);
+    if (![x, y, w, h].every(Number.isFinite)) return found.push(`box ${i + 1} has missing numbers`);
+    if (w < MIN_BOX || h < MIN_BOX) found.push(`box ${i + 1} is too small`);
+    if (x < 0 || y < 0 || x + w > size.width || y + h > size.height) {
+      found.push(`box ${i + 1} (${x},${y},${w}x${h}) is outside the ${size.width}x${size.height} screenshot`);
+    }
+  });
+  return found;
+}
+
+function ask(client, content) {
+  return client.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
     system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "Desktop:" },
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpg.toString("base64") } },
-          ...(phoneJpg
-            ? [
-                { type: "text", text: "Phone:" },
-                { type: "image", source: { type: "base64", media_type: "image/jpeg", data: phoneJpg.toString("base64") } },
-              ]
-            : []),
-          { type: "text", text: `${KIND_NOTE[pageKind(pageUrl)] || ""}First screen of ${pageUrl}. Stamp it.` },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
-  if (response.stop_reason === "refusal") throw new Error("The AI declined to judge this page. Stamp it by hand.");
-  if (response.stop_reason === "max_tokens") throw new Error("The AI ran out of room. Try again.");
-  const text = response.content.find((b) => b.type === "text")?.text || "";
-  let out;
-  try {
-    out = JSON.parse(text);
-  } catch (_) {
-    throw new Error("The AI answer could not be read. Try again.");
+}
+
+// The AI chooses what: verdict, sentence, which regions to circle. Code checks it.
+// A bad answer gets one retry that names the problem. If the boxes are still bad after that,
+// the stamp goes ahead without circles; only a missing verdict stops it (the order then waits in the desk).
+export async function judge(jpg, pageUrl, phoneJpg = null) {
+  const size = jpegSize(jpg) || { width: VIEWPORT.width, height: VIEWPORT.height };
+  const client = new Anthropic();
+  const base = [
+    { type: "text", text: `Desktop (${size.width}x${size.height} pixels):` },
+    { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpg.toString("base64") } },
+    ...(phoneJpg
+      ? [
+          { type: "text", text: "Phone:" },
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: phoneJpg.toString("base64") } },
+        ]
+      : []),
+    { type: "text", text: `${KIND_NOTE[pageKind(pageUrl)] || ""}First screen of ${pageUrl}. Stamp it.` },
+  ];
+
+  let out = null, problems = [], response = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const content = attempt === 1 ? base : [...base, { type: "text", text: `Your last answer had problems: ${problems.join("; ")}. Answer again with those fixed.` }];
+    response = await ask(client, content);
+    if (response.stop_reason === "refusal") throw new Error("The AI declined to judge this page. Stamp it by hand.");
+    let parsed = null;
+    if (response.stop_reason !== "max_tokens") {
+      try {
+        parsed = JSON.parse(response.content.find((b) => b.type === "text")?.text || "");
+      } catch (_) {}
+    }
+    problems = problemsWith(parsed, size);
+    // Keep the best answer so far: one with a verdict beats one without.
+    if (parsed && (!out || VERDICTS.includes(parsed.verdict))) out = parsed;
+    if (!problems.length) break;
   }
-  if (!VERDICTS.includes(out.verdict)) throw new Error("The AI answer had no stamp. Try again.");
+  if (!out || !VERDICTS.includes(out.verdict) || !String(out.sentence || "").trim()) {
+    throw new Error("The AI's answer was unusable twice. Stamp it by hand.");
+  }
+
+  // Boxes that still don't fit after the retry are dropped: a stamp without circles beats no stamp.
+  const fits = (m) => problemsWith({ verdict: "DEAD", sentence: "x", marks: [m] }, size).length === 0;
+  const all = Array.isArray(out.marks) ? out.marks : [];
+  const good = all.filter(fits).slice(0, MAX_BOXES);
   return {
     verdict: out.verdict,
-    sentence: String(out.sentence || "").trim().slice(0, 400),
+    sentence: String(out.sentence).trim().slice(0, 400),
     read: {
       product: String(out.read?.product || ""),
       buyer: String(out.read?.buyer || ""),
       reason: String(out.read?.reason || ""),
     },
-    marks: (Array.isArray(out.marks) ? out.marks : [])
-      .map((m) => {
-        const x = clamp(m.x), y = clamp(m.y);
-        return { x, y, w: Math.min(clamp(m.w), 1000 - x), h: Math.min(clamp(m.h), 1000 - y), why: String(m.why || "").slice(0, 200) };
-      })
-      .filter((m) => m.w > 0 && m.h > 0)
-      .slice(0, 4),
+    // Stored in thousandths of the screenshot, which is what the drawing code takes.
+    marks: good.map((m) => ({
+      x: Math.round((m.x / size.width) * 1000),
+      y: Math.round((m.y / size.height) * 1000),
+      w: Math.round((m.w / size.width) * 1000),
+      h: Math.round((m.h / size.height) * 1000),
+      why: String(m.label || "").slice(0, 120),
+    })),
+    droppedMarks: all.length - good.length,
     mobile: phoneJpg && out.mobile?.checked ? { ok: !!out.mobile.ok, note: String(out.mobile.note || "").slice(0, 200) } : null,
     confidence: ["high", "medium", "low"].includes(out.confidence) ? out.confidence : "low",
     problem: String(out.problem || "").slice(0, 300),
@@ -223,9 +278,24 @@ export async function makeDraft(orderId, rawPageUrl) {
 // Only confident drafts with nothing flagged go out without a person.
 export const autoPublishable = (d) => d.confidence === "high" && !d.problem;
 
+// When a step fails, the order isn't lost: a note is saved in its place so it waits in the desk with the reason.
+async function saveFailure(orderId, pageUrl, err) {
+  const opts = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
+  const note = { orderId, pageUrl, failed: String(err?.message || err || "Unknown error").slice(0, 300), createdAt: new Date().toISOString() };
+  await put(draftPaths(resultId(orderId)).json, JSON.stringify(note), { ...opts, contentType: "application/json" }).catch(() => {});
+  return note;
+}
+
 // A paid order arrived (webhook). Draft it, and in auto mode publish it when the draft is confident.
 export async function processPaidOrder(order) {
-  const { draft, jpg } = await buildDraft(order.id, orderPageUrl(order));
+  let built;
+  try {
+    built = await buildDraft(order.id, orderPageUrl(order));
+  } catch (err) {
+    console.error("Draft failed:", order.id, err);
+    return saveFailure(order.id, orderPageUrl(order), err);
+  }
+  const { draft, jpg } = built;
   if (!autoMode() || !autoPublishable(draft)) return draft;
   // Loaded only here, so routes that just read drafts don't carry the canvas library.
   const { renderStamp } = await import("./_render.js");
@@ -275,6 +345,7 @@ export async function readDraftVerdicts(orderIds) {
       if (!url) return;
       const d = await fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (d && d.verdict) out.set(id, d.verdict);
+      else if (d && d.failed) out.set(id, "failed");
     })
   );
   return out;

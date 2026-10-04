@@ -241,7 +241,9 @@ import { snapshotRows } from "../src/snapshot.js";
   // AI draft
 
   function showDraft(d, status) {
-    const auto = d && d.autoPublished ? ` Sent automatically${d.autoPublished.emailed ? " and emailed" : ""}.` : "";
+    const auto =
+      (d && d.autoPublished ? ` Sent automatically${d.autoPublished.emailed ? " and emailed" : ""}.` : "") +
+      (d && d.droppedMarks ? ` ${d.droppedMarks} circle${d.droppedMarks > 1 ? "s" : ""} didn't fit and ${d.droppedMarks > 1 ? "were" : "was"} left off.` : "");
     $("ai-status").textContent = status || (d ? `${d.verdict}, ${d.confidence} confidence.${auto}` : "None yet.");
     $("ai-run").textContent = d ? "Ask AI again" : "Ask AI";
     $("ai-problem").hidden = !(d && d.problem);
@@ -268,6 +270,7 @@ import { snapshotRows } from "../src/snapshot.js";
 
   function applyDraft(o, d) {
     if (current !== o) return; // the admin moved on to another order
+    if (d.failed) return showDraft(null, `The AI couldn't stamp this: ${d.failed} Ask AI again, or stamp it by hand.`);
     showDraft(d);
     if (o.resultUrl) return; // published already: show the draft, keep the editor as it is
     document.querySelector(`input[name=verdict][value=${d.verdict}]`).checked = true;
