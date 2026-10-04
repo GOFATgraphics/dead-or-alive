@@ -10,7 +10,9 @@ function stamp(v,x,y,s,a,rot=-11){const col={DEAD:R,COPE:C,ALIVE:G}[v];const w=s
  const an=[fade(a,0.08),{property:"scale",keyframes:[{at:a,value:2.6},{at:a+0.16,value:0.94,easing:"ease-out"},{at:a+0.28,value:1}]},{property:"rotation",from:rot,to:rot,duration:0.05}];
  return [<rect x={x-w/2} y={y-h/2} width={w} height={h} radius={s*0.14} fill="#ffffff" strokeColor={col} strokeWidth={s*0.1} animate={an} shadow={{y:10,blur:30,color:"#00000055"}}/>,
  <text x={x-w/2} y={y-h/2} width={w} height={h} align="center" lineHeight={h/s/1.0} fontFamily="JetBrains Mono" fontWeight={700} fontSize={s} letterSpacing={s*0.12} color={col} animate={an}>{v}</text>];}
-const chip=(s,x,y,a,col=V)=><text x={x} y={y} width={420} fontFamily="Inter" fontWeight={700} fontSize={30} color="#fff" animate={[...pop(a),{property:"offsetX",keyframes:[{at:a,value:60},{at:a+0.3,value:0,easing:"house"}]}]} shadow={{y:6,blur:18,color:col}}>{"● "+s}</text>;
+const chip=(s,x,y,a,col=V,tc="#fff")=><text x={x} y={y} width={470} fontFamily="Inter" fontWeight={700} fontSize={30} color={tc} animate={[...pop(a),{property:"offsetX",keyframes:[{at:a,value:60},{at:a+0.3,value:0,easing:"house"}]}]} shadow={{y:6,blur:18,color:col}}>{/^✓/.test(s)?s:"● "+s}</text>;
+const plateTop=(h=170)=><rect x={0} y={0} width={W} height={h} fill={{kind:"linear",angle:90,stops:[{offset:0,color:"#120f24",opacity:0.92},{offset:1,color:"#120f24",opacity:0}]}}/>;
+const plateBot=(h=300)=><rect x={0} y={H-h} width={W} height={h} fill={{kind:"linear",angle:90,stops:[{offset:0,color:"#120f24",opacity:0},{offset:0.6,color:"#120f24",opacity:0.92},{offset:1,color:"#120f24",opacity:0.96}]}}/>;
 const shot=(h,o={})=><media file={h} at={o.at} duration={o.dur} x={o.x||0} y={o.y||0} width={o.w||W} height={o.h||H} fit="cover" radius={o.r||0} shadow={o.sh} effects={o.fx} animate={[{property:"scale",from:o.z0||1.02,to:o.z1||1.14,duration:o.d||5,easing:"linear"},...(o.an||[])]}/>;
 const scene=(p,at,dur,kids,bg=BG)=>p.compose(<frame width={W} height={H} layout="none" background={bg} motion={{enter:{from:{opacity:0,scale:1.05},duration:0.25}}}>{kids}<rect x={0} y={0} width={W} height={H} fill={{kind:"radial",stops:[{offset:0.55,color:"#000000",opacity:0},{offset:1,color:"#000000",opacity:0.45}]}}/></frame>,{at,dur});
 export default async ({ project }) => {
@@ -38,26 +40,28 @@ export default async ({ project }) => {
   T("$1",{x:0,y:170,w:W,s:300,al:"center",at:0.1,m:false,an:pop(0.1),c:"#ffffff",sh:{y:20,blur:60,color:V}}),flash(0.1,"#9a7dff")]);
  scene(p,20.5,9.3,[shot(c[4],{d:4.65,dur:4.65,z1:1.08}),shot(c[1],{at:4.65,dur:4.65,d:4.65,z0:1.08,z1:1.16}),
   <rect x={0} y={0} width={W} height={10} fill={{kind:"linear",angle:90,stops:[{offset:0,color:"#9a7dff",opacity:0},{offset:0.5,color:"#b9a6ff"},{offset:1,color:"#9a7dff",opacity:0}]}} shadow={{blur:30,color:"#7b5cff"}} animate={[{property:"offsetY",keyframes:[{at:0,value:0},{at:2.2,value:710,easing:"linear"},{at:4.4,value:0,easing:"linear"}],repeat:2}]}/>,
-  T("AI reads it like a stranger",{x:60,y:40,s:52,at:0.1,c:INK,ls:-1.5}),
-  T("LOGGED OUT",{x:60,y:560,s:54,f:"JetBrains Mono",fw:700,ls:3,at:3.86,c:V,by:"character",md:0.3}),
-  T("NO SCROLLING",{x:470,y:560,s:54,f:"JetBrains Mono",fw:700,ls:3,at:5.34,c:V,by:"character",md:0.3}),
+  plateTop(),plateBot(320),
+  T("AI reads it like a stranger",{x:60,y:40,s:56,at:0.1,ls:-1.5}),
+  T("→ LOGGED OUT",{x:60,y:500,w:700,s:50,f:"JetBrains Mono",fw:700,ls:2,at:3.86,c:"#b9a6ff",by:"character",md:0.3}),
+  T("→ NO SCROLLING",{x:60,y:575,w:700,s:50,f:"JetBrains Mono",fw:700,ls:2,at:5.34,c:"#b9a6ff",by:"character",md:0.3}),
   T("5s",{x:1000,y:520,w:220,s:120,f:"JetBrains Mono",fw:700,at:7.12,c:R,m:false,an:pop(7.12)})]);
  scene(p,29.8,4.1,[shot(c[5],{d:4.1,an:shake(3.1,18)}),
-  T("It circles what works…",{x:60,y:40,s:46,at:0.3,c:INK,ls:-1}),T("…and what doesn't.",{x:60,y:96,s:46,at:1.2,c:R,ls:-1}),flash(3.1)]);
+  plateTop(190),T("It circles what works…",{x:60,y:36,s:52,at:0.3,ls:-1}),T("…and what doesn't.",{x:60,y:100,s:52,at:1.2,c:"#ff5a60",ls:-1}),flash(3.1)]);
  scene(p,33.9,4.3,[<rect x={0} y={0} width={W} height={H} fill={BG}/>,
   ...stamp("DEAD",300,330,84,0.26,-12),...stamp("COPE",640,390,84,1.82,-4),...stamp("ALIVE",990,330,84,3.36,-10),
   T("One word.",{x:0,y:560,w:W,s:56,al:"center",at:0.3,c:"#c9bfff"}),flash(0.26),flash(1.82),flash(3.36)]);
  scene(p,38.2,7.4,[shot(c[6],{x:40,y:150,w:720,h:420,r:16,d:7.0,dur:7.0,z0:1,z1:1.05,sh:{y:24,blur:60,color:"#00000088"}}),
   T("In minutes you get",{x:40,y:50,s:60,at:0.1}),
-  chip("✓ The verdict",800,190,0.9),chip("✓ One honest sentence",800,270,2.36),chip("✓ Stack & speed check",800,350,3.8),chip("✓ A card made to post",800,430,6.04,G)]);
+  chip("✓ The verdict",790,190,0.9),chip("✓ One honest sentence",790,270,2.36),chip("✓ Stack & speed check",790,350,3.8),chip("✓ A card made to post",790,430,6.04,G)]);
  scene(p,45.6,1.4,[shot(c[7],{d:1.4}),T("Share it.",{x:60,y:60,s:110,at:0.0,c:INK,m:false,an:pop(0.05)}),
-  chip("𝕏  Post",80,220,0.3,INK),chip("in  Share",80,290,0.45,"#0a66c2")],LIGHT);
- scene(p,47.0,2.6,[shot(c[8],{d:2.6}),T("Fix what's broken.",{x:60,y:40,s:56,at:0.0,c:INK}),
-  T("Post the comeback.",{x:60,y:110,s:56,at:1.36,c:G})],LIGHT);
+  chip("Post on X",80,220,0.3,"#ffffff",INK),chip("Share on LinkedIn",80,290,0.45,"#ffffff","#0a66c2")],LIGHT);
+ scene(p,47.0,2.6,[shot(c[8],{d:2.6}),plateTop(200),T("Fix what's broken.",{x:60,y:36,s:60,at:0.0}),
+  T("Post the comeback.",{x:60,y:108,s:60,at:1.36,c:"#4ade80"})],LIGHT);
  scene(p,49.6,5.4,[<rect x={540} y={90} width={200} height={200} radius={46} fill={{kind:"linear",angle:135,stops:[{offset:0,color:"#9a7dff"},{offset:1,color:"#4b2ee0"}]}} animate={pop(0)} shadow={{y:20,blur:60,color:"#7b5cff88"}}/>,
   T("stampmypage.com",{x:0,y:320,w:W,s:96,al:"center",at:0.1,ls:-3}),
   T("One page.",{x:140,y:460,w:340,s:50,fw:700,al:"center",c:"#c9bfff",at:1.9}),T("One stamp.",{x:470,y:460,w:340,s:50,fw:700,al:"center",c:"#c9bfff",at:3.1}),T("One dollar.",{x:800,y:460,w:340,s:50,fw:700,al:"center",c:"#ffffff",at:4.2}),
-  T("Judge my page — $1",{x:440,y:560,w:400,s:34,fw:700,al:"center",at:2.4,m:false,an:[...pop(2.4),{property:"scale",keyframes:[{at:3.0,value:1},{at:3.5,value:1.06},{at:4.0,value:1}],repeat:2}]})]);
+  <rect x={460} y={548} width={360} height={70} radius={35} fill={{kind:"linear",angle:0,stops:[{offset:0,color:"#7b5cff"},{offset:1,color:"#5b3df5"}]}} shadow={{y:12,blur:40,color:"#7b5cff99"}} animate={[...pop(2.4),{property:"scale",keyframes:[{at:3.0,value:1},{at:3.5,value:1.06},{at:4.0,value:1}],repeat:2}]}/>,
+  T("Judge my page — $1",{x:440,y:566,w:400,s:34,fw:700,al:"center",at:2.4,m:false,an:[...pop(2.4),{property:"scale",keyframes:[{at:3.0,value:1},{at:3.5,value:1.06},{at:4.0,value:1}],repeat:2}]})]);
  for (const t of process.env.FRAMES ? process.env.FRAMES.split(",") : []) await p.frame(+t, `fr_${t}.png`);
  if (process.env.RENDER) await p.render("renders/video.mp4");
 };
