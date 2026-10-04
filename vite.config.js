@@ -35,7 +35,7 @@ function siteInfo() {
       const robots = isPreview
         ? "User-agent: *\nDisallow: /\n"
         : `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`;
-      const urls = ["/", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
+      const urls = ["/", "/pricing", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
       writeFileSync(resolve(outDir, "robots.txt"), robots);
       writeFileSync(resolve(outDir, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
     },
@@ -50,6 +50,7 @@ export default defineConfig({
         home: page("index.html"),
         privacy: page("privacy/index.html"),
         terms: page("terms/index.html"),
+        pricing: page("pricing/index.html"),
         paid: page("paid/index.html"),
         sheet: page("paid/sheet/index.html"),
         resurrection: page("paid/resurrection/index.html"),

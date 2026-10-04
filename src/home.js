@@ -32,7 +32,7 @@ function closeQueue() {
   stage.stop();
   createStage($("#stage"), { closed: true });
   Box.mount(ctaBox, { state: "closed" });
-  $$("[data-focus-form]").forEach((a) => (a.textContent = "Queue is full"));
+  $$("[data-focus-form]").forEach((a) => (a.textContent = "Paused for a moment"));
 }
 
 async function queueOpen() {

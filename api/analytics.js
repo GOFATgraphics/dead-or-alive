@@ -5,7 +5,7 @@ import { fetchPolarOrders, isVerdictOrder, isWaiting, polarReady, publishedStamp
 import { pipeline, redisReady } from "./_redis.js";
 
 const COUNTERS = [
-  "view", "view:home", "view:result", "view:paid", "view:privacy", "view:terms",
+  "view", "view:home", "view:result", "view:paid", "view:pricing", "view:privacy", "view:terms",
   "form_start", "submit_try", "submit_error", "checkout", "queue_closed", "cta_click",
   "share_copy", "result_cta",
   "view:v:DEAD", "view:v:COPE", "view:v:ALIVE",

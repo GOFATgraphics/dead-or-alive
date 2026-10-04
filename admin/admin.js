@@ -270,6 +270,8 @@ import { snapshotRows } from "../src/snapshot.js";
 
   function applyDraft(o, d) {
     if (current !== o) return; // the admin moved on to another order
+    if (d.failed && d.refunded?.ok) return showDraft(null, `The AI couldn't stamp this twice, so it was refunded automatically${d.refunded.emailed ? " and the customer emailed" : ""}. Reason: ${d.failed}`);
+    if (d.failed && d.refunded) return showDraft(null, `The AI couldn't stamp this twice and the automatic refund failed (${d.refunded.error}). Refund it in Polar, or stamp it by hand. Reason: ${d.failed}`);
     if (d.failed) return showDraft(null, `The AI couldn't stamp this: ${d.failed} Ask AI again, or stamp it by hand.`);
     showDraft(d);
     if (o.resultUrl) return; // published already: show the draft, keep the editor as it is

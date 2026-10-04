@@ -20,7 +20,7 @@ Later links, not linked from this page:
 | Resurrection | `/paid/resurrection` |
 | Stay Alive | `/paid/alive` |
 
-The homepage closes the form by itself when `QUEUE_LIMIT` paid pages are waiting for a stamp (it asks `/api/queue` on load and again before checkout). To close it by hand, set `queueOpen` to `false` in `src/config.js`. The button is replaced with: “Queue is full. New stamps open when the desk is clear.”
+The homepage closes the form by itself when `QUEUE_LIMIT` paid pages are waiting for a stamp (it asks `/api/queue` on load and again before checkout). To close it by hand, set `queueOpen` to `false` in `src/config.js`. The button is replaced with: “Paused for a moment. Try again shortly.”
 
 Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `dist/`. Locally: `npm install`, then `npm run dev`. Do not use the Polar organization storefront as the homepage. It lists every product.
 
@@ -67,20 +67,22 @@ Stamp numbers count up with Redis (`stamp:number`) and fall back to the number o
 
 ### AI drafts
 
-Every stamp starts as an AI draft and goes out only after a person checks it.
+Every stamp starts as an AI draft. In auto mode (production) it goes out on its own; in review mode it waits in the desk.
 
 1. Polar calls `/api/polar-webhook` when an order is paid (event `order.paid`). The webhook checks Polar's signature and answers at once.
 2. In the background, [Microlink](https://microlink.io) opens the page logged out and screenshots the first screen at 1440×900 and on a 390×844 phone. At the same time the server loads the page once for the stack and speed snapshot (`api/_inspect.js`): HTML load time and size, host, framework, missing title/description/share/viewport tags. Every address and redirect is checked so it can't reach a private network.
 3. Claude (`claude-opus-5-5`) reads both screenshots and returns the stamp, one sentence, what a stranger gets (product, buyer, reason), up to four boxes to circle, whether the first screen works on a phone, a confidence, and any problem (error page, cookie wall, login).
-**AI chooses what, code does how.** The AI only decides the verdict, the sentence, and which regions to circle (up to 3 boxes in pixels of the desktop screenshot, each with a short label). Code does the rest and checks it: the screenshots are taken at fixed sizes, every box is checked against the image's real size, a bad answer (broken JSON, a box outside the image, no verdict) gets one retry that names the problem, and boxes that still don't fit are dropped so the stamp goes out without circles rather than failing. The first screen is always captured. If a step can't recover (screenshot fails, AI unusable twice, AI declines), a note with the reason is saved in the draft's place and the order waits in the desk as `AI: failed`.
+**AI chooses what, code does how.** The AI only decides the verdict, the sentence, and which regions to circle (up to 3 boxes in pixels of the desktop screenshot, each with a short label). Code does the rest and checks it: the screenshots are taken at fixed sizes, every box is checked against the image's real size, a bad answer (broken JSON, a box outside the image, no verdict) gets one retry that names the problem, and boxes that still don't fit are dropped so the stamp goes out without circles rather than failing. The first screen is always captured. If a step can't recover (screenshot fails, AI unusable twice, AI declines), a note with the reason is saved in the draft's place. In auto mode the whole run is then tried once more, and if that also fails the order is refunded through Polar (`POST /v1/refunds`, reason `service_disruption`) and the customer gets a short email; the desk shows `AI: refunded`. If Polar refuses the refund the order shows `AI: failed` with the reason.
 
 The $1 tier skips a scouting step. Scouting the whole page (the AI reading its text and links and choosing extra sections to capture, like pricing or signup) belongs to the Kill Sheet and Stay Alive.
 
 4. The draft is saved to Blob under `drafts/`. In the desk the order shows `AI: COPE`; opening it loads the screenshot with the circles drawn, the stamp picked, and the sentence filled in. Edit anything, then **Publish verdict** as before.
 
-**Modes.** `STAMP_MODE=review` (the default): every draft waits in the desk. `STAMP_MODE=auto`: a draft with high confidence and no flagged problem is drawn on the server (`api/_render.js`, the same drawing code as the editor in `src/stamp-draw.js`), published, and emailed right away; anything else waits for you. The desk shows which ones went out automatically, and publishing again replaces them.
+**Modes.** `STAMP_MODE=review` (the default): every draft waits in the desk. `STAMP_MODE=auto`: a draft with high or medium confidence and no flagged problem is drawn on the server (`api/_render.js`, the same drawing code as the editor in `src/stamp-draw.js`), published, and emailed right away. Anything else is retried once from scratch, then refunded. The desk shows which ones went out automatically, and publishing again replaces them.
 
 The stack and speed snapshot appears on the result page, in the email, and in the desk.
+
+**On screen.** Polar sends the buyer to `/paid?checkout_id=…` (set as the checkout link's success URL). That page polls `/api/status`, which finds the order for the checkout and answers `working`, `ready` (with the `/v/<id>` link, which the page opens), or `refunded`. The access token needs `orders:read` and `refunds:write`.
 
 **Ask AI** in the composer makes or remakes a draft by hand, which is also how to stamp orders that came in before the webhook was set up.
 
