@@ -121,13 +121,13 @@ Stamped screenshots and verdicts are public files in Blob storage. Customer emai
 
 ## Homepage design
 
-The homepage has its own stylesheet, `src/home.css`: warm paper (`#f4f1ea`), black ink, verdict red as the one accent, and IBM Plex Mono for labels. Two corner radii (4px, 12px), borders instead of shadows, and four text sizes (14, 16, 20, 48+). The other pages still use `src/styles.css`.
+The homepage has its own stylesheet, `src/home.css`: warm paper, black ink, verdict red for the main action, and IBM Plex Mono for labels and meta lines. Two corner radii (4px, 12px) and hairline borders; only the stamp cards cast a shadow. The other pages still use `src/styles.css`.
 
-The hero and before-and-after images in `public/samples/` are real outputs: screenshots of our own homepage (the previous design and this one) drawn with the production stamp code (`api/_render.js`). Replace them with a real customer stamp once there is one to show, with permission.
+The stamp cards on the homepage (hero and the before-and-after) are HTML and CSS, sized in `em` so one `font-size` scales each card. They show acme-notes.app, which is fictional and labelled as such on the page. Kill Sheet and Stay Alive are listed in the pricing section with a "Coming soon" button until their checkouts exist.
 
 ## Box and React Bits
 
-Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there. On the homepage Box sits small in the footer; the roaming version (`src/roam.js`) is used by the result and payment pages.
+Box, the desk cat, lives in `src/mascot.js`. The name is `NAME` there. Box appears on the result and payment pages; the homepage doesn't use Box.
 
 The result and payment pages use [React Bits](https://reactbits.dev) components, copied into `src/bits/`. See [src/bits/README.md](src/bits/README.md). The homepage uses small plain-JavaScript ports of the same effects (decrypt, magnet, click spark) in `src/home.js` to stay light. Everything holds still for visitors with reduced motion turned on, and all content is visible without scrolling or JavaScript animation.
 

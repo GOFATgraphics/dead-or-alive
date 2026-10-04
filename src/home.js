@@ -1,6 +1,5 @@
-// The homepage is plain HTML. This adds the form, the queue check, and Box in the footer.
+// The homepage is plain HTML. This adds the form and the queue check.
 import { DESK } from "./config.js";
-import { Box } from "./mascot.js";
 import { KIND_HINT, checkPageUrl, pageKind } from "./url.js";
 import { track, trackView } from "./track.js";
 
@@ -13,8 +12,6 @@ trackView("home");
 // Queue: closed by hand in src/config.js, or automatically when too many paid pages are waiting.
 
 let closed = false;
-const ctaBox = $("#cta-box");
-Box.mount(ctaBox, { state: "idle" });
 
 function closeQueue() {
   if (closed) return;
@@ -23,8 +20,8 @@ function closeQueue() {
   $("#judge-form").hidden = true;
   $("#queue-closed").hidden = false;
   $("#trust-line").hidden = true;
-  Box.mount(ctaBox, { state: "closed" });
   $$("[data-focus-form]").forEach((a) => (a.textContent = "Paused for a moment"));
+  $$("[data-focus-form]").forEach((a) => a.classList.add("is-paused"));
 }
 
 async function queueOpen() {
