@@ -3,6 +3,7 @@
 // Optional: POLAR_API_BASE (sandbox), POLAR_ORGANIZATION_ID, SITE_URL.
 import { fetchPolarOrders, isVerdictOrder, polarReady, publishedStamps, requireAdmin, resultId, siteOrigin } from "./_lib.js";
 import { checkPageUrl } from "../src/url.js";
+import { readDraftVerdicts } from "./_ai.js";
 
 export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return;
@@ -27,6 +28,9 @@ export default async function handler(req, res) {
   } catch (_) {
     warning = "Could not read published stamps. Is Vercel Blob connected?";
   }
+
+  // Drafts are a nice-to-have here: if they can't be read, the desk still lists orders.
+  const drafts = await readDraftVerdicts(items.map((o) => o.id)).catch(() => new Map());
 
   const origin = siteOrigin(req);
   const orders = await Promise.all(
@@ -53,6 +57,7 @@ export default async function handler(req, res) {
         pageUrlRaw: raw,
         resultUrl: jsonUrl ? `${origin}/v/${id}` : "",
         verdict,
+        draft: drafts.get(o.id) || "",
       };
     })
   );

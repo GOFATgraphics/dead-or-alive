@@ -71,7 +71,21 @@
 
       <section id="composer" class="section" hidden>
         <h2 class="kicker">Stamp <span id="c-target"></span></h2>
-        <p class="usp">Paste, drop, or pick a first-screen screenshot. Then circle what a stranger misses.</p>
+        <p class="usp">Check the AI draft: the screenshot, the circles, the stamp, and the sentence. Fix anything that's off, then publish. No draft? Ask the AI, or paste a screenshot yourself.</p>
+        <div class="ai-panel" id="ai-panel">
+          <div class="ai-head">
+            <strong>AI draft</strong>
+            <span class="ai-status" id="ai-status" aria-live="polite">None yet.</span>
+            <button type="button" class="link" id="ai-run">Ask AI</button>
+          </div>
+          <p class="alert" id="ai-problem" hidden></p>
+          <dl class="ai-read" id="ai-read" hidden>
+            <dt>Product</dt><dd id="ai-product"></dd>
+            <dt>Buyer</dt><dd id="ai-buyer"></dd>
+            <dt>Reason</dt><dd id="ai-reason"></dd>
+          </dl>
+          <ul class="ai-marks" id="ai-marks" hidden></ul>
+        </div>
         <label class="drop" id="drop">
           <input id="file" type="file" accept="image/*" hidden />
           <span>Drop screenshot here, paste it, or click to pick one.</span>

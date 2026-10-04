@@ -125,6 +125,22 @@ export async function fetchPolarOrders({ since } = {}) {
   return items;
 }
 
+// One order by id, or null when Polar doesn't know it.
+export async function fetchPolarOrder(id) {
+  const token = process.env.POLAR_ACCESS_TOKEN;
+  if (!token) throw new Error("POLAR_ACCESS_TOKEN is not set.");
+  const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
+  const r = await fetch(`${base}/v1/orders/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+  }).catch(() => null);
+  if (!r) throw new Error("Polar did not answer.");
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`Polar said ${r.status}.`);
+  return r.json();
+}
+
+export const orderPageUrl = (order) => String(order?.custom_field_data?.page_url || "").slice(0, 500);
+
 // Result id -> URL of its JSON, for every published stamp.
 export async function publishedStamps() {
   const found = new Map();

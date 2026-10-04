@@ -10,6 +10,9 @@ export default async function handler(req, res) {
     setup: {
       polar: polarReady(),
       blob: !!process.env.BLOB_READ_WRITE_TOKEN,
+      ai: !!process.env.ANTHROPIC_API_KEY,
+      webhook: !!process.env.POLAR_WEBHOOK_SECRET,
+      screenshots: !!process.env.MICROLINK_API_KEY,
       email: !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
       analytics: redisReady(),
       siteUrl: !!process.env.SITE_URL,

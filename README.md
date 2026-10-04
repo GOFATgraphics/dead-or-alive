@@ -44,6 +44,22 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
 
 Only `ADMIN_KEY` is needed to open the desk. Everything else lights up as it's connected; the **Setup** tab shows what's in and what's missing.
 
+### AI drafts
+
+Every stamp starts as an AI draft and goes out only after a person checks it.
+
+1. Polar calls `/api/polar-webhook` when an order is paid (event `order.paid`). The webhook checks Polar's signature and answers at once.
+2. In the background, [Microlink](https://microlink.io) opens the page at 1440×900, logged out, and takes one screenshot of the first screen.
+3. Claude (`claude-opus-5-5`) reads the screenshot and returns the stamp, one sentence, what a stranger gets (product, buyer, reason), up to four boxes to circle, a confidence, and any problem (error page, cookie wall, login).
+4. The draft is saved to Blob under `drafts/`. In the desk the order shows `AI: COPE`; opening it loads the screenshot with the circles drawn, the stamp picked, and the sentence filled in. Edit anything, then **Publish verdict** as before.
+
+**Ask AI** in the composer makes or remakes a draft by hand, which is also how to stamp orders that came in before the webhook was set up.
+
+Env vars:
+- `ANTHROPIC_API_KEY`: from console.anthropic.com. A draft costs a few cents.
+- `POLAR_WEBHOOK_SECRET`: Polar → Settings → Webhooks → add endpoint `https://stampmypage.com/api/polar-webhook`, format Raw, event `order.paid`, then copy its secret here.
+- `MICROLINK_API_KEY` (optional): without it, Microlink's free tier allows about 50 screenshots a day.
+
 ### Analytics
 
 The desk's **Analytics** tab covers the last 7, 30, or 90 days:

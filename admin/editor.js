@@ -342,6 +342,25 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
       draw();
       onChange();
     },
+    // Circles from the AI draft. Boxes are in thousandths of the screenshot.
+    // They are the starting point, not an edit, so history stays empty.
+    setBoxes(boxes) {
+      if (!image) return;
+      const shotH = layout().shotH;
+      marks = boxes
+        .filter((b) => b.w > 0 && b.h > 0)
+        .map((b, i) => ({
+          type: "ellipse",
+          x: (b.x / 1000) * W - 12,
+          y: (b.y / 1000) * shotH - 10,
+          w: (b.w / 1000) * W + 24,
+          h: (b.h / 1000) * shotH + 20,
+          seed: 0.37 + i * 0.29,
+          size,
+        }));
+      draw();
+      onChange();
+    },
     reset() {
       image = null;
       marks = [];

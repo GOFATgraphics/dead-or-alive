@@ -113,6 +113,9 @@ import { renderAnalytics } from "./analytics.js";
       ["Admin key", true, "Set. You're in."],
       ["Polar", setup.polar, setup.polar ? "Orders and revenue load from Polar." : "Add POLAR_ACCESS_TOKEN (Polar → Settings → Developers, scope orders:read)."],
       ["Checkout link", !!(DESK.polarVerdictUrl || "").trim(), (DESK.polarVerdictUrl || "").trim() ? "The homepage form sends people to Polar." : "Paste the Polar checkout link into polarVerdictUrl in src/config.js."],
+      ["AI drafts", setup.ai, setup.ai ? "Paid orders get an AI draft: screenshot, stamp, sentence, and circles." : "Add ANTHROPIC_API_KEY (console.anthropic.com → API keys). Until then, stamp by hand."],
+      ["Order webhook", setup.webhook, setup.webhook ? "Polar tells the desk when an order is paid, so the draft is ready when you open it." : "In Polar → Settings → Webhooks, add https://stampmypage.com/api/polar-webhook for order.paid, then set POLAR_WEBHOOK_SECRET. Until then, press Ask AI on each order."],
+      ["Screenshots", true, setup.screenshots ? "Using your Microlink plan." : "Using Microlink's free tier (about 50 a day). Add MICROLINK_API_KEY for more."],
       ["Stamp storage", setup.blob, setup.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
       ["Email", setup.email, setup.email ? "Customers get their link by email." : "Add RESEND_API_KEY and MAIL_FROM. Until then, use Draft email."],
       ["Visitor analytics", setup.analytics, setup.analytics ? "Visits and clicks are being counted." : "Add Upstash Redis from the Vercel Marketplace (Storage → Upstash). It adds KV_REST_API_URL and KV_REST_API_TOKEN."],
@@ -183,7 +186,9 @@ import { renderAnalytics } from "./analytics.js";
       const li = document.createElement("li");
       li.className = "order" + (current && current.id === o.id ? " on" : "");
       const when = o.createdAt ? new Date(o.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
-      const stamp = o.verdict ? `<a class="word ${o.verdict.toLowerCase()}" href="${o.resultUrl}" target="_blank" rel="noopener">${o.verdict}</a>` : "";
+      const stamp = o.verdict
+        ? `<a class="word ${o.verdict.toLowerCase()}" href="${o.resultUrl}" target="_blank" rel="noopener">${o.verdict}</a>`
+        : o.draft ? `<span class="chip-ai">AI: ${o.draft}</span>` : "";
       li.innerHTML = `
         <div class="meta"><span></span><span></span>${stamp}</div>
         <a class="page" target="_blank" rel="noopener noreferrer"></a>
@@ -225,7 +230,80 @@ import { renderAnalytics } from "./analytics.js";
     $("composer").hidden = false;
     render();
     $("composer").scrollIntoView({ behavior: "smooth", block: "start" });
+    showDraft(null, o.draft ? "Loading…" : "None yet.");
+    if (o.draft) loadDraft(o);
   }
+
+  // AI draft
+
+  function showDraft(d, status) {
+    $("ai-status").textContent = status || (d ? `${d.verdict}, ${d.confidence} confidence.` : "None yet.");
+    $("ai-run").textContent = d ? "Ask AI again" : "Ask AI";
+    $("ai-problem").hidden = !(d && d.problem);
+    $("ai-problem").textContent = d && d.problem ? `AI flagged: ${d.problem}` : "";
+    $("ai-read").hidden = !d;
+    $("ai-marks").hidden = !(d && d.marks.length);
+    if (!d) return;
+    $("ai-product").textContent = d.read.product || "Can't tell";
+    $("ai-buyer").textContent = d.read.buyer || "Can't tell";
+    $("ai-reason").textContent = d.read.reason || "Can't tell";
+    $("ai-marks").replaceChildren(...d.marks.map((m) => Object.assign(document.createElement("li"), { textContent: m.why })));
+  }
+
+  function applyDraft(o, d) {
+    if (current !== o) return; // the admin moved on to another order
+    showDraft(d);
+    if (o.resultUrl) return; // published already: show the draft, keep the editor as it is
+    document.querySelector(`input[name=verdict][value=${d.verdict}]`).checked = true;
+    sentence.value = d.sentence || SENTENCES[d.verdict];
+    if (!d.imageData) return;
+    const img = new Image();
+    img.onload = async () => {
+      if (current !== o) return;
+      try { await Promise.all([document.fonts.load('500 20px "IBM Plex Mono"'), document.fonts.load('500 20px "Plus Jakarta Sans"')]); } catch (_) {}
+      drop.hidden = true;
+      canvas.hidden = false;
+      editor.setImage(img);
+      editor.setBoxes(d.marks);
+    };
+    img.src = d.imageData;
+  }
+
+  async function loadDraft(o) {
+    try {
+      const r = await fetch(`/api/draft?order=${encodeURIComponent(o.id)}`, { headers: { "x-admin-key": key }, cache: "no-store" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+      if (data.draft) applyDraft(o, data.draft);
+      else if (current === o) showDraft(null);
+    } catch (err) {
+      if (current === o) showDraft(null, err.message || "Could not load the draft.");
+    }
+  }
+
+  const aiRun = $("ai-run");
+  aiRun.addEventListener("click", async () => {
+    const o = current;
+    if (!o) return;
+    aiRun.disabled = true;
+    showDraft(null, "Taking a screenshot and reading it. This takes up to a minute…");
+    try {
+      const r = await fetch("/api/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        body: JSON.stringify({ orderId: o.id }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+      o.draft = data.draft.verdict;
+      applyDraft(o, data.draft);
+      render();
+    } catch (err) {
+      if (current === o) showDraft(null, err.message || "The AI draft failed.");
+    } finally {
+      aiRun.disabled = false;
+    }
+  });
 
   document.querySelectorAll("input[name=verdict]").forEach((r) =>
     r.addEventListener("change", () => {

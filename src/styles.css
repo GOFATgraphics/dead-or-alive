@@ -386,6 +386,16 @@ input[aria-invalid="true"] { border-color: var(--dead); }
 .verdicts input, .check input { min-height: 0; accent-color: var(--brand); }
 .actions { margin-top: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .check { flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.75rem; font-size: 0.9375rem; }
+.ai-panel { margin: 0 0 1rem; padding: 0.9rem 1rem; border-radius: 12px; background: var(--chip); font-size: 0.9375rem; line-height: 1.5; }
+.ai-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.ai-status { color: var(--muted); }
+.ai-head .link { margin-left: auto; }
+.ai-read { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; margin: 0.75rem 0 0; }
+.ai-read dt { font-weight: 700; }
+.ai-read dd { margin: 0; overflow-wrap: anywhere; }
+.ai-marks { margin: 0.5rem 0 0; padding-left: 1.1rem; color: var(--muted); }
+.ai-panel .alert { margin: 0.75rem 0 0; }
+.chip-ai { padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--chip); font-size: 0.75rem; font-weight: 700; }
 .published { margin: 1rem 0 0; padding: 0.9rem 1rem; border-radius: 12px; background: var(--chip); font-size: 0.9375rem; line-height: 1.6; overflow-wrap: anywhere; }
 .published a { color: var(--brand-ink); font-weight: 600; }
 
