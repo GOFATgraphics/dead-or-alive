@@ -280,8 +280,9 @@ export function renderAnalytics(root, data) {
         ["Event", "Count"],
         [
           ["“Judge my page” buttons outside the form", num(t.totals.cta_click)],
-          ["Saw “Queue is full”", num(t.totals.queue_closed)],
+          ["Saw “Paused for a moment”", num(t.totals.queue_closed)],
           ["Payment confirmed page views", num(t.totals["view:paid"])],
+          ["Pricing page views", num(t.totals["view:pricing"])],
           ["Privacy page views", num(t.totals["view:privacy"])],
           ["Terms page views", num(t.totals["view:terms"])],
         ],

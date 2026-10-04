@@ -144,6 +144,39 @@ export async function fetchPolarOrder(id) {
   return r.json();
 }
 
+// Refunds a whole order through Polar. Throws an Error with a message for the desk.
+// Refunds are for the amount before tax; Polar returns the tax with it.
+export async function refundPolarOrder(order, comment = "") {
+  const token = process.env.POLAR_ACCESS_TOKEN;
+  if (!token) throw new Error("POLAR_ACCESS_TOKEN is not set.");
+  const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
+  const amount = order.net_amount ?? order.subtotal_amount ?? order.amount;
+  if (!(amount > 0)) throw new Error("The order has no amount to refund.");
+  const r = await fetch(`${base}/v1/refunds/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ order_id: order.id, amount, reason: "service_disruption", comment: String(comment).slice(0, 500) || null }),
+  }).catch(() => null);
+  if (!r) throw new Error("Polar did not answer.");
+  if (!r.ok) throw new Error(`Polar refused the refund (${r.status}).`);
+  return r.json();
+}
+
+// The order a checkout became, or null while Polar is still creating it.
+export async function polarOrderForCheckout(checkoutId) {
+  const token = process.env.POLAR_ACCESS_TOKEN;
+  if (!token) throw new Error("POLAR_ACCESS_TOKEN is not set.");
+  const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
+  const url = new URL(base + "/v1/orders/");
+  url.searchParams.set("checkout_id", checkoutId);
+  url.searchParams.set("limit", "1");
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }).catch(() => null);
+  if (!r) throw new Error("Polar did not answer.");
+  if (!r.ok) throw new Error(`Polar said ${r.status}.`);
+  const body = await r.json().catch(() => ({}));
+  return body.items?.[0] || null;
+}
+
 export const orderPageUrl = (order) => String(order?.custom_field_data?.page_url || "").slice(0, 500);
 
 // Result id -> URL of its JSON, for every published stamp.

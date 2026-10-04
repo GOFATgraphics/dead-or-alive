@@ -1,13 +1,14 @@
 // The automated half of a stamp: screenshot the first screen (desktop and phone), take the stack and speed
 // snapshot, have Claude read the screenshots, and save a draft.
-// In review mode a person checks every draft in the desk. In auto mode (STAMP_MODE=auto) a confident,
-// problem-free draft is published straight away and everything else still waits for a person.
+// In auto mode (STAMP_MODE=auto) a confident, problem-free draft is published straight away. If it isn't,
+// the whole run is tried once more, and if that still fails the order is refunded and the customer told.
+// In review mode (STAMP_MODE unset) every draft waits in the desk instead.
 // Env: ANTHROPIC_API_KEY, BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY (paid screenshot plan), STAMP_MODE.
 import Anthropic from "@anthropic-ai/sdk";
-import { list, put } from "@vercel/blob";
-import { VERDICTS, orderPageUrl, resultId } from "./_lib.js";
+import { head, list, put } from "@vercel/blob";
+import { VERDICTS, orderPageUrl, refundPolarOrder, resultId } from "./_lib.js";
 import { inspect } from "./_inspect.js";
-import { publishStamp, publicOrigin } from "./_publish.js";
+import { publishStamp, publicOrigin, sendRefundEmail } from "./_publish.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
 
 export const VIEWPORT = { width: 1440, height: 900 };
@@ -70,7 +71,7 @@ Mark one to three regions on the desktop screenshot that justify the stamp (usua
 
 If there is a phone screenshot, say whether the first screen works on a phone: nothing cut off or overflowing sideways, text readable, the main button visible. Note what breaks, in a few words.
 
-If the desktop screenshot shows an error page, a cookie wall covering the page, a login screen, or a blank page, set problem to describe it. A person will check your work before the customer sees anything, so say how sure you are.`;
+If the desktop screenshot shows an error page, a cookie wall covering the page, a login screen, or a blank page, set problem to describe it. If the page can't be judged, the customer is refunded, so say how sure you are.`;
 
 const SCHEMA = {
   type: "object",
@@ -199,7 +200,7 @@ export async function judge(jpg, pageUrl, phoneJpg = null) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     const content = attempt === 1 ? base : [...base, { type: "text", text: `Your last answer had problems: ${problems.join("; ")}. Answer again with those fixed.` }];
     response = await ask(client, content);
-    if (response.stop_reason === "refusal") throw new Error("The AI declined to judge this page. Stamp it by hand.");
+    if (response.stop_reason === "refusal") throw new Error("The AI declined to judge this page.");
     let parsed = null;
     if (response.stop_reason !== "max_tokens") {
       try {
@@ -212,7 +213,7 @@ export async function judge(jpg, pageUrl, phoneJpg = null) {
     if (!problems.length) break;
   }
   if (!out || !VERDICTS.includes(out.verdict) || !String(out.sentence || "").trim()) {
-    throw new Error("The AI's answer was unusable twice. Stamp it by hand.");
+    throw new Error("The AI's answer was unusable twice.");
   }
 
   // Boxes that still don't fit after the retry are dropped: a stamp without circles beats no stamp.
@@ -275,49 +276,86 @@ export async function makeDraft(orderId, rawPageUrl) {
   return (await buildDraft(orderId, rawPageUrl)).draft;
 }
 
-// Only confident drafts with nothing flagged go out without a person.
-export const autoPublishable = (d) => d.confidence === "high" && !d.problem;
+// A draft goes out on its own when the AI is reasonably sure and flagged nothing (error page, login wall, blank).
+export const autoPublishable = (d) => d.confidence !== "low" && !d.problem;
 
-// When a step fails, the order isn't lost: a note is saved in its place so it waits in the desk with the reason.
-async function saveFailure(orderId, pageUrl, err) {
-  const opts = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
-  const note = { orderId, pageUrl, failed: String(err?.message || err || "Unknown error").slice(0, 300), createdAt: new Date().toISOString() };
-  await put(draftPaths(resultId(orderId)).json, JSON.stringify(note), { ...opts, contentType: "application/json" }).catch(() => {});
+const BLOB_OPTS = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
+const saveNote = (orderId, note) =>
+  put(draftPaths(resultId(orderId)).json, JSON.stringify(note), { ...BLOB_OPTS, contentType: "application/json" });
+
+// When a step fails, the order isn't lost: a note is saved in its place so it shows in the desk with the reason.
+async function saveFailure(orderId, pageUrl, err, extra = {}) {
+  const note = { orderId, pageUrl, failed: String(err?.message || err || "Unknown error").slice(0, 300), createdAt: new Date().toISOString(), ...extra };
+  await saveNote(orderId, note).catch(() => {});
   return note;
 }
 
-// A paid order arrived (webhook). Draft it, and in auto mode publish it when the draft is confident.
+// Auto mode gave up on this order: refund it through Polar and tell the customer.
+// If Polar won't refund, the note says so and the order stays in the desk.
+async function giveUp(order, pageUrl, reason) {
+  const refund = await refundPolarOrder(order, reason).then(() => ({ ok: true }), (err) => ({ ok: false, error: err.message }));
+  const email = order.customer?.email || order.user?.email || "";
+  const mail = refund.ok && email ? await sendRefundEmail(email, { pageUrl }) : { emailed: false };
+  return saveFailure(order.id, pageUrl, reason, { refunded: { at: new Date().toISOString(), ...refund, emailed: mail.emailed } });
+}
+
+// A paid order arrived (webhook). Review mode: draft it for the desk.
+// Auto mode: draft it, publish it when confident, otherwise run the whole thing once more, then refund.
 export async function processPaidOrder(order) {
-  let built;
-  try {
-    built = await buildDraft(order.id, orderPageUrl(order));
-  } catch (err) {
-    console.error("Draft failed:", order.id, err);
-    return saveFailure(order.id, orderPageUrl(order), err);
+  const pageUrl = orderPageUrl(order);
+  const tries = autoMode() ? 2 : 1;
+  let built = null, reason = "";
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      built = await buildDraft(order.id, pageUrl);
+      if (!autoMode() || autoPublishable(built.draft)) break;
+      reason = built.draft.problem || `The AI wasn't sure (${built.draft.confidence} confidence).`;
+    } catch (err) {
+      console.error("Draft failed:", order.id, `attempt ${attempt}`, err);
+      built = null;
+      reason = err.message || String(err);
+    }
   }
+  if (!autoMode()) return built ? built.draft : saveFailure(order.id, pageUrl, reason);
+  if (!built || !autoPublishable(built.draft)) return giveUp(order, pageUrl, reason);
+
   const { draft, jpg } = built;
-  if (!autoMode() || !autoPublishable(draft)) return draft;
-  // Loaded only here, so routes that just read drafts don't carry the canvas library.
-  const { renderStamp } = await import("./_render.js");
-  const { image, shot } = await renderStamp({ jpg, boxes: draft.marks, verdict: draft.verdict, sentence: draft.sentence });
-  const out = await publishStamp({
-    orderId: order.id,
-    email: order.customer?.email || order.user?.email || "",
-    pageUrl: draft.pageUrl,
-    verdict: draft.verdict,
-    sentence: draft.sentence,
-    image,
-    shot,
-    focus: draft.marks.length
-      ? { top: Math.min(...draft.marks.map((m) => m.y)) / 1000, bottom: Math.max(...draft.marks.map((m) => m.y + m.h)) / 1000 }
-      : null,
-    origin: publicOrigin(),
-    extra: { snapshot: draft.snapshot },
-  });
-  const done = { ...draft, autoPublished: { at: new Date().toISOString(), url: out.url, emailed: out.emailed, emailError: out.emailError || "" } };
-  const opts = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
-  await put(draftPaths(resultId(order.id)).json, JSON.stringify(done), { ...opts, contentType: "application/json" });
-  return done;
+  try {
+    // Loaded only here, so routes that just read drafts don't carry the canvas library.
+    const { renderStamp } = await import("./_render.js");
+    const { image, shot } = await renderStamp({ jpg, boxes: draft.marks, verdict: draft.verdict, sentence: draft.sentence });
+    const out = await publishStamp({
+      orderId: order.id,
+      email: order.customer?.email || order.user?.email || "",
+      pageUrl: draft.pageUrl,
+      verdict: draft.verdict,
+      sentence: draft.sentence,
+      image,
+      shot,
+      focus: draft.marks.length
+        ? { top: Math.min(...draft.marks.map((m) => m.y)) / 1000, bottom: Math.max(...draft.marks.map((m) => m.y + m.h)) / 1000 }
+        : null,
+      origin: publicOrigin(),
+      extra: { snapshot: draft.snapshot },
+    });
+    const done = { ...draft, autoPublished: { at: new Date().toISOString(), url: out.url, emailed: out.emailed, emailError: out.emailError || "" } };
+    await saveNote(order.id, done);
+    return done;
+  } catch (err) {
+    console.error("Publish failed:", order.id, err);
+    return giveUp(order, pageUrl, `Publishing failed: ${err.message || err}`);
+  }
+}
+
+// The saved draft or note for one result id, or null. Reads one file, so it's cheap enough to poll.
+export async function draftFor(id) {
+  try {
+    const meta = await head(draftPaths(id).json);
+    const r = await fetch(meta.url, { cache: "no-store" });
+    return r.ok ? await r.json() : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 // resultId -> draft JSON URL, for every saved draft.
@@ -345,7 +383,7 @@ export async function readDraftVerdicts(orderIds) {
       if (!url) return;
       const d = await fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (d && d.verdict) out.set(id, d.verdict);
-      else if (d && d.failed) out.set(id, "failed");
+      else if (d && d.failed) out.set(id, d.refunded?.ok ? "refunded" : "failed");
     })
   );
   return out;

@@ -1,5 +1,5 @@
 // Publishing a stamp: save the image and record, then email the customer their link.
-// Used by the desk (a person pressed Publish) and by automatic mode.
+// Used by automatic mode and by the desk's Publish button.
 import { put } from "@vercel/blob";
 import { escapeHtml, paths, readResult, resultId } from "./_lib.js";
 import { pipeline, redisReady } from "./_redis.js";
@@ -45,30 +45,53 @@ ${snapshotHtml(snapshot)}
 </table></td></tr></table></body></html>`;
 }
 
-async function sendEmail(to, data) {
+async function mail(to, { subject, html, text }) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM;
   if (!key || !from) return { emailed: false, emailError: "Email is not set up (RESEND_API_KEY, MAIL_FROM)." };
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      reply_to: process.env.CONTACT_EMAIL || undefined,
-      subject: `${data.verdict}. We looked at ${data.host}.`,
-      html: emailHtml(data),
-      text: [
-        `${data.verdict}.`,
-        data.sentence,
-        snapshotRows(data.snapshot).map((r) => `${r.label}: ${r.value}`).join("\n"),
-        `See your stamp: ${data.link}`,
-        "Stamp My Page",
-      ].filter(Boolean).join("\n\n"),
-    }),
+    body: JSON.stringify({ from, to: [to], reply_to: process.env.CONTACT_EMAIL || undefined, subject, html, text }),
   }).catch(() => null);
   if (!r || !r.ok) return { emailed: false, emailError: `Resend said ${r ? r.status : "nothing"}.` };
   return { emailed: true };
+}
+
+const sendEmail = (to, data) =>
+  mail(to, {
+    subject: `${data.verdict}. We looked at ${data.host}.`,
+    html: emailHtml(data),
+    text: [
+      `${data.verdict}.`,
+      data.sentence,
+      snapshotRows(data.snapshot).map((r) => `${r.label}: ${r.value}`).join("\n"),
+      `See your stamp: ${data.link}`,
+      "Stamp My Page",
+    ].filter(Boolean).join("\n\n"),
+  });
+
+// Sent when the AI couldn't stamp a page twice and the order was refunded.
+export function sendRefundEmail(to, { pageUrl }) {
+  const e = escapeHtml;
+  let host = pageUrl;
+  try {
+    host = new URL(pageUrl).hostname.replace(/^www\./, "");
+  } catch (_) {}
+  const lines = [
+    `We couldn't stamp ${host}, so we've refunded your $1.`,
+    "This usually means the page didn't load for us, showed a login or cookie wall, or came up blank. You can try again once a logged-out visitor can see it.",
+  ];
+  return mail(to, {
+    subject: `Refunded: we couldn't stamp ${host}`,
+    html: `<!doctype html><html><body style="margin:0;background:#f6f5fc;color:#12132a;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" style="max-width:560px" cellpadding="0" cellspacing="0">
+${lines.map((l) => `<tr><td style="padding-top:12px;font-size:15px;line-height:1.5">${e(l)}</td></tr>`).join("")}
+<tr><td style="padding-top:32px;font-size:12px;color:#5d6180">Stamp My Page</td></tr>
+</table></td></tr></table></body></html>`,
+    text: [...lines, "Stamp My Page"].join("\n\n"),
+  });
 }
 
 // Stamp numbers make cards feel collectible (#0042). Republishing keeps the number.

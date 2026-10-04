@@ -91,7 +91,7 @@
       "maxDuration": 120
     },
     "api/polar-webhook.js": {
-      "maxDuration": 120,
+      "maxDuration": 300,
       "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-seal-red-256.png}"
     },
     "api/publish.js": {

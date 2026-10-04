@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { pipeline, redisReady } from "./_redis.js";
 
 export const EVENTS = new Set([
-  "view", // a page was opened (p: home | result | paid | privacy | terms)
+  "view", // a page was opened (p: home | result | paid | pricing | privacy | terms)
   "form_start", // first click into the homepage form
   "submit_try", // pressed the button
   "submit_error", // form refused the input (err: code)
@@ -14,7 +14,7 @@ export const EVENTS = new Set([
   "share_copy", // shared a result: copied the link, posted to X or LinkedIn, or downloaded the card
   "result_cta", // "Judge another page" from a result page
 ]);
-const PAGES = new Set(["home", "result", "paid", "privacy", "terms"]);
+const PAGES = new Set(["home", "result", "paid", "pricing", "privacy", "terms"]);
 const VERDICTS = new Set(["DEAD", "COPE", "ALIVE"]);
 const BOT = /bot|crawl|spider|slurp|facebookexternalhit|embedly|preview|whatsapp|telegram|discord|slack|lighthouse|pingdom|uptime/i;
 const TTL = 400 * 24 * 3600;
