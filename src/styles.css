@@ -121,8 +121,8 @@ input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px r
 
 /* Top bar */
 .topbar { position: relative; z-index: 5; display: flex; align-items: center; gap: 1.5rem; max-width: 76rem; margin: 0 auto; padding: 1.25rem 1.25rem 0; }
-.logo { display: inline-flex; align-items: center; gap: 0.55rem; font-weight: 800; letter-spacing: -0.015em; word-spacing: 0.1em; text-decoration: none; color: var(--ink); font-size: 1.0625rem; }
-.logo svg { width: 1.9rem; height: 1.9rem; }
+.logo { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 800; letter-spacing: 0.01em; word-spacing: 0.08em; text-transform: uppercase; text-decoration: none; color: var(--ink); font-size: 1.0625rem; }
+.logo img, .logo svg { width: 2.5rem; height: 2.5rem; flex: none; }
 .topbar .btn { margin-left: auto; }
 
 /* Hero: sky, hills, floating cards */
