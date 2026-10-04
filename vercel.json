@@ -92,11 +92,11 @@
     },
     "api/polar-webhook.js": {
       "maxDuration": 300,
-      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-seal-red-256.png}"
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
     },
     "api/publish.js": {
       "maxDuration": 60,
-      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-seal-red-256.png}"
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
     }
   }
 }
