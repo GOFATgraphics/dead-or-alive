@@ -458,7 +458,7 @@ input[aria-invalid="true"] { border-color: var(--dead); }
 .doc p, .doc li { color: #2e3150; }
 .doc p { margin: 0.5rem 0 0; }
 .doc ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
-.doc a:not(.logo):not(.link) { color: var(--brand-ink); font-weight: 600; }
+.doc a:not(.logo):not(.link):not(.submit) { color: var(--brand-ink); font-weight: 600; }
 .doc .name { font-size: clamp(2rem, 6vw, 2.6rem); }
 .doc-foot { margin-top: 3rem !important; }
 
