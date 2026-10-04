@@ -45,3 +45,31 @@ export function checkPageUrl(input) {
   const query = appId && /^[\w.]{1,150}$/.test(appId) ? `?id=${appId}` : "";
   return { url: `${url.protocol}//${host}${url.pathname}${query}` };
 }
+
+// What kind of page a checked URL is, so the form can say what we'll stamp
+// and the AI knows whether it's judging a landing page or a store listing.
+export function pageKind(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch (_) {
+    return "web";
+  }
+  const host = u.hostname.toLowerCase();
+  if (host === "apps.apple.com" || host === "itunes.apple.com") return "appstore";
+  if (host === "play.google.com" && u.pathname.startsWith("/store/apps")) return "playstore";
+  if (/\.(dmg|exe|msi|pkg|apk|aab|zip|appimage|deb|rpm)$/i.test(u.pathname)) return "download";
+  if (/^(app|dashboard|console|portal|admin)\./.test(host) || /\/(login|log-in|signin|sign-in|dashboard|account|admin)(\/|$)/i.test(u.pathname)) {
+    return "login";
+  }
+  return "web";
+}
+
+// What the form says under the URL field for each kind.
+export const KIND_HINT = {
+  web: "We'll check the first screen of this page.",
+  appstore: "We'll check your App Store page: icon, title, subtitle, and first screenshots.",
+  playstore: "We'll check your Google Play page: icon, title, short description, and first screenshots.",
+  login: "That looks like it's behind a login. We stamp what a logged-out stranger sees, so send your public landing page.",
+  download: "That's a file, not a page. Send the download page instead.",
+};

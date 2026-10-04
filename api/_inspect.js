@@ -3,15 +3,13 @@
 // The server fetches a customer's URL here, so every hop is checked against private networks first.
 import dns from "node:dns/promises";
 import net from "node:net";
-import { checkPageUrl } from "../src/url.js";
+import { checkPageUrl, pageKind } from "../src/url.js";
 
 const MAX_HOPS = 5;
 const MAX_BYTES = 3 * 1024 * 1024;
 const TIMEOUT_MS = 12000;
 const UA = "Mozilla/5.0 (compatible; StampMyPage/1.0; +https://stampmypage.com)";
 
-// App stores serve their own page, so their stack says nothing about the customer's product.
-const STORE_HOSTS = ["apps.apple.com", "play.google.com"];
 
 const blocked = new net.BlockList();
 for (const [net4, bits] of [
@@ -122,8 +120,8 @@ function meta(html, key) {
 }
 
 export async function inspect(pageUrl) {
-  const host = new URL(pageUrl).hostname;
-  if (STORE_HOSTS.includes(host)) return { skipped: "App store page. The store's stack isn't yours, so there's no snapshot." };
+  // App stores serve their own page, so their stack says nothing about the customer's product.
+  if (["appstore", "playstore"].includes(pageKind(pageUrl))) return { skipped: "App store page. The store's stack isn't yours, so there's no snapshot." };
   let f;
   try {
     f = await safeFetch(pageUrl);

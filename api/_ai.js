@@ -8,7 +8,7 @@ import { list, put } from "@vercel/blob";
 import { VERDICTS, orderPageUrl, resultId } from "./_lib.js";
 import { inspect } from "./_inspect.js";
 import { publishStamp, publicOrigin } from "./_publish.js";
-import { checkPageUrl } from "../src/url.js";
+import { checkPageUrl, pageKind } from "../src/url.js";
 
 export const VIEWPORT = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844, scale: 2 };
@@ -119,6 +119,15 @@ const SCHEMA = {
   },
 };
 
+// Store listings are an app's first screen, but they're judged differently from a landing page.
+const STORE_NOTE = (store) =>
+  `This is the app's ${store} listing, not a landing page. Judge it as a store listing: the icon, app name, subtitle or short description, rating, and the first screenshots a stranger sees before scrolling. Product means what the app does, buyer means who it's for, reason means why they'd install it. Ignore the store's own navigation, menus, and banners; circle parts of the listing itself. `;
+const KIND_NOTE = {
+  appstore: STORE_NOTE("App Store"),
+  playstore: STORE_NOTE("Google Play"),
+  login: "This page may sit behind a login. Judge exactly what a logged-out stranger sees here; if it's only a login form, say so in problem. ",
+};
+
 const clamp = (n) => Math.min(1000, Math.max(0, Math.round(Number(n) || 0)));
 
 export async function judge(jpg, pageUrl, phoneJpg = null) {
@@ -142,7 +151,7 @@ export async function judge(jpg, pageUrl, phoneJpg = null) {
                 { type: "image", source: { type: "base64", media_type: "image/jpeg", data: phoneJpg.toString("base64") } },
               ]
             : []),
-          { type: "text", text: `First screen of ${pageUrl}. Stamp it.` },
+          { type: "text", text: `${KIND_NOTE[pageKind(pageUrl)] || ""}First screen of ${pageUrl}. Stamp it.` },
         ],
       },
     ],

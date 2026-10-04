@@ -44,6 +44,16 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
 
 Only `ADMIN_KEY` is needed to open the desk. Everything else lights up as it's connected; the **Setup** tab shows what's in and what's missing.
 
+### What the $1 checks
+
+$1 checks the first screen only. The Kill Sheet (not built yet) is where the whole page and flow get scouted.
+
+The form reads the link as the visitor types (`pageKind` in `src/url.js`) and says what will be stamped:
+- `apps.apple.com` / `play.google.com/store/apps`: the App Store or Google Play listing (icon, title, subtitle, first screenshots). The AI is told to judge it as a store listing, and the stack snapshot is skipped.
+- `app.`, `dashboard.`, `/login`, `/dashboard` and similar: a warning that only the logged-out view gets stamped.
+- Installer files (`.dmg`, `.exe`, `.apk`, ...): refused, with a note to send the download page.
+- Anything else: the first screen of the page.
+
 ### Share cards
 
 Publishing a stamp (by hand or automatically) also draws two share cards on the server (`api/_card.js`):

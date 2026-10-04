@@ -3,7 +3,7 @@
 import { DESK } from "./config.js";
 import { Box } from "./mascot.js";
 import { createStage } from "./roam.js";
-import { checkPageUrl } from "./url.js";
+import { KIND_HINT, checkPageUrl, pageKind } from "./url.js";
 import { track, trackView } from "./track.js";
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -65,8 +65,19 @@ function fail(message, field, code = "other") {
     field.focus();
   }
 }
+// Under the URL field: what we'll stamp for this link (a page, an App Store or Google Play listing).
+const hintEl = $("#url-hint");
+function showHint() {
+  const page = checkPageUrl($("#page_url").value);
+  hintEl.hidden = !page.url;
+  if (!page.url) return;
+  const kind = pageKind(page.url);
+  hintEl.textContent = KIND_HINT[kind];
+  hintEl.dataset.kind = kind;
+}
 form.addEventListener("input", (e) => {
   e.target.removeAttribute("aria-invalid");
+  if (e.target.id === "page_url") showHint();
   stage.home();
   stage.look();
 });
@@ -92,6 +103,7 @@ form.addEventListener("submit", async (e) => {
   const emailField = $("#email");
   const page = checkPageUrl(urlField.value);
   if (!page.url) return fail(page.error, urlField, page.code);
+  if (pageKind(page.url) === "download") return fail(KIND_HINT.download, urlField, "download");
   const email = emailField.value.trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("That is not an email.", emailField, "email");
   // Check once more, so nobody pays for a slot that filled up while they typed.
