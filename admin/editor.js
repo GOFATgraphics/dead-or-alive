@@ -297,6 +297,16 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
       draw();
     },
     draw,
+    // Where the circles sit, as fractions of the screenshot height, so the share card keeps them in view.
+    focus() {
+      if (!image || !marks.length) return null;
+      const shotH = layout().shotH;
+      const boxes = marks.map(bounds);
+      return {
+        top: Math.max(0, Math.min(...boxes.map((b) => b.y)) / shotH),
+        bottom: Math.min(1, Math.max(...boxes.map((b) => b.y + b.h)) / shotH),
+      };
+    },
     // The circled screenshot alone (no stamp, no sentence) as a JPEG data URL, for the share cards.
     exportShot() {
       if (!image) return "";

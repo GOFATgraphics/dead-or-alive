@@ -61,7 +61,10 @@ Then stamp it:
 - COPE: it looks credible, but a stranger cannot name at least one of product, buyer, or reason without decoding.
 - ALIVE: a stranger can name all three.
 
-Write one sentence for the customer. Start it with "A stranger" and say plainly what they get or miss before they scroll. No jargon, no advice list, under 25 words.
+Write one sentence for the customer in the stranger's own voice, first person, the way they'd say it out loud after five seconds. Plain and specific to this page, under 20 words. No jargon, no advice. For example:
+- DEAD: "Five seconds in, I still don't know what this does or who it's for."
+- COPE: "Clear headline, but five buttons fight over what I should click first."
+- ALIVE: "In five seconds I know what it does, who it's for, and what to click."
 
 Mark one to three regions on the screenshot that justify the stamp (usually the headline, and whatever is missing or confusing). Give each as a box in thousandths of the screenshot's width and height (0 to 1000), with a short reason.
 
@@ -226,6 +229,9 @@ export async function processPaidOrder(order) {
     sentence: draft.sentence,
     image,
     shot,
+    focus: draft.marks.length
+      ? { top: Math.min(...draft.marks.map((m) => m.y)) / 1000, bottom: Math.max(...draft.marks.map((m) => m.y + m.h)) / 1000 }
+      : null,
     origin: publicOrigin(),
     extra: { snapshot: draft.snapshot },
   });

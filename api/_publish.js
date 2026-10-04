@@ -93,7 +93,8 @@ async function stampNumber(id) {
 
 // image: the finished stamp (JPEG buffer). shot: the circled screenshot alone, for the share cards.
 // pageUrl: an already checked URL. Throws if storage fails; a card that fails to draw is skipped.
-export async function publishStamp({ orderId, email, pageUrl, verdict, sentence, image, shot, sendMail = true, origin, extra = {} }) {
+// focus: { top, bottom } of the circles as fractions of the screenshot height, so the card keeps them in view.
+export async function publishStamp({ orderId, email, pageUrl, verdict, sentence, image, shot, focus, sendMail = true, origin, extra = {} }) {
   const id = resultId(orderId);
   const p = paths(id);
   const url = new URL(pageUrl);
@@ -114,10 +115,10 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
   if (shot) {
     try {
       const { renderCards } = await import("./_card.js");
-      const cards = await renderCards(shot, record);
+      const cards = await renderCards(shot, { ...record, focus });
       const [wide, square] = await Promise.all([
-        put(p.card, cards.wide, { ...opts, contentType: "image/png" }),
-        put(p.square, cards.square, { ...opts, contentType: "image/png" }),
+        put(p.card, cards.wide, { ...opts, contentType: "image/jpeg" }),
+        put(p.square, cards.square, { ...opts, contentType: "image/jpeg" }),
       ]);
       record.card = `${wide.url}?v=${v}`;
       record.cardSquare = `${square.url}?v=${v}`;

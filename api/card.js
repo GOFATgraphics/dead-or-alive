@@ -11,8 +11,8 @@ export default async function handler(req, res) {
   }
   const img = await fetch(src).catch(() => null);
   if (!img || !img.ok) return res.status(502).json({ error: "Could not load the card." });
-  const name = `${r.host.replace(/[^a-z0-9.-]/gi, "")}-${r.verdict.toLowerCase()}${square ? "-square" : ""}.png`;
-  res.setHeader("Content-Type", "image/png");
+  const name = `${r.host.replace(/[^a-z0-9.-]/gi, "")}-${r.verdict.toLowerCase()}${square ? "-square" : ""}.jpg`;
+  res.setHeader("Content-Type", "image/jpeg");
   res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
   res.setHeader("Cache-Control", "public, s-maxage=300");
   res.status(200).send(Buffer.from(await img.arrayBuffer()));

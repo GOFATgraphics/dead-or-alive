@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       sentence,
       image,
       shot: shot && shot.length <= MAX_IMAGE ? shot : null,
+      focus: b.focus && Number.isFinite(+b.focus.top) && Number.isFinite(+b.focus.bottom) ? { top: +b.focus.top, bottom: +b.focus.bottom } : null,
       sendMail: b.sendEmail !== false,
       origin: publicOrigin(req),
       extra: draft?.snapshot ? { snapshot: draft.snapshot } : {},

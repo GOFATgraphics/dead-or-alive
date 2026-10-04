@@ -72,8 +72,8 @@ export function isResultId(id) {
 export const paths = (id) => ({
   json: `verdicts/${id}.json`,
   image: `verdicts/${id}.jpg`,
-  card: `verdicts/${id}-card.png`,
-  square: `verdicts/${id}-square.png`,
+  card: `verdicts/${id}-card.jpg`,
+  square: `verdicts/${id}-square.jpg`,
 });
 
 // The public verdict record, or null.

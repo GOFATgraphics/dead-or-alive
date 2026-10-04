@@ -51,9 +51,9 @@ Publishing a stamp (by hand or automatically) also draws two share cards on the 
 - **Wide, 1200×630**: the circled first screen with the stamp across it, the sentence, the domain, the date, the stamp number (#0042), and stampmypage.com. It's the link preview (`og:image`, `twitter:image`) for `/v/<id>`, so a pasted link shows the card on X, LinkedIn, Slack, and iMessage.
 - **Square, 1080×1080** for Instagram and LinkedIn posts.
 
-They're stored in Blob next to the stamp (`verdicts/<id>-card.png`, `-square.png`). The result page shows the card with **Share on X**, **Share on LinkedIn**, **Download card**, and **Square for Instagram** (`/api/card?id=…&size=wide|square`). DEAD results lead with "Not ready to post a DEAD?" and a **Resurrect it** button that goes to the Kill Sheet or Resurrection checkout when one is set in `src/config.js`, otherwise back to the homepage for a re-stamp.
+They're stored in Blob next to the stamp (`verdicts/<id>-card.jpg`, `-square.jpg`). The result page shows the card with **Share on X**, **Share on LinkedIn**, **Download card**, and **Square for Instagram** (`/api/card?id=…&size=wide|square`). DEAD results lead with "Not ready to post a DEAD?" and a **Resurrect it** button that goes to the Kill Sheet or Resurrection checkout when one is set in `src/config.js`, otherwise back to the homepage for a re-stamp.
 
-Stamp numbers count up with Redis (`stamp:number`) and fall back to the number of published stamps. Republishing keeps the number. The card's bold type uses `server-fonts/` (Plus Jakarta Sans ExtraBold, OFL), which is bundled only with the functions that draw.
+Stamp numbers count up with Redis (`stamp:number`) and fall back to the number of published stamps. Republishing keeps the number. The card's bold type uses `server-fonts/` (Plus Jakarta Sans Bold and ExtraBold, IBM Plex Mono Bold, OFL), which is bundled only with the functions that draw.
 
 ### AI drafts
 

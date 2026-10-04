@@ -32,7 +32,7 @@ function wrap(ctx, text, max) {
   return lines.length ? lines : [""];
 }
 
-export const markColor = (verdict) => (verdict === "ALIVE" ? COLORS.ALIVE : COLORS.DEAD);
+export const markColor = (verdict) => COLORS[verdict] || COLORS.DEAD;
 
 // A marker circle: a little wobbly, overshoots where the pen started.
 export function ellipsePath(ctx, m) {

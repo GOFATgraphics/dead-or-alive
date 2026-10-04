@@ -7,9 +7,9 @@ import { snapshotRows } from "../src/snapshot.js";
   const $ = (id) => document.getElementById(id);
   const COLORS = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
   const SENTENCES = {
-    DEAD: "A stranger cannot tell what is being sold before they scroll.",
-    COPE: "A stranger cannot tell who this is for before they scroll.",
-    ALIVE: "A stranger can name the product, the buyer, and the reason to pay before they scroll.",
+    DEAD: "Five seconds in, I still don't know what this does or who it's for.",
+    COPE: "I get what it is, but not who it's for or what to click first.",
+    ALIVE: "In five seconds I know what it does, who it's for, and what to click.",
   };
 
   const session = {
@@ -457,6 +457,7 @@ import { snapshotRows } from "../src/snapshot.js";
           sentence: sentence.value.trim(),
           image: jpeg(),
           shot: editor.exportShot(),
+          focus: editor.focus(),
           sendEmail: $("send-email").checked,
         }),
       });
