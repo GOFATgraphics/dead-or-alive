@@ -52,20 +52,11 @@ export function InkButton({ as: Tag = "button", color = INK, className = "", chi
   );
 }
 
-// Brand mark: Box's ears peeking over a violet tile.
+// Brand mark: the Stamp My Page roundel and wordmark.
 export function Logo({ href = "/" }) {
   return (
     <a className="logo" href={href} aria-label="Stamp My Page home">
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <defs>
-          <linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#9a7dff" /><stop offset="1" stopColor="#4b2ee0" /></linearGradient>
-        </defs>
-        <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#logo-g)" />
-        <path d="M9 21v-9l4 3.2a8.6 8.6 0 0 1 6 0l4-3.2v9a7 7 0 0 1-14 0z" fill="#fff" />
-        <circle cx="13.3" cy="20" r="1.3" fill="#3b2bc2" />
-        <circle cx="18.7" cy="20" r="1.3" fill="#3b2bc2" />
-        <rect x="6" y="22.5" width="20" height="5" rx="1.5" fill="#e4c69c" stroke="#12132a" strokeWidth="1.2" />
-      </svg>
+      <img src="/brand/smp-icon.svg" alt="" width="40" height="40" />
       <span>Stamp My Page</span>
     </a>
   );

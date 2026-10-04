@@ -247,7 +247,19 @@ function fact(ctx, label, value, x, y, valueX, valueFont) {
   ctx.fillText(value, valueX, y + 1);
 }
 
-// Box's ears over a violet tile, as in the site logo.
+// The red seal, rotated like it was stamped on. Loaded once per render in renderCards.
+let SEAL = null;
+function seal(ctx, cx, cy, size) {
+  if (!SEAL) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((-10 * Math.PI) / 180);
+  ctx.globalAlpha = 0.92;
+  ctx.drawImage(SEAL, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+// Box's ears over a violet tile (the old mark, kept for reference).
 function logo(ctx, x, y, s) {
   ctx.save();
   ctx.translate(x, y);
@@ -287,9 +299,9 @@ function brand(ctx, right, y, size) {
   ctx.font = `${size}px ${BOLD}`;
   const text = "stampmypage.com";
   const tw = ctx.measureText(text).width;
-  const mark = size * 1.55;
-  const start = right - tw - mark - size * 0.55;
-  logo(ctx, start, y - mark / 2, mark);
+  const mark = size * 4.4;
+  const start = right - tw - mark - size * 0.45;
+  seal(ctx, start + mark / 2, y, mark);
   ctx.fillStyle = INK;
   ctx.textBaseline = "middle";
   ctx.fillText(text, start + mark + size * 0.55, y + 1);
@@ -331,7 +343,7 @@ function wide(shot, r) {
   fact(ctx, "PAGE", r.host, 862, 481, 940, hostFont);
   fact(ctx, "STAMPED", fmtDate(r.createdAt), 862, 508, 940, value(17));
   fact(ctx, "STAMP", fmtNumber(r.number), 862, 537, 940, `19px ${MONO}`);
-  brand(ctx, 1160, 583, 15);
+  brand(ctx, 1160, 574, 15);
   return c;
 }
 
@@ -383,6 +395,7 @@ function square(shot, r) {
 // r: { verdict, sentence, host, createdAt, number, focus? }. Returns JPEG buffers.
 export async function renderCards(shot, r) {
   registerFonts();
+  if (!SEAL) SEAL = await loadImage(path.join(process.cwd(), "public", "brand", "smp-seal-red-256.png"));
   const img = await loadImage(shot);
   return { wide: await wide(img, r).encode("jpeg", 90), square: await square(img, r).encode("jpeg", 90) };
 }
