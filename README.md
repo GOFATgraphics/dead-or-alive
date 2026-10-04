@@ -49,16 +49,21 @@ Only `ADMIN_KEY` is needed to open the desk. Everything else lights up as it's c
 Every stamp starts as an AI draft and goes out only after a person checks it.
 
 1. Polar calls `/api/polar-webhook` when an order is paid (event `order.paid`). The webhook checks Polar's signature and answers at once.
-2. In the background, [Microlink](https://microlink.io) opens the page at 1440×900, logged out, and takes one screenshot of the first screen.
-3. Claude (`claude-opus-5-5`) reads the screenshot and returns the stamp, one sentence, what a stranger gets (product, buyer, reason), up to four boxes to circle, a confidence, and any problem (error page, cookie wall, login).
+2. In the background, [Microlink](https://microlink.io) opens the page logged out and screenshots the first screen at 1440×900 and on a 390×844 phone. At the same time the server loads the page once for the stack and speed snapshot (`api/_inspect.js`): HTML load time and size, host, framework, missing title/description/share/viewport tags. Every address and redirect is checked so it can't reach a private network.
+3. Claude (`claude-opus-5-5`) reads both screenshots and returns the stamp, one sentence, what a stranger gets (product, buyer, reason), up to four boxes to circle, whether the first screen works on a phone, a confidence, and any problem (error page, cookie wall, login).
 4. The draft is saved to Blob under `drafts/`. In the desk the order shows `AI: COPE`; opening it loads the screenshot with the circles drawn, the stamp picked, and the sentence filled in. Edit anything, then **Publish verdict** as before.
+
+**Modes.** `STAMP_MODE=review` (the default): every draft waits in the desk. `STAMP_MODE=auto`: a draft with high confidence and no flagged problem is drawn on the server (`api/_render.js`, the same drawing code as the editor in `src/stamp-draw.js`), published, and emailed right away; anything else waits for you. The desk shows which ones went out automatically, and publishing again replaces them.
+
+The stack and speed snapshot appears on the result page, in the email, and in the desk.
 
 **Ask AI** in the composer makes or remakes a draft by hand, which is also how to stamp orders that came in before the webhook was set up.
 
 Env vars:
 - `ANTHROPIC_API_KEY`: from console.anthropic.com. A draft costs a few cents.
 - `POLAR_WEBHOOK_SECRET`: Polar → Settings → Webhooks → add endpoint `https://stampmypage.com/api/polar-webhook`, format Raw, event `order.paid`, then copy its secret here.
-- `MICROLINK_API_KEY` (optional): without it, Microlink's free tier allows about 50 screenshots a day.
+- `MICROLINK_API_KEY` (optional): without it, Microlink's free tier allows about 50 screenshots a day, which is about 25 orders (two screenshots each).
+- `STAMP_MODE` (optional): `auto` or `review` (default).
 
 ### Analytics
 

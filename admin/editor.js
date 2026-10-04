@@ -1,13 +1,11 @@
 // The stamp editor: screenshot, marker circles and scribbles, the stamp, and the sentence strip.
 // Marks can be selected, moved, resized, deleted, undone. The stamp can be dragged.
 
-const COLORS = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
+import { W, boxesToMarks, drawScene, layout as sceneLayout, stampBox as sceneStampBox } from "../src/stamp-draw.js";
+
 const PAPER = "#ffffff";
 const INK = "#12132a";
-const W = 1200;
 const HANDLE = 12;
-const FONT = '"IBM Plex Mono", ui-monospace, monospace';
-const SANS = '"Plus Jakarta Sans", system-ui, sans-serif';
 
 export function createEditor(canvas, { verdict, sentence, onChange = () => {} }) {
   const ctx = canvas.getContext("2d");
@@ -37,58 +35,8 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
     onChange();
   }
 
-  // Layout: the screenshot scaled to width W, then a strip with the sentence.
-  function layout() {
-    const shotH = Math.round(image.naturalHeight * (W / image.naturalWidth));
-    const pad = 32;
-    const font = 26;
-    ctx.font = `500 ${font}px ${SANS}`;
-    const lines = wrap(sentence().trim(), W - pad * 2);
-    return { shotH, pad, font, lines, h: shotH + pad * 2 + lines.length * font * 1.5 };
-  }
-
-  function wrap(text, max) {
-    const lines = [];
-    let line = "";
-    for (const w of text.split(/\s+/).filter(Boolean)) {
-      const t = line ? line + " " + w : w;
-      if (ctx.measureText(t).width > max && line) {
-        lines.push(line);
-        line = w;
-      } else line = t;
-    }
-    if (line) lines.push(line);
-    return lines.length ? lines : [""];
-  }
-
-  const markColor = () => (verdict() === "ALIVE" ? COLORS.ALIVE : COLORS.DEAD);
-
-  // A marker circle: a little wobbly, overshoots where the pen started.
-  function ellipsePath(m) {
-    const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
-    const rx = Math.max(Math.abs(m.w) / 2, 2), ry = Math.max(Math.abs(m.h) / 2, 2);
-    const start = -2.2 + (m.seed % 1) * 0.6;
-    const turn = Math.PI * 2 * 1.07;
-    ctx.beginPath();
-    for (let i = 0; i <= 90; i++) {
-      const t = start + (turn * i) / 90;
-      const k = 1 + 0.035 * Math.sin(3 * t + m.seed * 7) + 0.04 * (i / 90);
-      const x = cx + rx * k * Math.cos(t), y = cy + ry * k * Math.sin(t);
-      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    }
-  }
-
-  function penPath(m) {
-    const p = m.points;
-    ctx.beginPath();
-    ctx.moveTo(p[0][0], p[0][1]);
-    for (let i = 1; i < p.length - 1; i++) {
-      const mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2;
-      ctx.quadraticCurveTo(p[i][0], p[i][1], mx, my);
-    }
-    const last = p[p.length - 1];
-    ctx.lineTo(last[0], last[1]);
-  }
+  const layout = () => sceneLayout(ctx, image.naturalWidth, image.naturalHeight, sentence());
+  const stampBox = (L) => sceneStampBox(ctx, L, verdict(), stamp);
 
   function bounds(m) {
     if (m.type === "ellipse") {
@@ -98,37 +46,6 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
     const xs = m.points.map((p) => p[0]), ys = m.points.map((p) => p[1]);
     const x = Math.min(...xs), y = Math.min(...ys);
     return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
-  }
-
-  function stampBox(L) {
-    const v = verdict();
-    const fontSize = 44;
-    ctx.font = `500 ${fontSize}px ${FONT}`;
-    const spacing = fontSize * 0.14;
-    const textW = [...v].reduce((a, ch) => a + ctx.measureText(ch).width, 0) + spacing * (v.length - 1);
-    const w = textW + fontSize * 0.9, h = fontSize * 1.5;
-    const c = stamp || { x: W - w / 2 - 36, y: L.shotH - h / 2 - 36 };
-    return { v, fontSize, spacing, textW, w, h, x: c.x, y: c.y };
-  }
-
-  function drawStamp(L) {
-    const s = stampBox(L);
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate((-8 * Math.PI) / 180);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
-    ctx.fillRect(-s.w / 2, -s.h / 2, s.w, s.h);
-    ctx.strokeStyle = ctx.fillStyle = COLORS[s.v];
-    ctx.lineWidth = 8;
-    ctx.strokeRect(-s.w / 2, -s.h / 2, s.w, s.h);
-    ctx.font = `500 ${s.fontSize}px ${FONT}`;
-    ctx.textBaseline = "middle";
-    let cx = -s.textW / 2;
-    for (const ch of s.v) {
-      ctx.fillText(ch, cx, 2);
-      cx += ctx.measureText(ch).width + s.spacing;
-    }
-    ctx.restore();
   }
 
   function selection(box, handles) {
@@ -156,31 +73,9 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
 
   function draw() {
     if (!image) return;
-    const L = layout();
-    canvas.width = W;
-    canvas.height = L.h;
-    ctx.fillStyle = PAPER;
-    ctx.fillRect(0, 0, W, L.h);
-    ctx.drawImage(image, 0, 0, W, L.shotH);
-
-    ctx.save();
-    ctx.lineCap = ctx.lineJoin = "round";
-    ctx.strokeStyle = markColor();
-    for (const m of marks) {
-      ctx.lineWidth = m.size;
-      m.type === "ellipse" ? ellipsePath(m) : penPath(m);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    drawStamp(L);
-
-    ctx.fillStyle = "#e6e3f1";
-    ctx.fillRect(0, L.shotH, W, 2);
-    ctx.fillStyle = INK;
-    ctx.font = `500 ${L.font}px ${SANS}`;
-    ctx.textBaseline = "top";
-    L.lines.forEach((line, i) => ctx.fillText(line, L.pad, L.shotH + L.pad + i * L.font * 1.5));
+    const L = drawScene(canvas, {
+      image, imageW: image.naturalWidth, imageH: image.naturalHeight, marks, stamp, verdict: verdict(), sentence: sentence(),
+    });
 
     if (clean) return;
     if (selected === "stamp") {
@@ -346,18 +241,7 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
     // They are the starting point, not an edit, so history stays empty.
     setBoxes(boxes) {
       if (!image) return;
-      const shotH = layout().shotH;
-      marks = boxes
-        .filter((b) => b.w > 0 && b.h > 0)
-        .map((b, i) => ({
-          type: "ellipse",
-          x: (b.x / 1000) * W - 12,
-          y: (b.y / 1000) * shotH - 10,
-          w: (b.w / 1000) * W + 24,
-          h: (b.h / 1000) * shotH + 20,
-          seed: 0.37 + i * 0.29,
-          size,
-        }));
+      marks = boxesToMarks(boxes, layout().shotH, size);
       draw();
       onChange();
     },

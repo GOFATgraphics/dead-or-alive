@@ -395,6 +395,13 @@ input[aria-invalid="true"] { border-color: var(--dead); }
 .ai-read dd { margin: 0; overflow-wrap: anywhere; }
 .ai-marks { margin: 0.5rem 0 0; padding-left: 1.1rem; color: var(--muted); }
 .ai-panel .alert { margin: 0.75rem 0 0; }
+.snap-rows { display: grid; gap: 0; margin: 0.75rem 0 0; }
+.snap-rows > div { display: grid; grid-template-columns: minmax(7.5rem, auto) 1fr; gap: 0.75rem; padding: 0.5rem 0; border-top: 1px solid var(--line); }
+.snap-rows > div:first-child { border-top: 0; }
+.snap-rows dt { color: var(--muted); }
+.snap-rows dd { margin: 0; overflow-wrap: anywhere; }
+.snap-rows .warn dd { color: var(--dead); font-weight: 600; }
+.snapshot .fine { margin-top: 0.5rem; }
 .chip-ai { padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--chip); font-size: 0.75rem; font-weight: 700; }
 .published { margin: 1rem 0 0; padding: 0.9rem 1rem; border-radius: 12px; background: var(--chip); font-size: 0.9375rem; line-height: 1.6; overflow-wrap: anywhere; }
 .published a { color: var(--brand-ink); font-weight: 600; }

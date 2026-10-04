@@ -1,6 +1,7 @@
 import { DESK } from "../src/config.js";
 import { createEditor } from "./editor.js";
 import { renderAnalytics } from "./analytics.js";
+import { snapshotRows } from "../src/snapshot.js";
 
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -115,6 +116,9 @@ import { renderAnalytics } from "./analytics.js";
       ["Checkout link", !!(DESK.polarVerdictUrl || "").trim(), (DESK.polarVerdictUrl || "").trim() ? "The homepage form sends people to Polar." : "Paste the Polar checkout link into polarVerdictUrl in src/config.js."],
       ["AI drafts", setup.ai, setup.ai ? "Paid orders get an AI draft: screenshot, stamp, sentence, and circles." : "Add ANTHROPIC_API_KEY (console.anthropic.com → API keys). Until then, stamp by hand."],
       ["Order webhook", setup.webhook, setup.webhook ? "Polar tells the desk when an order is paid, so the draft is ready when you open it." : "In Polar → Settings → Webhooks, add https://stampmypage.com/api/polar-webhook for order.paid, then set POLAR_WEBHOOK_SECRET. Until then, press Ask AI on each order."],
+      ["Stamping mode", true, setup.autoMode
+        ? "Automatic. Confident drafts with nothing flagged go straight to the customer. The rest wait here for you. Set STAMP_MODE=review to check every one."
+        : "Review. Every AI draft waits here for you to check and publish. Set STAMP_MODE=auto to send confident drafts automatically."],
       ["Screenshots", true, setup.screenshots ? "Using your Microlink plan." : "Using Microlink's free tier (about 50 a day). Add MICROLINK_API_KEY for more."],
       ["Stamp storage", setup.blob, setup.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
       ["Email", setup.email, setup.email ? "Customers get their link by email." : "Add RESEND_API_KEY and MAIL_FROM. Until then, use Draft email."],
@@ -237,17 +241,29 @@ import { renderAnalytics } from "./analytics.js";
   // AI draft
 
   function showDraft(d, status) {
-    $("ai-status").textContent = status || (d ? `${d.verdict}, ${d.confidence} confidence.` : "None yet.");
+    const auto = d && d.autoPublished ? ` Sent automatically${d.autoPublished.emailed ? " and emailed" : ""}.` : "";
+    $("ai-status").textContent = status || (d ? `${d.verdict}, ${d.confidence} confidence.${auto}` : "None yet.");
     $("ai-run").textContent = d ? "Ask AI again" : "Ask AI";
     $("ai-problem").hidden = !(d && d.problem);
     $("ai-problem").textContent = d && d.problem ? `AI flagged: ${d.problem}` : "";
     $("ai-read").hidden = !d;
+    if (!d) $("ai-snapshot").hidden = true;
     $("ai-marks").hidden = !(d && d.marks.length);
     if (!d) return;
     $("ai-product").textContent = d.read.product || "Can't tell";
     $("ai-buyer").textContent = d.read.buyer || "Can't tell";
     $("ai-reason").textContent = d.read.reason || "Can't tell";
     $("ai-marks").replaceChildren(...d.marks.map((m) => Object.assign(document.createElement("li"), { textContent: m.why })));
+    const rows = snapshotRows(d.snapshot);
+    $("ai-snapshot").hidden = !rows.length;
+    $("ai-snapshot").replaceChildren(
+      ...rows.map((row) => {
+        const div = document.createElement("div");
+        div.className = row.warn ? "warn" : "";
+        div.append(Object.assign(document.createElement("dt"), { textContent: row.label }), Object.assign(document.createElement("dd"), { textContent: row.value }));
+        return div;
+      })
+    );
   }
 
   function applyDraft(o, d) {

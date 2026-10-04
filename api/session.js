@@ -13,6 +13,7 @@ export default async function handler(req, res) {
       ai: !!process.env.ANTHROPIC_API_KEY,
       webhook: !!process.env.POLAR_WEBHOOK_SECRET,
       screenshots: !!process.env.MICROLINK_API_KEY,
+      autoMode: String(process.env.STAMP_MODE || "").toLowerCase() === "auto",
       email: !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
       analytics: redisReady(),
       siteUrl: !!process.env.SITE_URL,

@@ -9,6 +9,7 @@ import AnimatedContent from "./bits/AnimatedContent.jsx";
 import GlareHover from "./bits/GlareHover.jsx";
 import StatusMark from "./bits/StatusMark.jsx";
 import { track, trackView } from "./track.js";
+import { snapshotRows } from "./snapshot.js";
 
 const still = reducedMotion();
 
@@ -16,8 +17,8 @@ const NEXT = {
   DEAD: {
     line: "It can come back.",
     offers: [
-      { key: "resurrection", label: "Book a Resurrection" },
       { key: "killSheet", label: "Get the Kill Sheet" },
+      { key: "resurrection", label: "Book a Resurrection" },
     ],
   },
   COPE: { line: "Close. Not clear yet.", offers: [{ key: "killSheet", label: "Get the Kill Sheet" }] },
@@ -72,6 +73,25 @@ function CopyLink({ verdict }) {
   );
 }
 
+function Snapshot({ s }) {
+  const rows = snapshotRows(s);
+  if (!rows.length) return null;
+  return (
+    <section className="section snapshot">
+      <h2 className="kicker brand">Stack and speed</h2>
+      <dl className="snap-rows">
+        {rows.map((row) => (
+          <div key={row.label} className={row.warn ? "warn" : ""}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="fine">Checked once, when we stamped the page. Load time is how long the HTML took to arrive from our server.</p>
+    </section>
+  );
+}
+
 function Result({ r }) {
   const v = r.verdict;
   const next = NEXT[v];
@@ -111,6 +131,8 @@ function Result({ r }) {
         </p>
       </section>
       </div>
+
+      <Snapshot s={r.snapshot} />
 
       <section className="section next">
         <h2 className="kicker brand">Next</h2>

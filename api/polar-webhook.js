@@ -1,10 +1,10 @@
 // Polar calls this when an order is paid. It verifies the signature, answers right away,
-// and makes the AI draft in the background so it's waiting in the desk.
+// and makes the AI draft in the background: it waits in the desk, or in auto mode goes out when confident.
 // Env: POLAR_WEBHOOK_SECRET (from Polar → Settings → Webhooks), plus what the draft needs.
 import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
-import { isVerdictOrder, orderPageUrl, resultId } from "./_lib.js";
-import { aiReady, makeDraft, savedDrafts } from "./_ai.js";
+import { isVerdictOrder, resultId } from "./_lib.js";
+import { aiReady, processPaidOrder, savedDrafts } from "./_ai.js";
 
 const TOLERANCE_S = 5 * 60;
 
@@ -27,7 +27,7 @@ function verify(headers, body, secret) {
 
 async function draftOnce(order) {
   if ((await savedDrafts()).has(resultId(order.id))) return;
-  await makeDraft(order.id, orderPageUrl(order));
+  await processPaidOrder(order);
 }
 
 export async function POST(request) {
