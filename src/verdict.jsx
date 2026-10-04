@@ -92,6 +92,46 @@ function Snapshot({ s }) {
   );
 }
 
+const SHARE_TEXT = {
+  DEAD: "My first screen got stamped DEAD. Fixing it in public.",
+  COPE: "My first screen got stamped COPE. Close, not clear yet.",
+  ALIVE: "My first screen got stamped ALIVE. A stranger gets it in five seconds.",
+};
+
+// The share card and the ways to post it. DEAD gets a way out first: not everyone posts a bad stamp.
+function ShareCard({ r }) {
+  const v = r.verdict;
+  const url = `${location.origin}/v/${r.id}`;
+  const shared = () => track("share_copy", { v });
+  const x = `https://x.com/intent/post?text=${encodeURIComponent(SHARE_TEXT[v])}&url=${encodeURIComponent(url)}`;
+  const li = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+  const fix = (DESK.offers.killSheet || DESK.offers.resurrection || "").trim();
+  return (
+    <section className="section share-card">
+      <h2 className="kicker brand">Post it</h2>
+      {v === "DEAD" && (
+        <div className="resurrect">
+          <p><strong>Not ready to post a DEAD?</strong> Fix the first screen, then post the comeback.</p>
+          <InkButton as="a" href={fix || "/"} color={VERDICT_COLOR.DEAD} onClick={() => track("result_cta", { v })}>
+            {fix ? "Resurrect it" : "Fix it, then re-stamp — $1"}
+          </InkButton>
+        </div>
+      )}
+      <a className="card-preview" href={r.card} target="_blank" rel="noopener noreferrer">
+        <img src={r.card} width="1200" height="630" alt={`Share card: ${r.host} stamped ${v}.`} />
+      </a>
+      <div className="share-buttons">
+        <a className="submit" href={x} target="_blank" rel="noopener noreferrer" onClick={shared}>Share on X</a>
+        <a className="submit ghost" href={li} target="_blank" rel="noopener noreferrer" onClick={shared}>Share on LinkedIn</a>
+        <a className="submit ghost" href={`/api/card?id=${encodeURIComponent(r.id)}`} download onClick={shared}>Download card</a>
+        {r.cardSquare && (
+          <a className="submit ghost" href={`/api/card?id=${encodeURIComponent(r.id)}&size=square`} download onClick={shared}>Square for Instagram</a>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Result({ r }) {
   const v = r.verdict;
   const next = NEXT[v];
@@ -131,6 +171,8 @@ function Result({ r }) {
         </p>
       </section>
       </div>
+
+      {r.card && <ShareCard r={r} />}
 
       <Snapshot s={r.snapshot} />
 

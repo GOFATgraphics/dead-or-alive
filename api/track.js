@@ -11,7 +11,7 @@ export const EVENTS = new Set([
   "checkout", // sent to Polar
   "queue_closed", // saw the "queue is full" state
   "cta_click", // a "Judge my page" button outside the form
-  "share_copy", // copied a result link
+  "share_copy", // shared a result: copied the link, posted to X or LinkedIn, or downloaded the card
   "result_cta", // "Judge another page" from a result page
 ]);
 const PAGES = new Set(["home", "result", "paid", "privacy", "terms"]);

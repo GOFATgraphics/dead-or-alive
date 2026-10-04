@@ -1,7 +1,7 @@
 // The stamp editor: screenshot, marker circles and scribbles, the stamp, and the sentence strip.
 // Marks can be selected, moved, resized, deleted, undone. The stamp can be dragged.
 
-import { W, boxesToMarks, drawScene, layout as sceneLayout, stampBox as sceneStampBox } from "../src/stamp-draw.js";
+import { W, boxesToMarks, drawScene, drawShot, layout as sceneLayout, stampBox as sceneStampBox } from "../src/stamp-draw.js";
 
 const PAPER = "#ffffff";
 const INK = "#12132a";
@@ -297,6 +297,13 @@ export function createEditor(canvas, { verdict, sentence, onChange = () => {} })
       draw();
     },
     draw,
+    // The circled screenshot alone (no stamp, no sentence) as a JPEG data URL, for the share cards.
+    exportShot() {
+      if (!image) return "";
+      const c = document.createElement("canvas");
+      drawShot(c, { image, imageW: image.naturalWidth, imageH: image.naturalHeight, marks, verdict: verdict() });
+      return c.toDataURL("image/jpeg", 0.85);
+    },
     // Runs fn with a clean render (no selection boxes), then restores the editing view.
     exportWith(fn) {
       clean = true;

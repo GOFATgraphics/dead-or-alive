@@ -1,7 +1,9 @@
 // Publishing a stamp: save the image and record, then email the customer their link.
 // Used by the desk (a person pressed Publish) and by automatic mode.
 import { put } from "@vercel/blob";
-import { escapeHtml, paths, resultId } from "./_lib.js";
+import { escapeHtml, paths, readResult, resultId } from "./_lib.js";
+import { pipeline, redisReady } from "./_redis.js";
+import { list } from "@vercel/blob";
 import { snapshotRows } from "../src/snapshot.js";
 
 const COLOR = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
@@ -69,23 +71,60 @@ async function sendEmail(to, data) {
   return { emailed: true };
 }
 
-// image: JPEG buffer. pageUrl: an already checked URL. Throws if storage fails.
-export async function publishStamp({ orderId, email, pageUrl, verdict, sentence, image, sendMail = true, origin, extra = {} }) {
+// Stamp numbers make cards feel collectible (#0042). Republishing keeps the number.
+// Redis counts when it's connected; otherwise the count of published stamps stands in.
+async function stampNumber(id) {
+  const existing = await readResult(id);
+  if (existing?.number) return existing.number;
+  if (redisReady()) {
+    try {
+      const [n] = await pipeline([["INCR", "stamp:number"]]);
+      if (Number(n) > 0) return Number(n);
+    } catch (_) {}
+  }
+  let count = 0, cursor;
+  do {
+    const page = await list({ prefix: "verdicts/", cursor, limit: 1000 });
+    count += page.blobs.filter((b) => /^verdicts\/[A-Za-z0-9_-]+\.json$/.test(b.pathname)).length;
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return count + 1;
+}
+
+// image: the finished stamp (JPEG buffer). shot: the circled screenshot alone, for the share cards.
+// pageUrl: an already checked URL. Throws if storage fails; a card that fails to draw is skipped.
+export async function publishStamp({ orderId, email, pageUrl, verdict, sentence, image, shot, sendMail = true, origin, extra = {} }) {
   const id = resultId(orderId);
   const p = paths(id);
   const url = new URL(pageUrl);
   const opts = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
+  const v = Date.now();
   const imageUrl = (await put(p.image, image, { ...opts, contentType: "image/jpeg" })).url;
   const record = {
     id,
+    number: await stampNumber(id),
     verdict,
     sentence,
     pageUrl: url.toString(),
     host: url.hostname.replace(/^www\./, ""),
-    image: `${imageUrl}?v=${Date.now()}`,
+    image: `${imageUrl}?v=${v}`,
     createdAt: new Date().toISOString(),
     ...extra,
   };
+  if (shot) {
+    try {
+      const { renderCards } = await import("./_card.js");
+      const cards = await renderCards(shot, record);
+      const [wide, square] = await Promise.all([
+        put(p.card, cards.wide, { ...opts, contentType: "image/png" }),
+        put(p.square, cards.square, { ...opts, contentType: "image/png" }),
+      ]);
+      record.card = `${wide.url}?v=${v}`;
+      record.cardSquare = `${square.url}?v=${v}`;
+    } catch (err) {
+      console.error("Share card failed:", err);
+    }
+  }
   await put(p.json, JSON.stringify(record), { ...opts, contentType: "application/json" });
   const link = `${origin}/v/${id}`;
   const mail = sendMail && email ? await sendEmail(email, { ...record, link }) : { emailed: false };

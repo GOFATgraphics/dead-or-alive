@@ -69,7 +69,12 @@ export function isResultId(id) {
   return typeof id === "string" && /^[A-Za-z0-9_-]{6,40}$/.test(id);
 }
 
-export const paths = (id) => ({ json: `verdicts/${id}.json`, image: `verdicts/${id}.jpg` });
+export const paths = (id) => ({
+  json: `verdicts/${id}.json`,
+  image: `verdicts/${id}.jpg`,
+  card: `verdicts/${id}-card.png`,
+  square: `verdicts/${id}-square.png`,
+});
 
 // The public verdict record, or null.
 export async function readResult(id) {

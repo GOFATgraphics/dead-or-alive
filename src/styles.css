@@ -344,6 +344,13 @@ input[aria-invalid="true"] { border-color: var(--dead); }
 .result.v-dead .offer-list > div:first-child .submit:not(.ghost) { background: var(--dead); }
 .result.v-cope .offer-list > div:first-child .submit:not(.ghost) { background: var(--cope); }
 .result.v-alive .offer-list > div:first-child .submit:not(.ghost) { background: var(--alive); }
+.share-card .resurrect { margin: 0.75rem 0 1rem; padding: 1rem 1.1rem; border-radius: 16px; background: var(--dead-soft); display: grid; gap: 0.75rem; }
+.share-card .resurrect p { margin: 0; line-height: 1.5; }
+.share-card .resurrect .submit { width: 100%; background: var(--dead); }
+.card-preview { display: block; margin-top: 0.75rem; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(40, 30, 110, 0.1); }
+.card-preview img { display: block; width: 100%; height: auto; }
+.share-buttons { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.share-buttons .submit { flex: 1 1 auto; text-align: center; text-decoration: none; }
 .share { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; }
 
 /* React Bits wrappers */

@@ -18,7 +18,13 @@ export default async function handler(req, res) {
       `<meta name="description" content="${escapeHtml(r.sentence)}" />`,
       `<meta property="og:title" content="${escapeHtml(title)}" />`,
       `<meta property="og:description" content="${escapeHtml(r.sentence)}" />`,
-      `<meta property="og:image" content="${escapeHtml(r.image)}" />`,
+      // The share card is made for previews (1200x630). Older stamps fall back to the stamped screenshot.
+      `<meta property="og:image" content="${escapeHtml(r.card || r.image)}" />`,
+      ...(r.card ? [`<meta property="og:image:width" content="1200" />`, `<meta property="og:image:height" content="630" />`] : []),
+      `<meta property="og:image:alt" content="${escapeHtml(`${r.host} stamped ${r.verdict}.`)}" />`,
+      `<meta name="twitter:image" content="${escapeHtml(r.card || r.image)}" />`,
+      `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+      `<meta name="twitter:description" content="${escapeHtml(r.sentence)}" />`,
       `<meta property="og:url" content="${escapeHtml(`${origin}/v/${r.id}`)}" />`,
       `<meta name="twitter:card" content="summary_large_image" />`,
     ].join("\n    ");

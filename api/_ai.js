@@ -217,7 +217,7 @@ export async function processPaidOrder(order) {
   if (!autoMode() || !autoPublishable(draft)) return draft;
   // Loaded only here, so routes that just read drafts don't carry the canvas library.
   const { renderStamp } = await import("./_render.js");
-  const image = await renderStamp({ jpg, boxes: draft.marks, verdict: draft.verdict, sentence: draft.sentence });
+  const { image, shot } = await renderStamp({ jpg, boxes: draft.marks, verdict: draft.verdict, sentence: draft.sentence });
   const out = await publishStamp({
     orderId: order.id,
     email: order.customer?.email || order.user?.email || "",
@@ -225,6 +225,7 @@ export async function processPaidOrder(order) {
     verdict: draft.verdict,
     sentence: draft.sentence,
     image,
+    shot,
     origin: publicOrigin(),
     extra: { snapshot: draft.snapshot },
   });

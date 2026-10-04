@@ -122,6 +122,24 @@ export function drawScene(canvas, { image, imageW, imageH, marks, stamp, verdict
   return L;
 }
 
+// Just the screenshot and its circles, no stamp and no sentence: the hero of the share card.
+export function drawShot(canvas, { image, imageW, imageH, marks, verdict }) {
+  const ctx = canvas.getContext("2d");
+  const shotH = Math.round(imageH * (W / imageW));
+  canvas.width = W;
+  canvas.height = shotH;
+  ctx.drawImage(image, 0, 0, W, shotH);
+  ctx.save();
+  ctx.lineCap = ctx.lineJoin = "round";
+  ctx.strokeStyle = markColor(verdict);
+  for (const m of marks) {
+    ctx.lineWidth = m.size;
+    m.type === "ellipse" ? ellipsePath(ctx, m) : penPath(ctx, m);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // AI boxes (thousandths of the screenshot) become marker circles with a little breathing room.
 export function boxesToMarks(boxes, shotH, size = 6) {
   return boxes

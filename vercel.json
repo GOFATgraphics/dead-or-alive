@@ -88,12 +88,15 @@
   ],
   "functions": {
     "api/draft.js": {
-      "maxDuration": 120,
-      "includeFiles": "public/fonts/**"
+      "maxDuration": 120
     },
     "api/polar-webhook.js": {
       "maxDuration": 120,
-      "includeFiles": "public/fonts/**"
+      "includeFiles": "{public/fonts/**,server-fonts/**}"
+    },
+    "api/publish.js": {
+      "maxDuration": 60,
+      "includeFiles": "{public/fonts/**,server-fonts/**}"
     }
   }
 }

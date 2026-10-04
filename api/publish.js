@@ -23,6 +23,9 @@ export default async function handler(req, res) {
   if (!m) return res.status(400).json({ error: "Add the screenshot." });
   const image = Buffer.from(m[1], "base64");
   if (image.length > MAX_IMAGE) return res.status(413).json({ error: "Screenshot is too big. Crop it to the first screen." });
+  // The circled screenshot without stamp or sentence, for the share cards. Optional.
+  const s = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.shot || ""));
+  const shot = s ? Buffer.from(s[1], "base64") : null;
 
   // The stack and speed snapshot rides along from the AI draft, when there is one.
   const draft = await readDraft(String(b.orderId)).catch(() => null);
@@ -34,6 +37,7 @@ export default async function handler(req, res) {
       verdict,
       sentence,
       image,
+      shot: shot && shot.length <= MAX_IMAGE ? shot : null,
       sendMail: b.sendEmail !== false,
       origin: publicOrigin(req),
       extra: draft?.snapshot ? { snapshot: draft.snapshot } : {},

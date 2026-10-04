@@ -168,7 +168,7 @@ export function renderAnalytics(root, data) {
     tile("Revenue", money(b?.totals.revenue, cur), b ? `${money(b.totals.averageOrder, cur)} per order` : "Connect Polar"),
     tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Connect Polar"),
     tile("Median turnaround", hours(b?.turnaround.medianHours), b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}% within 24 h` : "No stamps yet"),
-    tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} links copied to post` : "Connect Redis"),
+    tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Connect Redis"),
     tile("Came back from a stamp", num(t?.totals.result_cta), t ? "Clicked “Judge another page”" : "Connect Redis")
   );
   out.push(tiles);
@@ -184,7 +184,7 @@ export function renderAnalytics(root, data) {
       { label: "Paid", value: b?.totals.orders, missing: "Connect Polar" },
       { label: "Stamped", value: b?.totals.stamped, missing: "Connect Polar" },
       { label: "Result page views", value: t?.totals["view:result"] },
-      { label: "Links copied to post", value: t?.totals.share_copy },
+      { label: "Shares (link, X, LinkedIn, card)", value: t?.totals.share_copy },
     ])
   );
   out.push(f);

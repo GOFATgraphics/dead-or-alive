@@ -456,6 +456,7 @@ import { snapshotRows } from "../src/snapshot.js";
           verdict: verdict(),
           sentence: sentence.value.trim(),
           image: jpeg(),
+          shot: editor.exportShot(),
           sendEmail: $("send-email").checked,
         }),
       });
