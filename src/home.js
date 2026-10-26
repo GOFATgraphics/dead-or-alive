@@ -256,7 +256,7 @@ if (location.hash === "#top" && !location.search) requestAnimationFrame(() => fo
 // The hero's "Latest stamps" card: real ALIVE and COPE stamps when there are any (never DEAD), else the sample.
 (async () => {
   try {
-    const r = await fetch("/api/recent", { headers: { Accept: "application/json" } });
+    const r = await fetch("/api/status?recent=1", { headers: { Accept: "application/json" } });
     const { stamps } = r.ok ? await r.json() : {};
     if (!Array.isArray(stamps) || !stamps.length) return;
     const ul = $("#recent-rows");

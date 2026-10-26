@@ -1,4 +1,5 @@
-// Public. The latest ALIVE and COPE stamps for the homepage's "Latest stamps" card: domain, verdict, and score only.
+// The latest ALIVE and COPE stamps for the homepage's "Latest stamps" card: domain, verdict, and score only.
+// Served by /api/status?recent=1 (Vercel's Hobby plan allows 12 functions, so this one rides along).
 // DEAD stamps are never listed, and no private result link leaves the server.
 // Reads the Redis list _publish.js keeps; without Redis, reads the newest published records from Blob.
 import { list } from "@vercel/blob";
@@ -46,7 +47,7 @@ function pick(items) {
     .map(({ host, verdict, score, at }) => ({ host, verdict, score, at }));
 }
 
-export default async function handler(req, res) {
+export async function recentStamps(req, res) {
   let items = [];
   try {
     items = redisReady() ? await fromRedis() : [];

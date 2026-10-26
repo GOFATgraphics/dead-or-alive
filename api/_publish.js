@@ -72,7 +72,7 @@ const sendEmail = (to, data) =>
   });
 
 // The homepage's "Latest stamps" card reads this list. Only ALIVE and COPE go on it, never DEAD,
-// and only the domain, verdict, and score: never the private link. Without Redis, /api/recent lists blobs instead.
+// and only the domain, verdict, and score: never the private link. Without Redis, _recent.js lists blobs instead.
 async function noteRecent(r) {
   if (!redisReady() || !["ALIVE", "COPE"].includes(r.verdict)) return;
   const item = JSON.stringify({ id: r.id, host: r.host, verdict: r.verdict, score: r.score ?? null, at: r.createdAt });
