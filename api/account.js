@@ -22,6 +22,7 @@ import {
 import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, resumeStayAlive } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
 import { readMonitor, runMonitor } from "./_monitor.js";
+import { xCallback, xReady, xStart } from "./_x.js";
 import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
@@ -62,7 +63,7 @@ async function me(email) {
 }
 
 function setup() {
-  return { ready: storeReady(), emailLinks: mailReady(), polarApi: polarApiReady(), portal: PORTAL };
+  return { ready: storeReady(), emailLinks: mailReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
 }
 
 async function sendLink(email, next) {
@@ -129,6 +130,8 @@ export default async function handler(req, res) {
 
   const q = req.query || {};
   if (req.method === "GET") {
+    if (q.op === "x") return xStart(req, res);
+    if (q.op === "x-callback") return xCallback(req, res);
     if (q.op === "link") {
       const v = await useMagicToken(String(q.t || ""));
       if (!v) return res.redirect(302, "/dashboard?link=expired");
@@ -147,6 +150,34 @@ export default async function handler(req, res) {
 
   try {
     // Signed-out operations.
+    // One form: a new email gets an account, a known one signs in.
+    if (op === "continue") {
+      const email = normEmail(b.email);
+      const password = String(b.password || "");
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, or use an email link." });
+      const u = await getUser(email);
+      if (!u) {
+        if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters." });
+        await ensureUser(email);
+        await updateUser(email, async (x) => ({ ...x, pass: await hashPassword(password) }));
+      } else if (u.pass) {
+        if (!(await checkPassword(password, u.pass))) {
+          await noteFail(email);
+          await new Promise((r) => setTimeout(r, 400));
+          return res.status(401).json({ error: "That password doesn't match this email.", code: "wrongpass" });
+        }
+        await clearFails(email);
+      } else {
+        // The account exists without a password (made by a payment, an email link, or X). Prove the email first.
+        if (!mailReady()) return res.status(409).json({ error: `That email already has an account${u.x ? " linked to X. Use Continue with X" : `. Write to ${process.env.CONTACT_EMAIL || "us"} and we'll help you in`}.` });
+        await sendLink(email, String(b.next || ""));
+        return res.status(202).json({ sent: true, note: `That email already has an account${u.x ? " linked to X" : ""}. We sent a sign-in link to prove it's yours.` });
+      }
+      await startSession(res, email);
+      if (Array.isArray(b.jobs)) await claim(email, b.jobs);
+      return res.status(200).json({ ...(await me(email)), created: !u, setup: setup() });
+    }
     if (op === "signup" || op === "login") {
       const email = normEmail(b.email);
       const password = String(b.password || "");
@@ -263,7 +294,7 @@ export default async function handler(req, res) {
       if (String(b.confirm || "") !== "DELETE") return res.status(400).json({ error: "Type DELETE to confirm." });
       const u = await getUser(email);
       if (hasStayAlive(u) && !u.stayAlive.cancelAtPeriodEnd) return res.status(409).json({ error: "Cancel Stay Alive first, so you aren't billed for a page nobody watches." });
-      await Promise.all([...(u?.reviews || []).map((r) => remove(`cred:${r.id}`)), remove(`report:${email}`), remove(`monitor:${email}`), remove(`uid:${u?.id}`), remove(userKey(email))]);
+      await Promise.all([...(u?.reviews || []).map((r) => remove(`cred:${r.id}`)), remove(`report:${email}`), remove(`monitor:${email}`), remove(`uid:${u?.id}`), ...(u?.x?.id ? [remove(`xid:${u.x.id}`)] : []), remove(userKey(email))]);
       await endSession(req, res);
       return res.status(200).json({ user: null, deleted: true });
     }

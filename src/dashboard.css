@@ -149,3 +149,10 @@ label.check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color:
 }
 @media (max-width: 860px) { .bar-links { display: none; } .bar .btn { margin-left: auto; } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.auth-h { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+.btn-x { background: #000; color: #fff; box-shadow: var(--shadow-2); }
+.btn-x:hover { background: #222; }
+.or { display: flex; align-items: center; gap: 0.75rem; color: var(--soft); font-size: 0.8125rem; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.quiet-link { display: inline-flex; align-items: center; gap: 0.4rem; justify-self: center; font-size: 0.875rem; text-decoration: none; color: var(--body); }
+.quiet-link:hover { color: var(--ink); }

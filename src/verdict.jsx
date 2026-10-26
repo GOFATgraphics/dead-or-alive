@@ -297,8 +297,7 @@ function SavePrompt({ r }) {
               <p>Save this stamp, see all your stamps in one place, and get your free re-stamp after you fix it.</p>
             </div>
             <div className="save-actions">
-              <a className="btn btn-dark" href={`${next}&mode=signup`} onClick={() => track("save_click", { v: r.verdict })}>Create free account</a>
-              <a className="btn btn-line" href={`${next}&mode=login`}>Sign in</a>
+              <a className="btn btn-dark" href={next} onClick={() => track("save_click", { v: r.verdict })}>Save it free</a>
             </div>
           </>
         ) : (

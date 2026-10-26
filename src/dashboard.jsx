@@ -65,11 +65,33 @@ function Foot() {
 }
 
 // Signed out: create an account or sign in. When buying, say what happens next.
+const X_NOTE = {
+  noemail: "Your X account didn't share a confirmed email, and your plans are matched by email. Continue with email instead.",
+  cancelled: "X sign-in was cancelled.",
+  expired: "That X sign-in took too long. Try again.",
+  failed: "X sign-in didn't work this time. Try again, or continue with email.",
+  off: "Sign-in with X isn't switched on yet. Continue with email.",
+};
+
+function XLogo() {
+  return <svg className="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.9 1.2h3.7l-8 9.1 9.4 12.5h-7.4l-5.8-7.6-6.6 7.6H.5l8.6-9.8L.1 1.2h7.6l5.2 6.9 6-6.9Zm-1.3 19.4h2L6.5 3.2H4.3l13.3 17.4Z" /></svg>;
+}
+
+// Signed out: one form. Continue with X, or an email and password: a new email gets an account, a known one signs in.
 function Auth({ setup, onIn }) {
-  const [mode, setMode] = useState(params.get("mode") === "login" ? "login" : "signup");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(params.get("link") === "expired" ? { bad: true, text: "That sign-in link expired or was already used. Send a new one." } : null);
+  const xNote = X_NOTE[params.get("x")];
+  const [msg, setMsg] = useState(params.get("link") === "expired" ? { bad: true, text: "That sign-in link expired or was already used. Send a new one." } : xNote ? { bad: true, text: xNote } : null);
+  const [wrong, setWrong] = useState(false);
   const plan = PLANS[PLAN];
+  // Where X sends them back to: the same dashboard URL (plan, page, stamp to save), minus old X notes.
+  const next = (() => {
+    const q = new URLSearchParams(location.search);
+    q.delete("x");
+    q.delete("link");
+    const s = q.toString();
+    return s ? `?${s}` : "";
+  })();
 
   async function submit(e) {
     e.preventDefault();
@@ -77,14 +99,14 @@ function Auth({ setup, onIn }) {
     setBusy(true);
     setMsg(null);
     try {
-      const out = await api(mode, { email: f.get("email"), password: f.get("password"), jobs: jobs(), next: location.search });
+      const out = await api("continue", { email: f.get("email"), password: f.get("password"), jobs: jobs(), next });
       if (out.sent) setMsg({ text: out.note || "Check your email for a sign-in link." });
       else {
-        track(mode === "signup" ? "signup" : "login", { plan: PLAN || "none" });
+        track(out.created ? "signup" : "login", { plan: PLAN || "none" });
         onIn(out);
       }
     } catch (err) {
-      if (err.body?.code === "exists") setMode("login");
+      setWrong(err.body?.code === "wrongpass");
       setMsg({ bad: true, text: err.message });
     } finally {
       setBusy(false);
@@ -96,7 +118,7 @@ function Auth({ setup, onIn }) {
     if (!email) return setMsg({ bad: true, text: "Enter your email first." });
     setBusy(true);
     try {
-      await api("sendlink", { email, next: location.search });
+      await api("sendlink", { email, next });
       setMsg({ text: `We sent a sign-in link to ${email}. It works once, for 15 minutes.` });
     } catch (err) {
       setMsg({ bad: true, text: err.message });
@@ -134,16 +156,19 @@ function Auth({ setup, onIn }) {
       </div>
 
       <form className="auth-card" onSubmit={submit}>
-        <div className="seg" role="tablist" aria-label="Account">
-          <button type="button" role="tab" aria-selected={mode === "signup"} onClick={() => setMode("signup")}>Create account</button>
-          <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")}>Sign in</button>
-        </div>
+        <h2 className="auth-h">{plan ? "Continue to checkout" : "Sign up or sign in"}</h2>
+        {setup?.x && (
+          <>
+            <a className="btn btn-x" href={`/auth/x?next=${encodeURIComponent(next)}`} onClick={() => track("login", { via: "x", plan: PLAN || "none" })}><XLogo /> Continue with X</a>
+            <p className="or"><span>or with email</span></p>
+          </>
+        )}
         <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200} /></label>
-        <label>Password<input name="password" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={mode === "signup" ? 8 : undefined} required /></label>
-        {mode === "signup" && <p className="fine">At least 8 characters.</p>}
-        <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : mode === "signup" ? (plan ? "Create account and continue" : "Create free account") : plan ? "Sign in and continue" : "Sign in"}</button>
-        {setup?.emailLinks && <button type="button" className="btn btn-line" onClick={link} disabled={busy}><Icon name="mail" /> Email me a sign-in link instead</button>}
+        <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+        <p className="fine">New here? Pick any password with 8 or more characters and your account is made. Been here before? Use the one you set.</p>
+        <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Continue"}</button>
         {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
+        {setup?.emailLinks && (wrong || !msg) && <button type="button" className="link quiet-link" onClick={link} disabled={busy}><Icon name="mail" /> {wrong ? "Forgot it? Email me a sign-in link" : "Or email me a sign-in link, no password"}</button>}
         <p className="fine">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
       </form>
     </main>
