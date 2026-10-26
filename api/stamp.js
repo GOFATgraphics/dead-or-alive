@@ -1,10 +1,12 @@
-// Public. Starts a free stamp: checks the URL and the daily limits, answers with a job id right away,
-// and screenshots, scores (rules, no AI), and publishes in the background. The homepage polls /api/status.
+// Public. Starts a free stamp: checks the URL, that the page exists and answers, and the daily limits, then
+// answers with a job id right away and screenshots, scores (rules, no AI), and publishes in the background.
+// The homepage polls /api/status.
 // Env: BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY, STAMP_IP_LIMIT, STAMP_DAILY_LIMIT.
 import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import { processStamp } from "./_stamp.js";
 import { takeStamp } from "./_limit.js";
+import { precheck } from "./_inspect.js";
 import { DESK } from "../src/config.js";
 import { KIND_HINT, checkPageUrl, pageKind } from "../src/url.js";
 
@@ -27,6 +29,10 @@ export default async function handler(req, res) {
   if (!page.url) return res.status(400).json({ error: page.error, code: page.code });
   const kind = pageKind(page.url);
   if (["download", "appstore", "playstore"].includes(kind)) return res.status(400).json({ error: KIND_HINT[kind], code: kind });
+
+  // Real and reachable before anything is spent on it.
+  const check = await precheck(page.url);
+  if (!check.ok) return res.status(400).json({ error: check.error, code: check.code });
 
   const gate = await takeStamp(req);
   if (!gate.ok) return res.status(429).json({ error: gate.error, code: "limit" });

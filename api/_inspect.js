@@ -69,6 +69,52 @@ async function safeFetch(start) {
   throw new Error("Too many redirects.");
 }
 
+// Is this a real, public page worth screenshotting? Resolves { ok: true, finalUrl } or { ok: false, code, error }.
+// Checked before any screenshot runs, so typos and dead links fail fast and don't use up a screenshot.
+// Bot walls (403, 429, 503, 520s from Cloudflare) pass: a real browser usually gets through them.
+const DEAD = { 404: "That page doesn't exist (it answers 404). Check the address.", 410: "That page has been removed (it answers 410).", 401: "That page asks for a login. Send the page a logged-out visitor sees." };
+export async function precheck(start) {
+  let url = start;
+  try {
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+      try {
+        await assertPublic(url);
+      } catch (err) {
+        if (/ENOTFOUND|ENODATA/i.test(`${err.code} ${err.message}`)) {
+          return { ok: false, code: "no_domain", error: `We can't find ${new URL(url).hostname}. Check the spelling, or that the domain is live.` };
+        }
+        if (/private network|public web address|IP address|port number|https:\/\/|name and password/i.test(err.message)) return { ok: false, code: "not_public", error: err.message };
+        // A DNS hiccup (EAI_AGAIN and the like) isn't proof the site is gone: let the browser try.
+        return { ok: true, finalUrl: url, unsure: true };
+      }
+      const r = await fetch(url, {
+        redirect: "manual",
+        headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml" },
+        signal: AbortSignal.timeout(9000),
+      });
+      r.body?.cancel().catch(() => {});
+      if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+        url = new URL(r.headers.get("location"), url).toString();
+        continue;
+      }
+      if (DEAD[r.status]) return { ok: false, code: `http_${r.status}`, error: DEAD[r.status] };
+      if ([502, 504].includes(r.status)) return { ok: false, code: `http_${r.status}`, error: `That site is down right now (it answers ${r.status}). Try again once it's back.` };
+      return { ok: true, finalUrl: url, status: r.status };
+    }
+    return { ok: false, code: "redirects", error: "That address redirects too many times." };
+  } catch (err) {
+    if (err.name === "TimeoutError") return { ok: false, code: "timeout", error: "That site didn't answer within 9 seconds. Check it's online, then try again." };
+    if (/ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENETUNREACH/i.test(`${err.cause?.code || ""} ${err.message}`)) {
+      return { ok: false, code: "refused", error: "That site isn't accepting connections right now. Check it's online, then try again." };
+    }
+    if (/certificate|SSL|TLS|CERT_/i.test(`${err.cause?.code || ""} ${err.cause?.message || ""} ${err.message}`)) {
+      return { ok: false, code: "tls", error: "That site's security certificate is broken, so browsers warn visitors away. Fix https, then try again." };
+    }
+    // Anything else we can't classify: let the browser try.
+    return { ok: true, finalUrl: url, unsure: true };
+  }
+}
+
 // A small file (an icon) from a public address, following redirects with the same private-network checks.
 // Resolves { buf, type }, or throws.
 export async function fetchPublicFile(start, maxBytes = 256 * 1024) {

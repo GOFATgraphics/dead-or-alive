@@ -91,7 +91,10 @@ form.addEventListener("submit", async (e) => {
 
   busy = true;
   const button = form.querySelector("button[type=submit]");
+  const label = button.innerHTML;
   button.disabled = true;
+  // The server checks the link is real and answering before it starts; say so while it does.
+  button.textContent = "Checking the link…";
   try {
     const r = await fetch("/api/stamp", {
       method: "POST",
@@ -109,6 +112,7 @@ form.addEventListener("submit", async (e) => {
   } finally {
     busy = false;
     button.disabled = false;
+    button.innerHTML = label;
   }
 });
 
