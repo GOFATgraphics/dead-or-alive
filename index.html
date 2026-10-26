@@ -3,72 +3,140 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Stamp My Page: is your page dead or alive?</title>
-    <meta name="description" content="Free. Paste a URL and we run the checks a stranger's first five seconds would: headline, who it's for, next step, speed, phone. Then we stamp it DEAD, COPE, or ALIVE. No signup, no card." />
-    <meta name="theme-color" content="#f5f3ee" />
+    <title>Why Isn’t My Landing Page Converting? Free 60-Second Check | Stamp My Page</title>
+    <meta name="description" content="Find out why your landing page, SaaS site or launch isn’t converting. Paste a URL: 13 first-screen checks in 60 seconds, a DEAD, COPE or ALIVE stamp, and the fix for every fail. Free, no signup." />
+    <meta name="theme-color" content="#f3f3f4" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="%SITE_URL%/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Stamp My Page" />
     <meta property="og:url" content="%SITE_URL%/" />
-    <meta property="og:title" content="Is your page dead or alive?" />
-    <meta property="og:description" content="Free and brutally honest. Your first screen gets five seconds and one stamp: DEAD, COPE, or ALIVE." />
+    <meta property="og:title" content="Why isn’t your page converting? Find out in 60 seconds." />
+    <meta property="og:description" content="13 first-screen checks, one stamp: DEAD, COPE or ALIVE, with the fix for every fail. Free for landing pages, SaaS sites and indie launches." />
     <meta property="og:image" content="%SITE_URL%/og-image-1200x630.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Stamp My Page: the SMP roundel. Free first-screen verdicts." />
+    <meta property="og:image:alt" content="Stamp My Page: free first-screen checks for landing pages." />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Is your page dead or alive?" />
-    <meta name="twitter:description" content="Free and brutally honest. Your first screen gets five seconds and one stamp: DEAD, COPE, or ALIVE." />
+    <meta name="twitter:title" content="Why isn’t your page converting? Find out in 60 seconds." />
+    <meta name="twitter:description" content="13 first-screen checks, one stamp: DEAD, COPE or ALIVE, with the fix for every fail. Free." />
     <meta name="twitter:image" content="%SITE_URL%/og-image-1200x630.png" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preload" href="/fonts/plus-jakarta-sans-latin-v12.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/ibm-plex-mono-500-latin-v20.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/home.css" />
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "%SITE_URL%/#org",
+      "name": "Stamp My Page",
+      "url": "%SITE_URL%/",
+      "logo": "%SITE_URL%/brand/smp-icon-256.png",
+      "parentOrganization": { "@type": "Organization", "name": "Gofat Labs" }
+    },
+    {
+      "@type": "WebApplication",
+      "name": "Stamp My Page",
+      "url": "%SITE_URL%/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any",
+      "description": "A free first-screen check for landing pages and SaaS sites. 13 checks in 60 seconds, a DEAD, COPE or ALIVE stamp, and the fix for every fail.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "publisher": { "@id": "%SITE_URL%/#org" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "Why is my landing page not converting?", "acceptedAnswer": { "@type": "Answer", "text": "Most pages lose visitors in the first five seconds: the headline doesn’t say what the product is, it doesn’t say who it’s for, there’s no single clear next step, or the page is slow or broken on a phone. Stamp My Page checks all of these on your first screen and tells you which ones fail." } },
+        { "@type": "Question", "name": "Is Stamp My Page free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The stamp is free with no signup and no card. Each visitor gets a few stamps a day." } },
+        { "@type": "Question", "name": "What do DEAD, COPE and ALIVE mean?", "acceptedAnswer": { "@type": "Answer", "text": "Your first screen is scored on 13 weighted checks. 80 or more with a plain-English headline is ALIVE, 55 or more is COPE, and below that, or no headline at all, is DEAD." } },
+        { "@type": "Question", "name": "Does it work with Framer, Webflow, Shopify or WordPress?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. It works on any public web page, whatever it’s built with: Framer, Webflow, Shopify, WordPress, Wix, Squarespace, Next.js, Carrd, Notion sites and more." } },
+        { "@type": "Question", "name": "Who can see my stamp?", "acceptedAnswer": { "@type": "Answer", "text": "Only people you share the link with. Stamps aren’t listed anywhere, and search engines are asked not to index them." } }
+      ]
+    }
+  ]
+}
+    </script>
   </head>
   <body class="home">
-    <header class="bar">
-      <a class="mark" href="/" aria-label="Stamp My Page home">
-        <img src="/brand/smp-mark.svg" alt="" width="28" height="28" />
-        <span>Stamp My Page</span>
-      </a>
-      <nav class="bar-links" aria-label="Sections">
-        <a href="#stamps">Stamps</a>
-        <a href="#how">How it works</a>
-        <a href="#example">Example</a>
-        <a href="#faq">FAQ</a>
-      </nav>
-      <a class="btn btn-acid" href="#top" data-focus-form>Stamp it free</a>
-    </header>
+    <div class="frame">
+      <header class="bar">
+        <a class="mark" href="/" aria-label="Stamp My Page home">
+          <img src="/brand/smp-mark.svg" alt="" width="26" height="26" />
+          <span>Stamp My Page</span>
+        </a>
+        <nav class="bar-links" aria-label="Sections">
+          <a href="#why">Why pages fail</a>
+          <a href="#how">How it works</a>
+          <a href="#example">Example</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <a class="btn btn-line btn-sm" href="#top" data-focus-form>Stamp my page</a>
+      </header>
 
-    <div class="ticker" aria-hidden="true">
-      <div class="ticker-track">
-        <span>Free</span><span class="dead">Dead</span><span>No signup</span><span class="cope">Cope</span><span>No card</span><span class="alive">Alive</span><span>Five seconds</span><span>One stamp</span><span>No mercy</span>
-        <span>Free</span><span class="dead">Dead</span><span>No signup</span><span class="cope">Cope</span><span>No card</span><span class="alive">Alive</span><span>Five seconds</span><span>One stamp</span><span>No mercy</span>
-      </div>
-    </div>
+      <main>
+        <section class="hero" id="top" aria-labelledby="hero-h">
+          <div class="float f-note" aria-hidden="true">
+            <span class="pin"></span>
+            <p>Your headline says “Reimagine”. Nobody knows what you sell.</p>
+            <span class="tile tile-check"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/></svg></span>
+          </div>
 
-    <main>
-      <section class="hero wrap" id="top">
-        <p class="label"><span class="dot"></span>Free first-screen verdicts · no signup</p>
-        <h1>
-          <span class="h-line">Is your page</span>
-          <span class="h-line"><span class="w-dead">dead</span> <span class="w-or">or</span> <span class="w-alive">alive?</span></span>
-        </h1>
+          <div class="float f-time" aria-hidden="true">
+            <div class="folder">
+              <p class="folder-tab">Load time</p>
+              <div class="mini">
+                <p class="mini-title">acme-notes.app</p>
+                <p class="mini-sub">First screen, desktop</p>
+                <p class="chip chip-red"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg> 3.9s · too slow</p>
+              </div>
+            </div>
+            <span class="tile tile-timer"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
+          </div>
 
-        <div class="hero-grid">
-          <div class="hero-copy">
-            <p class="lede">Paste a URL. We put your first screen through 13 checks a stranger runs in five seconds, score it, and stamp it. It doesn’t do polite. It doesn’t charge.</p>
+          <div class="float f-stamps" aria-hidden="true">
+            <div class="folder">
+              <p class="folder-tab">Today’s stamps <span>sample</span></p>
+              <ul class="rows">
+                <li><span class="dot-tile red">A</span><span class="row-name">acme-notes.app</span><span class="row-bar"><i class="w31"></i></span><b class="v-dead">DEAD</b></li>
+                <li><span class="dot-tile amber">I</span><span class="row-name">invoice-cat.io</span><span class="row-bar"><i class="w64"></i></span><b class="v-cope">COPE</b></li>
+                <li><span class="dot-tile green">S</span><span class="row-name">shipnotes.dev</span><span class="row-bar"><i class="w92"></i></span><b class="v-alive">ALIVE</b></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="float f-built" aria-hidden="true">
+            <div class="folder">
+              <p class="folder-tab">Works on what you built with</p>
+              <div class="logo-tiles">
+                <span class="logo-tile t1"><img src="/logos/framer.svg" alt="" width="30" height="30" /></span>
+                <span class="logo-tile t2"><img src="/logos/webflow.svg" alt="" width="30" height="30" /></span>
+                <span class="logo-tile t3"><img src="/logos/shopify.svg" alt="" width="30" height="30" /></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-center">
+            <span class="app-tile"><img src="/brand/smp-mark.svg" alt="" width="44" height="44" /></span>
+            <h1 id="hero-h">
+              <span class="h-1">Why isn’t your page converting?</span>
+              <span class="h-2">Find out in 60 seconds.</span>
+            </h1>
+            <p class="lede">13 first-screen checks for landing pages, SaaS sites and indie launches. One stamp: DEAD, COPE or ALIVE, and the fix for every fail.</p>
 
             <div class="form-box" id="hero-form">
               <p class="closed" id="queue-closed" hidden>The stamp is resting. Try again shortly.</p>
               <form id="judge-form" novalidate>
-                <label class="field" for="page_url"><span class="label">Your page</span></label>
+                <label class="sr-only" for="page_url">Your page URL</label>
                 <div class="field-row">
+                  <span class="field-ic"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
                   <input id="page_url" name="page_url" type="text" inputmode="url" autocomplete="url" required placeholder="yourstartup.com" aria-describedby="form-alert url-hint" />
-                  <button class="btn btn-acid btn-big" type="submit">Stamp it <span aria-hidden="true">→</span></button>
+                  <button class="btn btn-red" type="submit">Stamp it free <svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
                 </div>
                 <p class="alert" id="form-alert" role="alert" hidden></p>
                 <p class="url-hint" id="url-hint" aria-live="polite" hidden></p>
@@ -76,13 +144,13 @@
 
               <div class="run" id="run" hidden aria-live="polite">
                 <div class="run-head">
-                  <p class="label" id="run-label">Stamping</p>
-                  <p class="run-host mono" id="run-host"></p>
-                  <p class="run-time mono" id="run-time">0s</p>
+                  <p class="run-label" id="run-label">Stamping</p>
+                  <p class="run-host" id="run-host"></p>
+                  <p class="run-time" id="run-time">0s</p>
                 </div>
                 <ol class="run-steps" id="run-steps">
                   <li data-at="0">Opening your page logged out</li>
-                  <li data-at="6">Capturing the first screen, desktop and phone</li>
+                  <li data-at="6">Capturing the first screen</li>
                   <li data-at="18">Running the 13 checks</li>
                   <li data-at="40">Inking the stamp</li>
                 </ol>
@@ -91,77 +159,64 @@
                 <button class="btn btn-line" type="button" id="run-again" hidden>Try another page</button>
               </div>
             </div>
-            <p class="meta" id="trust-line"><b>$0</b> · no account · result in ~60s · public pages only</p>
+            <p class="trust" id="trust-line"><span><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6 9 17l-5-5"/></svg> Free</span><span><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6 9 17l-5-5"/></svg> No signup</span><span><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 6 9 17l-5-5"/></svg> No card</span></p>
           </div>
+        </section>
 
-          <figure class="hero-card">
-            <div class="scard tilt" data-v="dead" aria-hidden="true">
-            <div class="sc-shot">
-              <div class="sc-chrome"><i></i><i></i><i></i><span class="sc-url">acme-notes.app</span><span class="sc-dim">FIRST SCREEN · 1440 × 900</span></div>
-              <div class="sc-site">
-                <div class="sc-nav"><span class="sc-logo"><b></b>acme</span><span>Platform ▾</span><span>Solutions ▾</span><span>Resources ▾</span><span>Enterprise</span><span>Pricing</span><span>Blog</span><span class="sc-end">Log in</span><span class="sc-btn">Contact sales</span><span class="sc-btn dark">Start free</span></div>
-                <div class="sc-hero">
-                  <div class="sc-copy">
-                    <p class="sc-h"><span class="mk">Reimagine the way your work works.</span></p>
-                    <p class="sc-p">The intelligent, AI-native synergy layer that empowers modern teams to unlock what’s next, everywhere.</p>
-                    <div class="sc-row"><span class="mk wide"><span class="sc-btn dark">Get started</span><span class="sc-btn">Book a demo</span><span class="sc-btn">Watch the film ▸</span><span class="sc-btn">Join waitlist</span></span></div>
-                  </div>
-                  <div class="sc-art"><i></i><i></i></div>
-                </div>
-                <span class="sc-stamp">DEAD</span>
-              </div>
+        <section class="logos" aria-label="Works with any public page">
+          <p class="logos-label">Checks pages built on</p>
+          <ul class="logo-row">
+            <li><img src="/logos/framer.svg" alt="Framer" width="22" height="22" /><span>Framer</span></li>
+            <li><img src="/logos/webflow.svg" alt="Webflow" width="22" height="22" /><span>Webflow</span></li>
+            <li><img src="/logos/shopify.svg" alt="Shopify" width="22" height="22" /><span>Shopify</span></li>
+            <li><img src="/logos/wordpress.svg" alt="WordPress" width="22" height="22" /><span>WordPress</span></li>
+            <li><img src="/logos/nextdotjs.svg" alt="Next.js" width="22" height="22" /><span>Next.js</span></li>
+            <li><img src="/logos/wix.svg" alt="Wix" width="22" height="22" /><span>Wix</span></li>
+            <li><img src="/logos/squarespace.svg" alt="Squarespace" width="22" height="22" /><span>Squarespace</span></li>
+            <li><img src="/logos/carrd.svg" alt="Carrd" width="22" height="22" /><span>Carrd</span></li>
+            <li><img src="/logos/notion.svg" alt="Notion" width="22" height="22" /><span>Notion</span></li>
+            <li><img src="/logos/ghost.svg" alt="Ghost" width="22" height="22" /><span>Ghost</span></li>
+          </ul>
+        </section>
+
+        <section class="sect wrap" id="why" aria-labelledby="why-h">
+          <div class="sect-head">
+            <p class="eyebrow">Why pages fail</p>
+            <h2 id="why-h">7 reasons your landing page isn’t converting</h2>
+            <p class="sect-sub">A stranger decides in about five seconds. These are the things that make them leave, and every one of them is a check in your stamp.</p>
+          </div>
+          <ol class="reasons">
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 4v16"/><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"/><path d="M9 20h6"/></svg></span><h3>The headline doesn’t say what it is</h3><p>If the biggest line on the page could describe any product, visitors can’t picture yours. Name the thing and the result.</p></li>
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg></span><h3>It’s written in pitch-deck</h3><p>“Reimagine”, “unlock”, “seamless”, “AI-powered”. They sound big and say nothing. Plain words convert.</p></li>
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span><h3>It doesn’t say who it’s for</h3><p>People buy when they recognise themselves. “For sales teams on Zoom” beats “for modern teams”.</p></li>
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></span><h3>There’s no clear next step</h3><p>A visitor who’s interested needs one button with a verb and a payoff: “Try it free”, “Get the template”.</p></li>
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span><h3>Too many buttons fight</h3><p>Get started, Book a demo, Watch the film, Join the waitlist. Four choices feel like none. Keep one main action.</p></li>
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span><h3>It loads too slowly</h3><p>Every second before the first screen shows is a second to hit Back. Aim for the page to arrive in under 2.5 seconds.</p></li>
+            <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span><h3>It breaks on a phone</h3><p>Most launch traffic is mobile. A missing viewport tag turns your page into a shrunken desktop site.</p></li>
+            <li class="reasons-more"><span class="ic-tile red"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="1"/><path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0"/></svg></span><h3>Plus 6 more</h3><p>Headline length, https, page weight, tab title, search description and share preview. 13 checks in all.</p><a class="btn btn-red" href="#top" data-focus-form>Check my page free <svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></li>
+          </ol>
+        </section>
+
+        <section class="sect band" id="how" aria-labelledby="how-h">
+          <div class="wrap">
+            <div class="sect-head">
+              <p class="eyebrow">How it works</p>
+              <h2 id="how-h">Paste a link. Get the truth.</h2>
+              <p class="sect-sub">No account, no setup, no card. About a minute from paste to stamp.</p>
             </div>
-            <div class="sc-foot">
-              <div class="sc-say">
-                <p class="sc-verdict"><b></b>VERDICT · DEAD ON ARRIVAL · #0042</p>
-                <p class="sc-sentence">Five seconds in, I still can’t tell what this does or who it’s for.</p>
-              </div>
-              <dl class="sc-facts">
-                <div><dt>PAGE</dt><dd>acme-notes.app</dd></div>
-                <div><dt>STAMPED</dt><dd>Oct 4, 2026</dd></div>
-                <div><dt>LOAD</dt><dd class="mono"><em>3.9s</em> · 2.4 MB</dd></div>
-                <div><dt>STACK</dt><dd class="mono">Next.js · Vercel</dd></div>
-                <div class="sc-brand"><img src="/brand/smp-mark.svg" alt="" width="14" height="14" />stampmypage.com</div>
-              </dl>
-            </div>
+            <ol class="steps">
+              <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><p class="step-n">01 · 0s</p><h3>Paste your URL</h3><p>Any public landing page, homepage or SaaS site. We open it logged out, like a stranger would.</p></li>
+              <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="1"/><path d="M18.944 12.33a1 1 0 0 0 0-.66 7.5 7.5 0 0 0-13.888 0 1 1 0 0 0 0 .66 7.5 7.5 0 0 0 13.888 0"/></svg></span><p class="step-n">02 · ~30s</p><h3>We run 13 checks</h3><p>We capture the first screen and read the page itself: the headline, the buttons, speed, phone setup and tags.</p></li>
+              <li><span class="ic-tile"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/><path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z"/><path d="M5 22h14"/></svg></span><p class="step-n">03 · ~60s</p><h3>You get your stamp</h3><p>DEAD, COPE or ALIVE, a score out of 100, and what failed with the fix for each. Share it, or fix it first.</p></li>
+            </ol>
           </div>
-            <figcaption class="meta">Sample stamp card · acme-notes.app is fictional</figcaption>
-          </figure>
-        </div>
-      </section>
+        </section>
 
-      <section class="stamps-sect" id="stamps" aria-labelledby="stamps-h">
-        <div class="wrap">
-          <div class="head-row">
-            <h2 id="stamps-h">Three stamps.<br />No participation trophies.</h2>
-            <p class="aside">Decided by what fits on the first screen, before anyone scrolls.</p>
-          </div>
-        </div>
-        <ol class="stamps">
-          <li class="s-dead"><span class="stamp">DEAD</span><p class="s-title">Nothing lands.</p><p>A stranger can’t tell what you sell or who it’s for. They’re gone.</p></li>
-          <li class="s-cope"><span class="stamp">COPE</span><p class="s-title">Close. Not there.</p><p>The offer is in there somewhere, but something blocks the click.</p></li>
-          <li class="s-alive"><span class="stamp">ALIVE</span><p class="s-title">It works.</p><p>What it does, who it’s for, and the next step. All in five seconds.</p></li>
-        </ol>
-      </section>
-
-      <section class="wrap sect" id="how" aria-labelledby="how-h">
-        <div class="head-row">
-          <h2 id="how-h">Sixty seconds.<br />Zero dollars.</h2>
-          <p class="aside">No account, no setup, no card. Paste and wait.</p>
-        </div>
-        <ol class="flow">
-          <li><span class="num">01</span><p class="label">0s</p><h3>Paste a URL</h3><p>Any public homepage, landing page, or App Store and Google Play listing.</p></li>
-          <li><span class="num">02</span><p class="label">~15s</p><h3>We capture the first screen</h3><p>Desktop at 1440 × 900 and phone at 390 × 844. Exactly what loads before scrolling.</p></li>
-          <li><span class="num">03</span><p class="label">~40s</p><h3>13 checks score it</h3><p>Headline, who it’s for, the next step, competing buttons, speed, phone, https, and the tags. Every one counts.</p></li>
-          <li><span class="num">04</span><p class="label">~60s</p><h3>You get the stamp</h3><p>With the score, what failed, and how to fix each one. Share it, or quietly fix things first.</p></li>
-        </ol>
-      </section>
-
-      <section class="band" id="example" aria-labelledby="ex-h">
-        <div class="wrap">
-          <div class="head-row">
-            <h2 id="ex-h">Dead on Monday.<br />Alive by Friday.</h2>
-            <p class="aside">An illustration: acme-notes.app is fictional. It rewrote the first screen and stamped again.</p>
+        <section class="sect wrap" id="example" aria-labelledby="ex-h">
+          <div class="sect-head">
+            <p class="eyebrow">Example</p>
+            <h2 id="ex-h">Dead on Monday. Alive by Friday.</h2>
+            <p class="sect-sub">acme-notes.app is fictional. It rewrote three lines of its first screen and stamped again.</p>
           </div>
           <div class="ba">
             <figure><div class="scard sm" data-v="dead" aria-hidden="true">
@@ -193,7 +248,7 @@
                 <div class="sc-brand"><img src="/brand/smp-mark.svg" alt="" width="14" height="14" />stampmypage.com</div>
               </dl>
             </div>
-          </div><figcaption class="meta"><span class="red">BEFORE · DEAD</span><span>Stamp #0042 · Oct 4</span></figcaption></figure>
+          </div><figcaption><span class="v-dead">Before · DEAD</span><span>Stamp #0042</span></figcaption></figure>
             <figure><div class="scard sm" data-v="alive" aria-hidden="true">
             <div class="sc-shot">
               <div class="sc-chrome"><i></i><i></i><i></i><span class="sc-url">acme-notes.app</span><span class="sc-dim">FIRST SCREEN · 1440 × 900</span></div>
@@ -223,46 +278,63 @@
                 <div class="sc-brand"><img src="/brand/smp-mark.svg" alt="" width="14" height="14" />stampmypage.com</div>
               </dl>
             </div>
-          </div><figcaption class="meta"><span class="green">AFTER · ALIVE</span><span>Stamp #0057 · Oct 11</span></figcaption></figure>
+          </div><figcaption><span class="v-alive">After · ALIVE</span><span>Stamp #0057</span></figcaption></figure>
           </div>
           <dl class="diff">
-            <div><dt class="label">Headline</dt><dd><s>Reimagine the way your work works.</s></dd><dd>Meeting notes that write themselves.</dd></div>
-            <div><dt class="label">Subhead</dt><dd><s>The intelligent, AI-native synergy layer for modern teams.</s></dd><dd>For sales teams on Zoom: a summary and action items in your CRM a minute after every call.</dd></div>
-            <div><dt class="label">Buttons</dt><dd><s>Get started, Book a demo, Watch the film, Join waitlist</s></dd><dd>Try it free, no card</dd></div>
+            <div><dt>Headline</dt><dd><s>Reimagine the way your work works.</s></dd><dd>Meeting notes that write themselves.</dd></div>
+            <div><dt>Subhead</dt><dd><s>The intelligent, AI-native synergy layer for modern teams.</s></dd><dd>For sales teams on Zoom: a summary and action items in your CRM a minute after every call.</dd></div>
+            <div><dt>Buttons</dt><dd><s>Get started, Book a demo, Watch the film, Join waitlist</s></dd><dd>Try it free, no card</dd></div>
           </dl>
-        </div>
-      </section>
+        </section>
 
-      <section class="wrap sect" id="faq" aria-labelledby="faq-h">
-        <div class="faq">
-          <div>
-            <h2 id="faq-h">Questions</h2>
-            <p class="aside">Anything else: <a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></p>
+        <section class="sect band" id="share" aria-labelledby="share-h">
+          <div class="wrap share-grid">
+            <div>
+              <p class="eyebrow">Built to be posted</p>
+              <h2 id="share-h">An ALIVE stamp is a flex.</h2>
+              <p class="sect-sub">Every stamp comes with a share card sized for X and launch posts, a link that unfurls with your verdict, and a number. Post the ALIVE. Keep the DEAD to yourself until the comeback.</p>
+              <ul class="share-list">
+                <li><span class="logo-chip"><img src="/logos/x.svg" alt="" width="18" height="18" /></span>A card that unfurls on X</li>
+                <li><span class="logo-chip"><img src="/logos/producthunt.svg" alt="" width="18" height="18" /></span>Proof for your launch-day post</li>
+                <li><span class="logo-chip"><svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg></span>A private link, yours to share</li>
+              </ul>
+            </div>
+            <figure class="share-card">
+              <img src="/press/f4-card-ALIVE.jpg" alt="A sample share card: a first screen stamped ALIVE with its one-line verdict." width="1200" height="630" />
+            </figure>
           </div>
-          <dl>
-            <div><dt>Is it really free?</dt><dd>Yes. No card, no account, no trial that turns into a bill. There’s a daily limit per person so the stamp keeps working for everyone.</dd></div>
-            <div><dt>Who decides the stamp?</dt><dd>Fixed rules, not a mood. The same 13 checks for every page, each with a weight. Score 80+ with a clear headline is ALIVE, 55+ is COPE, the rest is DEAD.</dd></div>
-            <div><dt>What if it fails?</dt><dd>It retries once by itself. If your page still can’t be captured, usually because it’s down, blocks bots, or sits behind a login, we tell you on the spot.</dd></div>
-            <div><dt>What comes after the stamp?</dt><dd>Your result shows every check that failed and how to fix it. If you’d rather we fix it, or keep watching it for you, the options are right there under your stamp.</dd></div>
-            <div><dt>Does it work for apps?</dt><dd>Send your app’s website. Store listings can’t be stamped yet.</dd></div>
-            <div><dt>Who sees my stamp?</dt><dd>Only people you give the link to. It isn’t listed anywhere, and search engines are asked not to index it.</dd></div>
-          </dl>
-        </div>
-      </section>
+        </section>
 
-      <section class="final">
-        <div class="wrap final-row">
-          <h2>Stop guessing.<br /><span class="acid">Get stamped.</span></h2>
-          <a class="btn btn-acid btn-big" href="#top" data-focus-form>Stamp my page free <span aria-hidden="true">→</span></a>
-        </div>
-      </section>
-    </main>
+        <section class="sect wrap" id="faq" aria-labelledby="faq-h">
+          <div class="sect-head">
+            <p class="eyebrow">FAQ</p>
+            <h2 id="faq-h">Questions</h2>
+          </div>
+          <div class="faq">
+            <details open><summary>Why is my landing page not converting?</summary><p>Most pages lose visitors in the first five seconds: the headline doesn’t say what the product is, it doesn’t say who it’s for, there’s no single clear next step, or the page is slow or broken on a phone. The stamp checks all of these on your first screen and tells you which ones fail.</p></details>
+            <details><summary>Is it really free?</summary><p>Yes. No card, no account, no trial that turns into a bill. Each visitor gets a few stamps a day so it keeps working for everyone.</p></details>
+            <details><summary>What do DEAD, COPE and ALIVE mean?</summary><p>Your first screen is scored on 13 weighted checks. 80 or more with a plain-English headline is ALIVE, 55 or more is COPE, and below that, or no headline at all, is DEAD. The same rules for every page.</p></details>
+            <details><summary>Does it work with Framer, Webflow, Shopify or WordPress?</summary><p>Yes, any public web page: Framer, Webflow, Shopify, WordPress, Wix, Squarespace, Next.js, Carrd, Notion sites and more. App Store and Google Play listings aren’t supported yet; send your app’s website.</p></details>
+            <details><summary>What if it can’t stamp my page?</summary><p>It retries once by itself. If your page still can’t be captured, usually because it’s down, blocks bots, or sits behind a login, it tells you on the spot.</p></details>
+            <details><summary>Who can see my stamp?</summary><p>Only people you give the link to. It isn’t listed anywhere, and search engines are asked not to index it.</p></details>
+          </div>
+        </section>
 
-    <footer class="foot wrap">
-      <a class="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
-      <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></nav>
-      <span class="meta">Free forever-ish · © Gofat Labs</span>
-    </footer>
+        <section class="final" aria-labelledby="final-h">
+          <div class="final-in">
+            <span class="app-tile sm"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>
+            <h2 id="final-h"><span class="h-1">Stop guessing.</span> <span class="h-2">Get stamped.</span></h2>
+            <a class="btn btn-red" href="#top" data-focus-form>Stamp my page free <svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="foot">
+        <a class="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
+        <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></nav>
+        <span class="foot-meta">© Gofat Labs</span>
+      </footer>
+    </div>
 
     <script type="module" src="/src/home.js"></script>
   </body>
