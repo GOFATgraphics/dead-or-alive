@@ -230,7 +230,28 @@ ol, ul { padding: 0; list-style: none; }
 .share-list li { display: flex; align-items: center; gap: 0.75rem; font-weight: 600; }
 .logo-chip { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 10px; background: var(--card); box-shadow: var(--shadow-1); color: var(--ink); }
 .logo-chip img { width: 1.1rem; height: 1.1rem; }
-.share-card img { width: 100%; border-radius: 18px; box-shadow: var(--shadow-3); transform: rotate(1.5deg); }
+.tiers-show { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
+.tier-fan { position: relative; width: min(100%, 26rem); height: 17rem; }
+.tcard { position: absolute; left: 50%; display: flex; flex-direction: column; justify-content: space-between; width: 16.5rem; height: 10.3rem; margin-left: -8.25rem; padding: 1rem 1.15rem; border-radius: 16px; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, var(--shadow-3); }
+.tcard p { margin: 0; }
+.tc-top { display: flex; align-items: center; gap: 0.45rem; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.12em; }
+.tc-top span { margin-left: auto; font-family: var(--mono); font-weight: 500; color: #a9adb5; }
+.tc-name { font-size: 1.6rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1; }
+.tc-range { font: 500 0.6875rem var(--mono); letter-spacing: 0.12em; }
+.t-steel { top: 0; transform: translateX(-6.5rem) rotate(-8deg); background: linear-gradient(150deg, #8e939b, #c9cdd3 50%, #9da2aa); color: #0e0f12; }
+.t-gold { top: 1.6rem; z-index: 1; transform: translateX(0) rotate(-1deg); background: linear-gradient(150deg, #b58a2e, #e9cf8a 50%, #c29a45); color: #1a1406; }
+.t-obsidian { top: 3.4rem; z-index: 2; transform: translateX(6.5rem) rotate(6deg); background: linear-gradient(150deg, #1c1e23, #0e0f12 55%, #23262c); color: #f1f2f4; box-shadow: 0 0 0 1px #2a2d33 inset, var(--shadow-3); }
+.t-obsidian .tc-range { color: #c7cbd1; }
+.embed-sample { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+.embed-sample img { width: 300px; filter: drop-shadow(0 12px 20px rgba(14, 15, 18, 0.22)); }
+.embed-sample figcaption { font: 500 0.75rem var(--mono); letter-spacing: 0.08em; color: var(--soft); }
+@media (max-width: 560px) {
+  .tier-fan { height: 15rem; }
+  .tcard { width: 13rem; height: 8.2rem; margin-left: -6.5rem; }
+  .t-steel { transform: translateX(-4rem) rotate(-8deg); }
+  .t-obsidian { transform: translateX(4rem) rotate(6deg); }
+  .tc-name { font-size: 1.3rem; }
+}
 
 /* FAQ */
 .faq { max-width: 46rem; margin: 0 auto; display: grid; gap: 0.75rem; }

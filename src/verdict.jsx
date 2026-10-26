@@ -10,6 +10,7 @@ import StatusMark from "./bits/StatusMark.jsx";
 import { track, trackView } from "./track.js";
 import { snapshotRows } from "./snapshot.js";
 import { DESK } from "./config.js";
+import { TIERS, embedSvg, svgUri, tickSvg, tierFor } from "./badge.js";
 
 const still = reducedMotion();
 
@@ -192,6 +193,84 @@ function Offers({ r }) {
   );
 }
 
+// The status a stamp earns (G: tier card, D: tick, C: footer embed). ALIVE only; COPE sees how close it is.
+function CopyButton({ text, label }) {
+  const [done, setDone] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setDone(true);
+      setTimeout(() => setDone(false), 1600);
+    } catch (_) {
+      prompt("Copy this", text);
+    }
+  }
+  return (
+    <button type="button" className="submit ghost small" onClick={copy} aria-live="polite">
+      {done ? "Copied" : label}
+    </button>
+  );
+}
+
+function Status({ r }) {
+  const tier = tierFor(r.verdict, r.score);
+  if (r.verdict === "COPE" && r.score >= 0) {
+    const gap = Math.max(1, TIERS.steel.min - r.score);
+    return (
+      <section className="section status">
+        <h2 className="kicker brand">Your status</h2>
+        <div className="watch-card">
+          <p className="watch-name">On watch</p>
+          <p className="watch-line"><strong>{gap} point{gap === 1 ? "" : "s"}</strong> to Steel, the first ALIVE tier. Fix what failed below, then stamp again.</p>
+          <div className="watch-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (r.score / TIERS.steel.min) * 100)}%` }}></span></div>
+        </div>
+      </section>
+    );
+  }
+  if (!tier) return null;
+  const origin = location.origin;
+  const link = `${origin}/v/${r.id}`;
+  const embed = (theme) =>
+    `<a href="${link}"><img src="${origin}/badge/${r.id}${theme === "steel" ? "" : `?theme=${theme}`}" alt="${tier.name}, alive on Stamp My Page" width="300" height="64"></a>`;
+  const c = tier.card;
+  return (
+    <section className="section status">
+      <h2 className="kicker brand">Your status</h2>
+      <div className="tier-row">
+        <div className={"tier-card tier-" + tier.key} style={{ background: `linear-gradient(150deg, ${c.from} 0%, ${c.mid} 50%, ${c.to} 100%)`, color: c.ink }}>
+          <div className="tier-top">
+            <img src={tier.key === "obsidian" ? "/brand/smp-mark-white.svg" : "/brand/smp-mark-ink.svg"} alt="" width="22" height="22" />
+            <span>STAMP MY PAGE</span>
+            <span className="tier-no">NO. {String(r.number || 0).padStart(4, "0")}</span>
+          </div>
+          <div>
+            <p className="tier-host"><img src={svgUri(tickSvg(tier, 22))} alt="" width="22" height="22" />{r.host}</p>
+            <p className="tier-name">{tier.name.toUpperCase()}</p>
+            <p className="tier-range" style={{ color: c.sub }}>ALIVE · {r.score} / 100</p>
+          </div>
+        </div>
+        <div className="tier-copy">
+          <p className="tier-line">{tier.line}</p>
+          <p className="fine">Tiers: Steel {TIERS.steel.min}–{TIERS.steel.max}, Gold {TIERS.gold.min}–{TIERS.gold.max}, Obsidian {TIERS.obsidian.min}–{TIERS.obsidian.max}.{tier.key !== "obsidian" ? " Re-stamp after you fix something to climb." : ""}</p>
+        </div>
+      </div>
+
+      <div className="embed-box">
+        <h3 className="embed-h">Put it in your footer</h3>
+        <p className="fine">The badge links back to this stamp. Paste it anywhere that takes HTML.</p>
+        <div className="embed-grid">
+          {["steel", "dark"].map((theme) => (
+            <div key={theme} className={"embed-item " + theme}>
+              <img src={svgUri(embedSvg({ tier, score: r.score, theme }))} alt={`${tier.name}, alive on Stamp My Page (${theme} badge)`} width="300" height="64" />
+              <CopyButton text={embed(theme)} label={`Copy ${theme} badge code`} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ShareCard({ r }) {
   const v = r.verdict;
   const url = `${location.origin}/v/${r.id}`;
@@ -240,7 +319,7 @@ function Result({ r }) {
     <main className={"desk result v-" + v.toLowerCase()}>
       <Logo />
       <div className="result-card">
-      <p className="kicker brand">We looked at {r.host}{when ? ` · ${when}` : ""}</p>
+      <p className="kicker brand host-line">We looked at {r.host}{tierFor(v, r.score) && <img src={svgUri(tickSvg(tierFor(v, r.score), 16))} alt={`${tierFor(v, r.score).name} tier`} width="16" height="16" />}{when ? ` · ${when}` : ""}</p>
       <h1 className="verdict-word" style={{ color: VERDICT_COLOR[v] }}>
         {still ? v : (
           <DecryptedText text={v} animateOn="view" sequential speed={90} characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" encryptedClassName="scrambled" />
@@ -261,6 +340,8 @@ function Result({ r }) {
         </p>
       </section>
       </div>
+
+      <Status r={r} />
 
       <Checks r={r} />
 

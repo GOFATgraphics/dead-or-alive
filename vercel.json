@@ -25,6 +25,10 @@
     {
       "source": "/v/:id",
       "destination": "/api/v?id=:id"
+    },
+    {
+      "source": "/badge/:id",
+      "destination": "/api/badge?id=:id"
     }
   ],
   "headers": [
