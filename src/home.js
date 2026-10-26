@@ -263,48 +263,102 @@ $$("[data-focus-form]").forEach((a) =>
 // Arriving from another page at /#top lands in the form too.
 if (location.hash === "#top" && !location.search) requestAnimationFrame(() => focusForm({ smooth: false }));
 
-// The hero's "Latest stamps" card: real ALIVE and COPE stamps when there are any (never DEAD), else the sample.
+// Latest stamps: real ALIVE and COPE stamps (never DEAD) for the hero's floating card (newest 3) and the
+// carousel under the URL box (up to 12). Until there are some, both keep their sample rows.
+
+// The site's icon when we have it; the letter tile stays if it's missing or fails to load.
+function iconTile(s, className, size) {
+  const v = String(s.verdict).toLowerCase();
+  const tile = document.createElement("span");
+  tile.className = `${className} ${v === "alive" ? "green" : "amber"}`;
+  tile.textContent = (s.host || "?").charAt(0).toUpperCase();
+  if (s.icon) {
+    const img = new Image(size, size);
+    img.alt = "";
+    img.decoding = "async";
+    img.onload = () => {
+      tile.className = `${className} ${className === "dot-tile" ? "icon" : "img"}`;
+      tile.replaceChildren(img);
+    };
+    img.src = s.icon;
+  }
+  return tile;
+}
+
+function cardRow(s) {
+  const v = String(s.verdict).toLowerCase();
+  const li = document.createElement("li");
+  const name = document.createElement("span");
+  name.className = "row-name";
+  name.textContent = s.host;
+  const bar = document.createElement("span");
+  bar.className = "row-bar";
+  const fill = document.createElement("i");
+  fill.className = v;
+  fill.style.width = `${Math.max(4, Math.min(100, Number(s.score) || (v === "alive" ? 85 : 65)))}%`;
+  bar.append(fill);
+  const tag = document.createElement("b");
+  tag.className = `v-${v}`;
+  tag.textContent = s.verdict;
+  li.append(iconTile(s, "dot-tile", 24), name, bar, tag);
+  return li;
+}
+
+function chip(s) {
+  const v = String(s.verdict).toLowerCase();
+  const li = document.createElement("li");
+  li.className = "mq-item";
+  const host = document.createElement("span");
+  host.className = "mq-host";
+  host.textContent = s.host;
+  const tag = document.createElement("span");
+  tag.className = `mq-v ${v}`;
+  tag.textContent = s.verdict;
+  li.append(iconTile(s, "mq-icon", 26), host, tag);
+  if (Number.isFinite(Number(s.score)) && s.score !== null) {
+    const score = document.createElement("span");
+    score.className = "mq-score";
+    score.textContent = String(s.score);
+    li.append(score);
+  }
+  return li;
+}
+
+// Doubles the chips so the loop is seamless (the copies are hidden from screen readers), and paces the speed.
+function loopTrack() {
+  const track = $("#mq-track");
+  if (!track) return;
+  [...track.querySelectorAll("[data-clone]")].forEach((n) => n.remove());
+  const items = [...track.children];
+  // Short lists repeat until the strip is wide enough to loop without a gap.
+  let copies = items.length < 6 ? Math.ceil(6 / Math.max(1, items.length)) : 1;
+  const extra = [];
+  for (let i = 1; i < copies; i++) extra.push(...items.map((n) => n.cloneNode(true)));
+  extra.forEach((n) => n.setAttribute("aria-hidden", "true"));
+  track.append(...extra);
+  const half = [...track.children];
+  half.forEach((n) => {
+    const c = n.cloneNode(true);
+    c.dataset.clone = "";
+    c.setAttribute("aria-hidden", "true");
+    track.append(c);
+  });
+  track.style.setProperty("--mq-dur", `${Math.max(20, half.length * 4.5)}s`);
+}
+
+loopTrack();
+
 (async () => {
   try {
-    const r = await fetch("/api/status?recent=1", { headers: { Accept: "application/json" } });
+    const r = await fetch("/api/status?recent=12", { headers: { Accept: "application/json" } });
     const { stamps } = r.ok ? await r.json() : {};
     if (!Array.isArray(stamps) || !stamps.length) return;
-    const ul = $("#recent-rows");
-    ul.replaceChildren(
-      ...stamps.map((s) => {
-        const v = String(s.verdict).toLowerCase();
-        const li = document.createElement("li");
-        const tile = document.createElement("span");
-        tile.className = `dot-tile ${v === "alive" ? "green" : "amber"}`;
-        tile.textContent = (s.host || "?").charAt(0).toUpperCase();
-        // The site's own icon when we have it; the letter stays if it fails to load.
-        if (s.icon) {
-          const img = new Image(24, 24);
-          img.alt = "";
-          img.decoding = "async";
-          img.onload = () => {
-            tile.className = "dot-tile icon";
-            tile.replaceChildren(img);
-          };
-          img.src = s.icon;
-        }
-        const name = document.createElement("span");
-        name.className = "row-name";
-        name.textContent = s.host;
-        const bar = document.createElement("span");
-        bar.className = "row-bar";
-        const fill = document.createElement("i");
-        fill.className = v;
-        fill.style.width = `${Math.max(4, Math.min(100, Number(s.score) || (v === "alive" ? 85 : 65)))}%`;
-        bar.append(fill);
-        const tag = document.createElement("b");
-        tag.className = `v-${v}`;
-        tag.textContent = s.verdict;
-        li.append(tile, name, bar, tag);
-        return li;
-      })
-    );
+    $("#recent-rows").replaceChildren(...stamps.slice(0, 3).map(cardRow));
     $("#recent-tag").textContent = "live";
     $("#recent-dot").hidden = false;
+    $("#mq-track").replaceChildren(...stamps.map(chip));
+    $("#mq-title").textContent = "Latest stamps";
+    $("#mq-dot").hidden = false;
+    loopTrack();
   } catch (_) {}
 })();

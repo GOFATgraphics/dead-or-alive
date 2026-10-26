@@ -5,7 +5,8 @@
 import { list } from "@vercel/blob";
 import { pipeline, redisReady } from "./_redis.js";
 
-const SHOW = 3;
+// How many to return: ?recent=N asks for up to N (the carousel takes 12, the card 3).
+const MAX_SHOW = 12;
 
 async function fromRedis() {
   const [rows] = await pipeline([["LRANGE", "recent", 0, 49]]);
@@ -37,15 +38,15 @@ async function fromBlob() {
 const safeIcon = (u) => (/^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\/icons\//i.test(String(u || "")) ? u : "");
 
 // Newest first, ALIVE always on the card when there is one: up to two ALIVE and one COPE, then whatever is newer.
-function pick(items) {
+function pick(items, show) {
   const seen = new Set();
   const fresh = items.filter((s) => ["ALIVE", "COPE"].includes(s.verdict) && s.host && !seen.has(s.host) && seen.add(s.host));
   const alive = fresh.filter((s) => s.verdict === "ALIVE");
   const cope = fresh.filter((s) => s.verdict === "COPE");
-  const chosen = [...alive.slice(0, 2), ...cope.slice(0, 1)];
-  for (const s of fresh) if (chosen.length < SHOW && !chosen.includes(s)) chosen.push(s);
+  const chosen = [...alive.slice(0, Math.max(2, show - 1)), ...cope.slice(0, 1)];
+  for (const s of fresh) if (chosen.length < show && !chosen.includes(s)) chosen.push(s);
   return chosen
-    .slice(0, SHOW)
+    .slice(0, show)
     .sort((a, b) => new Date(b.at) - new Date(a.at))
     .map(({ host, verdict, score, icon, at }) => ({ host, verdict, score, icon: safeIcon(icon), at }));
 }
@@ -59,5 +60,6 @@ export async function recentStamps(req, res) {
     console.error("Recent stamps failed:", err.message);
   }
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
-  res.status(200).json({ stamps: pick(items) });
+  const show = Math.min(MAX_SHOW, Math.max(1, parseInt(req.query.recent, 10) || 3));
+  res.status(200).json({ stamps: pick(items, show) });
 }
