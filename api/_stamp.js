@@ -55,13 +55,14 @@ export async function processStamp(jobId, pageUrl) {
   try {
     // Loaded only here, so routes that just read stamps don't carry the canvas library.
     const { renderStamp } = await import("./_render.js");
-    const { image, shot: clean } = await renderStamp({ jpg: shot.jpg, boxes: [], verdict, sentence });
+    // The result page frames the first screen itself, so the clean screenshot is the stamp's image.
+    const { shot: clean } = await renderStamp({ jpg: shot.jpg, boxes: [], verdict, sentence });
     return await publishStamp({
       orderId: jobId,
       pageUrl,
       verdict,
       sentence,
-      image,
+      image: clean,
       shot: clean,
       focus: null,
       sendMail: false,
