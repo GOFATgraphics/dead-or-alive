@@ -183,3 +183,33 @@ export async function capture(pageUrl) {
   };
   return { jpg, rendered: h1 || ctas.length || title ? rendered : null };
 }
+
+// The whole page, top to bottom, for the Kill Sheet scout. Banners hidden like the first screen.
+// Null when the screenshot service can't do it; the scout still reports on the HTML.
+export async function fullPageShot(pageUrl) {
+  const key = process.env.MICROLINK_API_KEY;
+  const api = new URL(key ? "https://pro.microlink.io/" : "https://api.microlink.io/");
+  const q = {
+    url: pageUrl,
+    screenshot: "true",
+    meta: "false",
+    "screenshot.fullPage": "true",
+    "screenshot.type": "jpeg",
+    "viewport.width": "1280",
+    "viewport.height": "800",
+    waitForTimeout: "1500",
+    adblock: "true",
+    styles: CONSENT_CSS,
+  };
+  for (const [k, v] of Object.entries(q)) api.searchParams.set(k, v);
+  try {
+    const r = await fetch(api, { headers: key ? { "x-api-key": key } : {} });
+    const data = await r.json().catch(() => ({}));
+    const shot = data?.data?.screenshot?.url;
+    if (!r.ok || data.status !== "success" || !shot) return null;
+    const img = await fetch(shot);
+    return img.ok ? Buffer.from(await img.arrayBuffer()) : null;
+  } catch (_) {
+    return null;
+  }
+}

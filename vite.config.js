@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { plansHtml, reviewHtml } from "./src/plans.js";
 
 const page = (p) => resolve(import.meta.dirname, p);
 
@@ -27,7 +28,12 @@ function siteInfo() {
       const contactHtml = contact
         ? `<a href="mailto:${escape(contact)}">${escape(contact)}</a>`
         : "a reply to the email that brought your stamp";
-      return html.replaceAll("%SITE_URL%", SITE).replaceAll("%CONTACT%", contactHtml);
+      return html
+        .replaceAll("%SITE_URL%", SITE)
+        .replaceAll("%CONTACT%", contactHtml)
+        .replaceAll("<!--plans:free-->", plansHtml({ free: true }))
+        .replaceAll("<!--plans-->", plansHtml())
+        .replaceAll("<!--plans:review-->", reviewHtml());
     },
     closeBundle() {
       // Preview deployments stay out of search results. Private pages are not listed here (that would
@@ -35,7 +41,7 @@ function siteInfo() {
       const robots = isPreview
         ? "User-agent: *\nDisallow: /\n"
         : `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`;
-      const urls = ["/", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
+      const urls = ["/", "/pricing", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
       writeFileSync(resolve(outDir, "robots.txt"), robots);
       writeFileSync(resolve(outDir, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
     },
@@ -50,8 +56,8 @@ export default defineConfig({
         home: page("index.html"),
         privacy: page("privacy/index.html"),
         terms: page("terms/index.html"),
-        sheet: page("paid/sheet/index.html"),
-        alive: page("paid/alive/index.html"),
+        pricing: page("pricing/index.html"),
+        dashboard: page("dashboard/index.html"),
         verdict: page("v/index.html"),
         admin: page("admin/index.html"),
       },

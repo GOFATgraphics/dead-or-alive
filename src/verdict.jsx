@@ -6,7 +6,9 @@ import DecryptedText from "./bits/DecryptedText.jsx";
 import { Icon } from "./icons.jsx";
 import { track, trackView } from "./track.js";
 import { snapshotRows } from "./snapshot.js";
-import { DESK } from "./config.js";
+import { DESK, PLANS } from "./config.js";
+import { REVIEW_STEPS, planHref, point } from "./plans.js";
+import "./plans.css";
 import { TIERS, embedSvg, svgUri, tickSvg, tierFor } from "./badge.js";
 
 const still = reducedMotion();
@@ -39,7 +41,7 @@ function Foot() {
   return (
     <footer className="foot">
       <a className="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
-      <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href={`mailto:${DESK.contact}`}>{DESK.contact}</a></nav>
+      <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/dashboard">Dashboard</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href={`mailto:${DESK.contact}`}>{DESK.contact}</a></nav>
       <span className="foot-meta">© Gofat Labs</span>
     </footer>
   );
@@ -248,34 +250,71 @@ function Checks({ r }) {
   );
 }
 
-const OFFERS = {
-  killSheet: {
-    name: "Kill Sheet",
-    pitch: "We fix it for you.",
-    points: ["Your headline, subhead, and button rewritten, ready to paste", "The whole page scouted, not just the first screen", "3 to 5 fixes ranked by impact", "A free re-stamp after you ship"],
-    cta: "Get the Kill Sheet",
-  },
-  stayAlive: {
-    name: "Stay Alive",
-    pitch: "We keep watching it.",
-    points: ["A fresh stamp every week", "Uptime and speed checks between stamps", "An alert when the page goes down or slows down", "Cancel anytime"],
-    cta: "Start Stay Alive",
-  },
-};
-
-// Polar checkout with the page attached, or an email asking to be told when the offer is ready.
-function offerHref(key, r) {
-  const link = (DESK.offers[key]?.url || "").trim();
-  if (link) {
-    try {
-      const u = new URL(link);
-      u.searchParams.set("custom_field_data.page_url", r.pageUrl);
-      return u.toString();
-    } catch (_) {}
+// Saving the result: a free account, no card. Signed in already? The stamp is saved to the dashboard on the spot.
+function localJobs() {
+  try {
+    return JSON.parse(localStorage.getItem("smp.jobs") || "[]");
+  } catch (_) {
+    return [];
   }
-  const subject = `${OFFERS[key].name} for ${r.host}`;
-  const body = `I'd like the ${OFFERS[key].name} for ${r.pageUrl} (stamped ${r.verdict}).`;
-  return `mailto:${DESK.contact}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function SavePrompt({ r }) {
+  const [state, setState] = useState({ status: "loading" });
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/account", { cache: "no-store" });
+        if (!res.ok) return live && setState({ status: "off" });
+        const data = await res.json();
+        if (!data.user) return live && setState({ status: "out" });
+        const jobs = localJobs();
+        let saved = (data.user.stamps || []).some((x) => x.id === r.id);
+        if (!saved && jobs.length) {
+          const c = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "claim", jobs }) }).then((x) => x.json()).catch(() => ({}));
+          saved = (c.user?.stamps || []).some((x) => x.id === r.id);
+        }
+        if (live) setState({ status: "in", saved });
+      } catch (_) {
+        if (live) setState({ status: "off" });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [r.id]);
+  if (state.status === "loading" || state.status === "off") return null;
+  const next = `/dashboard?save=${encodeURIComponent(r.id)}`;
+  return (
+    <section className="wrap save-wrap" aria-labelledby="save-h">
+      <div className="save">
+        <span className="ic-tile"><Icon name={state.status === "in" ? "check" : "lock"} size={20} /></span>
+        {state.status === "out" ? (
+          <>
+            <div>
+              <h2 id="save-h">Create a free account if you don't want to miss your result.</h2>
+              <p>Save this stamp, see all your stamps in one place, and get your free re-stamp after you fix it.</p>
+            </div>
+            <div className="save-actions">
+              <a className="btn btn-dark" href={`${next}&mode=signup`} onClick={() => track("save_click", { v: r.verdict })}>Create free account</a>
+              <a className="btn btn-line" href={`${next}&mode=login`}>Sign in</a>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <h2 id="save-h">{state.saved ? "Saved to your dashboard." : "You're signed in."}</h2>
+              <p>{state.saved ? "Every stamp you make while signed in lands there too." : "This stamp was made in another browser, so it can't be saved here. Stamp the page again to add it."}</p>
+            </div>
+            <div className="save-actions">
+              <a className="btn btn-line" href="/dashboard">Open dashboard <Icon name="arrow-right" /></a>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function Offers({ r }) {
@@ -288,25 +327,38 @@ function Offers({ r }) {
       <div className="sect-head">
         <p className="eyebrow">{v === "ALIVE" ? "Keep it alive" : "Bring it back"}</p>
         <h2 id="offers-h">{v === "ALIVE" ? "Pages break quietly. We'll watch it." : "Fix it yourself, or hand it to us."}</h2>
-        <p className="sect-sub">{v === "ALIVE" ? "A deploy, a slow script, a new hero. Stay Alive re-stamps every week and tells you first." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}The list above is free. The Kill Sheet is the rewrite, done for you.`}</p>
+        <p className="sect-sub">{v === "ALIVE" ? "A deploy, a slow script, a new hero. Stay Alive re-stamps every week and tells you first." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}The list above is free. The Kill Sheet is the rewrite and the full-page scout, in your dashboard the moment you pay.`}</p>
       </div>
-      <div className="plans">
+      <div className="pc-grid">
         {order.map((key, i) => {
-          const o = OFFERS[key];
-          const price = DESK.offers[key];
+          const p = PLANS[key];
           return (
-            <article key={key} className={"plan" + (i === 0 ? " main" : "")}>
-              <p className="plan-label">{i === 0 ? "Recommended" : "Also"}</p>
-              <h3>{o.name}</h3>
-              <p className="amount">{price.price} <span>{price.per}</span></p>
-              <p className="plan-note">{o.pitch}</p>
-              <ul className="ticks">{o.points.map((p) => <li key={p}><Icon name="check" size={16} />{p}</li>)}</ul>
-              <a className={"btn " + (i === 0 ? "btn-red" : "btn-line")} href={offerHref(key, r)} onClick={() => track("offer_click", { v })}>
-                {o.cta} <Icon name="arrow-right" />
+            <article key={key} className={"pc" + (i === 0 ? " pc-main" : "")}>
+              <p className="pc-label">{i === 0 ? "Recommended" : key === "stayAlive" ? "Membership" : "One-time"}</p>
+              <h3>{p.name}</h3>
+              <p className="pc-amount">{p.price} <span>{p.per}</span></p>
+              <p className="pc-pitch">{p.pitch}</p>
+              <ul className="pc-ticks">
+                {p.points.map(point).map((x) => (
+                  <li key={x.text}><Icon name="check" size={16} /><span>{x.instant && <b className="pc-tag">Instant</b>} {x.text}</span></li>
+                ))}
+              </ul>
+              <a className={"btn " + (i === 0 ? "btn-red" : "btn-dark")} href={planHref(key, r.pageUrl)} onClick={() => track("offer_click", { v, plan: key })}>
+                {p.cta} <Icon name="arrow-right" />
               </a>
             </article>
           );
         })}
+      </div>
+      <ol className="pc-steps" aria-label="How buying works">
+        <li><b>1</b><span>Create a free account with your email.</span></li>
+        <li><b>2</b><span>Pay on Polar with the same email.</span></li>
+        <li><b>3</b><span>Your dashboard opens with everything marked Instant already running.</span></li>
+      </ol>
+      <div className="pc-review">
+        <h3>App review, included with both plans</h3>
+        <p>The Kill Sheet includes one. Stay Alive includes one every month. Tracked in your dashboard.</p>
+        <ol>{REVIEW_STEPS.map((x) => <li key={x}>{x}</li>)}</ol>
       </div>
     </section>
   );
@@ -515,6 +567,7 @@ function Result({ r }) {
         <Hero r={r} />
         <Status r={r} />
         <Checks r={r} />
+        <SavePrompt r={r} />
         <Offers r={r} />
         <Share r={r} />
         <Snapshot s={r.snapshot} />

@@ -2,8 +2,9 @@
 // _rules.js, draw the stamp, and publish it. No AI. If the page can't be captured or read, a note with the
 // reason is saved instead and the homepage says so.
 // Env: BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY.
+import crypto from "node:crypto";
 import { head, put } from "@vercel/blob";
-import { resultId } from "./_lib.js";
+import { readResult, resultId } from "./_lib.js";
 import { inspect } from "./_inspect.js";
 import { capture, isBusy } from "./_shot.js";
 import { scorePage } from "./_rules.js";
@@ -172,4 +173,13 @@ export async function processStamp(jobId, pageUrl) {
     console.error("Publish failed:", jobId, err);
     return saveFailure(id, pageUrl, `Publishing failed: ${err.message || err}`);
   }
+}
+
+// Stamps a page right now and waits for it: the published record, or { failed } with the reason.
+// For the dashboard's automated runs (the Kill Sheet scout, Stay Alive's weekly re-stamp).
+export async function stampNow(pageUrl) {
+  const job = crypto.randomUUID();
+  const out = await processStamp(job, pageUrl);
+  if (out?.failed) return { failed: out.failed, reason: failReason(out.failed) };
+  return (await readResult(resultId(job))) || { failed: "The stamp didn't save.", reason: "other" };
 }

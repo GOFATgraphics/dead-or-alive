@@ -1,7 +1,7 @@
 {
   "name": "Stamp My Page",
   "short_name": "Stamp My Page",
-  "description": "First-screen verdicts. DEAD, COPE, or ALIVE for $1.",
+  "description": "Free first-screen stamp: DEAD, COPE, or ALIVE, with the fix for every fail.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F4F1FF",

@@ -31,7 +31,8 @@
 
       <nav class="desk-nav" id="desk-nav" aria-label="Desk" hidden>
         <div class="tabs desk-tabs">
-          <button type="button" data-pane="orders" aria-pressed="true">Orders</button>
+          <button type="button" data-pane="reviews" aria-pressed="true">Reviews</button>
+          <button type="button" data-pane="members" aria-pressed="false">Members</button>
           <button type="button" data-pane="analytics" aria-pressed="false">Analytics</button>
           <button type="button" data-pane="setup" aria-pressed="false">Setup</button>
         </div>
@@ -58,81 +59,28 @@
         <ul class="setup-list" id="setup-list"></ul>
       </section>
 
-      <section id="board" class="section" hidden>
+      <section id="pane-reviews" class="section pane" hidden>
         <div class="bar">
-          <h2 class="kicker">Orders</h2>
-          <div class="tabs view-tabs" role="group" aria-label="Show">
+          <h2 class="kicker">App reviews</h2>
+          <div class="tabs rv-tabs" role="group" aria-label="Show">
             <button type="button" data-view="open" aria-pressed="true">Open</button>
-            <button type="button" data-view="done" aria-pressed="false">Done</button>
+            <button type="button" data-view="delivered" aria-pressed="false">Delivered</button>
             <button type="button" data-view="all" aria-pressed="false">All</button>
           </div>
-          <button type="button" class="link" id="refresh">Refresh</button>
+          <button type="button" class="link" id="rv-refresh">Refresh</button>
         </div>
-        <p class="alert" id="board-alert" role="alert" hidden></p>
-        <ul class="orders" id="orders"></ul>
+        <p class="usp">Move a review to In review to see its test login. Delivering it puts the result in the member's dashboard and deletes the test login.</p>
+        <p class="alert" id="rv-alert" role="alert" hidden></p>
+        <ul class="orders" id="reviews"></ul>
       </section>
 
-      <section id="composer" class="section" hidden>
-        <h2 class="kicker">Stamp <span id="c-target"></span></h2>
-        <p class="usp">Check the AI draft: the screenshot, the circles, the stamp, and the sentence. Fix anything that's off, then publish. No draft? Ask the AI, or paste a screenshot yourself.</p>
-        <div class="ai-panel" id="ai-panel">
-          <div class="ai-head">
-            <strong>AI draft</strong>
-            <span class="ai-status" id="ai-status" aria-live="polite">None yet.</span>
-            <button type="button" class="link" id="ai-run">Ask AI</button>
-          </div>
-          <p class="alert" id="ai-problem" hidden></p>
-          <dl class="ai-read" id="ai-read" hidden>
-            <dt>Product</dt><dd id="ai-product"></dd>
-            <dt>Buyer</dt><dd id="ai-buyer"></dd>
-            <dt>Reason</dt><dd id="ai-reason"></dd>
-          </dl>
-          <ul class="ai-marks" id="ai-marks" hidden></ul>
-          <dl class="snap-rows" id="ai-snapshot" hidden></dl>
+      <section id="pane-members" class="section pane" hidden>
+        <div class="bar">
+          <h2 class="kicker">Members</h2>
+          <button type="button" class="link" id="mb-refresh">Refresh</button>
         </div>
-        <label class="drop" id="drop">
-          <input id="file" type="file" accept="image/*" hidden />
-          <span>Drop screenshot here, paste it, or click to pick one.</span>
-        </label>
-        <div class="tools" id="tools" role="toolbar" aria-label="Marker tools" hidden>
-          <div class="seg">
-            <button type="button" data-tool="circle" aria-pressed="true" title="Drag to draw a circle">Circle</button>
-            <button type="button" data-tool="pen" aria-pressed="false" title="Draw freehand">Pen</button>
-          </div>
-          <div class="seg" aria-label="Marker size">
-            <button type="button" data-size="4" aria-pressed="false" title="Thin">S</button>
-            <button type="button" data-size="6" aria-pressed="true" title="Medium">M</button>
-            <button type="button" data-size="10" aria-pressed="false" title="Thick">L</button>
-          </div>
-          <div class="seg">
-            <button type="button" id="undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
-            <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
-            <button type="button" id="remove" title="Delete selected (Delete)" disabled>Delete</button>
-          </div>
-          <button type="button" class="link" id="clear-ring">Clear marks</button>
-          <button type="button" class="link" id="replace">Replace screenshot</button>
-        </div>
-        <canvas id="canvas" hidden></canvas>
-        <p class="hint" id="hint">Drag to draw. Click a mark to select it, drag to move, pull a corner to resize. Drag the stamp to move it.</p>
-
-        <fieldset class="verdicts">
-          <legend class="label">Stamp</legend>
-          <label><input type="radio" name="verdict" value="DEAD" checked /><span class="word dead">DEAD</span></label>
-          <label><input type="radio" name="verdict" value="COPE" /><span class="word cope">COPE</span></label>
-          <label><input type="radio" name="verdict" value="ALIVE" /><span class="word alive">ALIVE</span></label>
-        </fieldset>
-        <label class="label">One sentence
-          <input id="sentence" type="text" />
-        </label>
-
-        <label class="check"><input id="send-email" type="checkbox" checked /> Email the customer their link</label>
-
-        <div class="actions">
-          <button type="button" class="submit" id="publish">Publish verdict</button>
-          <button type="button" class="submit ghost" id="download">Download PNG</button>
-          <button type="button" class="submit ghost" id="email">Draft email</button>
-        </div>
-        <p class="published" id="published" aria-live="polite" hidden></p>
+        <p class="alert" id="mb-alert" role="alert" hidden></p>
+        <ul class="orders" id="members"></ul>
       </section>
     </main>
     <script type="module" src="/admin/admin.js"></script>

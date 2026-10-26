@@ -14,8 +14,13 @@ export const EVENTS = new Set([
   "share_copy", // shared a result: copied the link, posted to X or LinkedIn, or downloaded the card
   "result_cta", // "Stamp another page" or "See how to fix it" from a result page
   "offer_click", // pressed Kill Sheet or Stay Alive on a result page
+  "save_click", // "Create free account" on a result page
+  "signup", // created an account
+  "login", // signed in
+  "checkout_start", // sent to Polar checkout
+  "review_submit", // sent an app review from the dashboard
 ]);
-const PAGES = new Set(["home", "result", "privacy", "terms"]);
+const PAGES = new Set(["home", "result", "privacy", "terms", "pricing", "dashboard"]);
 const VERDICTS = new Set(["DEAD", "COPE", "ALIVE"]);
 const BOT = /bot|crawl|spider|slurp|facebookexternalhit|embedly|preview|whatsapp|telegram|discord|slack|lighthouse|pingdom|uptime/i;
 const TTL = 400 * 24 * 3600;

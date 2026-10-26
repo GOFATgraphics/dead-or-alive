@@ -3,14 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Paid — Stamp My Page</title>
+    <title>Dashboard — Stamp My Page</title>
+    <meta name="description" content="Your stamps, your Kill Sheet, Stay Alive monitoring, and app reviews." />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#f3f3f4" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main class="paid"><h1>Paid. Your Kill Sheet arrives by email.</h1></main>
+    <div id="root"></div>
+    <noscript><p>Turn on JavaScript to use your dashboard.</p></noscript>
+    <script type="module" src="/src/dashboard.jsx"></script>
   </body>
 </html>

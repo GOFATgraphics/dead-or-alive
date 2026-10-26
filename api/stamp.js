@@ -9,9 +9,26 @@ import { takeStamp } from "./_limit.js";
 import { precheck } from "./_inspect.js";
 import { DESK } from "../src/config.js";
 import { KIND_HINT, checkPageUrl, pageKind } from "../src/url.js";
+import { monitorAll } from "./_monitor.js";
+import { get, set } from "./_store.js";
+
+// The daily Stay Alive run (vercel.json crons): uptime and speed for every member, and the weekly re-stamps.
+// Vercel signs cron calls with CRON_SECRET when it's set; without it, only Vercel's cron agent gets in, once a day.
+async function cron(req, res) {
+  const secret = process.env.CRON_SECRET || "";
+  const auth = String(req.headers.authorization || "");
+  const fromVercel = /vercel-cron/i.test(String(req.headers["user-agent"] || ""));
+  if (secret ? auth !== `Bearer ${secret}` : !fromVercel) return res.status(401).json({ error: "Not allowed." });
+  const last = await get("cron:monitor").catch(() => null);
+  if (!secret && last && Date.now() - last < 20 * 3600000) return res.status(200).json({ skipped: "Ran in the last 20 hours." });
+  await set("cron:monitor", Date.now()).catch(() => {});
+  const out = await monitorAll();
+  res.status(200).json(out);
+}
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
+  if (req.method === "GET") return cron(req, res);
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
   if (!DESK.queueOpen || !process.env.BLOB_READ_WRITE_TOKEN) {
     return res.status(503).json({ error: "The stamp is resting. Try again shortly." });

@@ -175,6 +175,14 @@ function watch(job, pageUrl) {
     history.replaceState(null, "", location.pathname + "#top");
   };
 
+  // The job id proves this browser made the stamp, so a free account can save it later (see /dashboard).
+  const rememberJob = (j) => {
+    try {
+      const jobs = JSON.parse(localStorage.getItem("smp.jobs") || "[]").filter((x) => x !== j);
+      localStorage.setItem("smp.jobs", JSON.stringify([j, ...jobs].slice(0, 50)));
+    } catch (_) {}
+  };
+
   const check = async () => {
     try {
       const r = await fetch(`/api/status?job=${encodeURIComponent(job)}`, { cache: "no-store" });
@@ -189,6 +197,7 @@ function watch(job, pageUrl) {
         });
         $("#run-bar").style.width = "100%";
         $("#run-note").textContent = "Stamped. Opening it now.";
+        rememberJob(job);
         location.assign(body.url);
         return;
       }

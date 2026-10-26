@@ -208,7 +208,7 @@ fs.writeFileSync(
     {
       name: "Stamp My Page",
       short_name: "Stamp My Page",
-      description: "First-screen verdicts. DEAD, COPE, or ALIVE for $1.",
+      description: "Free first-screen stamp: DEAD, COPE, or ALIVE, with the fix for every fail.",
       start_url: "/",
       display: "standalone",
       background_color: BRAND.lavender,
@@ -223,24 +223,6 @@ fs.writeFileSync(
   ) + "\n"
 );
 
-// --- Link preview, 1200x630
-const og = svg(
-  1200,
-  630,
-  `<defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4F1FF"/><stop offset="1" stop-color="#E9E0FF"/></linearGradient>
-    <radialGradient id="b1" cx="0.62" cy="0.18" r="0.45"><stop offset="0" stop-color="#C9B8FF" stop-opacity="0.75"/><stop offset="1" stop-color="#C9B8FF" stop-opacity="0"/></radialGradient>
-    <radialGradient id="b2" cx="0.1" cy="0.95" r="0.4"><stop offset="0" stop-color="#D8C8FF" stop-opacity="0.7"/><stop offset="1" stop-color="#D8C8FF" stop-opacity="0"/></radialGradient>
-  </defs>
-  <rect width="1200" height="630" fill="url(#g)"/><rect width="1200" height="630" fill="url(#b1)"/><rect width="1200" height="630" fill="url(#b2)"/>
-  ${roundel(BRAND.ink, { x: 168, y: 200, s: 1.08 })}
-  <path fill="${BRAND.text}" d="${textPath(HEAVY, "STAMP MY PAGE", 76, { x: 432, y: 318, track: 0.5 })}"/>
-  <path fill="${BRAND.ink}" d="${textPath(MONO, "FIRST-SCREEN VERDICTS", 26, { x: 436, y: 372, track: 7.5 })}"/>
-  <path fill="${BRAND.ink}" d="${(() => { const s = "$1 · STAMPMYPAGE.COM"; const w = textWidth(MONO, s, 22, 6); return textPath(MONO, s, 22, { x: 600 - w / 2, y: 560, track: 6 }); })()}"/>`
-);
-fs.writeFileSync(path.join(out, "og-image-1200x630.svg"), og);
-const ogPng = new Resvg(og, { fitTo: { mode: "width", value: 1200 } }).render().asPng();
-fs.writeFileSync(path.join(out, "og-image-1200x630.png"), ogPng);
-fs.writeFileSync(path.join(pub, "og-image-1200x630.png"), ogPng);
+// The link preview (og-image-1200x630.png) is drawn by scripts/og.mjs, in the share cards' style.
 
 console.log("Brand pack written to public/brand and public/.");

@@ -45,7 +45,7 @@ ${snapshotHtml(snapshot)}
 </table></td></tr></table></body></html>`;
 }
 
-async function mail(to, { subject, html, text }) {
+export async function mail(to, { subject, html, text }) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM;
   if (!key || !from) return { emailed: false, emailError: "Email is not set up (RESEND_API_KEY, MAIL_FROM)." };

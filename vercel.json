@@ -6,18 +6,13 @@
   "trailingSlash": false,
   "redirects": [
     {
-      "source": "/pricing",
-      "destination": "/",
-      "permanent": false
-    },
-    {
       "source": "/paid",
-      "destination": "/",
+      "destination": "/dashboard",
       "permanent": false
     },
     {
-      "source": "/paid/resurrection",
-      "destination": "/",
+      "source": "/paid/:path*",
+      "destination": "/dashboard",
       "permanent": false
     }
   ],
@@ -98,7 +93,7 @@
       ]
     },
     {
-      "source": "/paid(.*)",
+      "source": "/dashboard(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
@@ -108,16 +103,27 @@
     }
   ],
   "functions": {
-    "api/draft.js": {
-      "maxDuration": 120
-    },
-    "api/publish.js": {
-      "maxDuration": 60,
-      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
-    },
     "api/stamp.js": {
       "maxDuration": 300,
       "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
+    },
+    "api/account.js": {
+      "maxDuration": 300,
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
+    },
+    "api/polar.js": {
+      "maxDuration": 300,
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
+    },
+    "api/admin.js": {
+      "maxDuration": 300,
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/stamp?cron=monitor",
+      "schedule": "17 9 * * *"
+    }
+  ]
 }

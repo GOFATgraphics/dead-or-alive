@@ -311,3 +311,11 @@ ol, ul { padding: 0; list-style: none; }
 .hood-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
 .hood-list { padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--card); font-size: 0.875rem; line-height: 1.7; color: var(--body); overflow-wrap: anywhere; }
 @media (max-width: 700px) { .hood-two { grid-template-columns: minmax(0, 1fr); } }
+
+/* Save prompt */
+.save-wrap { margin-top: clamp(2.5rem, 5vw, 3.5rem); }
+.save { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.25rem; align-items: center; max-width: 58rem; margin: 0 auto; padding: 1.5rem 1.75rem; border: 1px solid var(--line); border-radius: 22px; background: var(--card); box-shadow: var(--shadow-2); }
+.save h2 { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; }
+.save p { margin-top: 0.35rem; color: var(--body); font-size: 0.9375rem; }
+.save-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+@media (max-width: 760px) { .save { grid-template-columns: minmax(0, 1fr); } }

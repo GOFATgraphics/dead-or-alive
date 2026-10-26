@@ -1,0 +1,117 @@
+// Admin-only. The desk: what's connected, members, and app reviews. One route by ?op= (Vercel's 12-function limit).
+//   GET  session                   checks the key, reports setup
+//   GET  members                   every account with a plan
+//   GET  reviews                   every app review, newest first (no test logins)
+//   POST login { email, id }       shows a review's test login, only while it's In review
+//   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
+//   POST rescout { email }         runs a member's Kill Sheet again
+// Env: ADMIN_KEY.
+import { waitUntil } from "@vercel/functions";
+import { polarReady, requireAdmin } from "./_lib.js";
+import { redisReady } from "./_redis.js";
+import { get, members, remove, storeReady, unseal } from "./_store.js";
+import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
+import { polarApiReady } from "./_billing.js";
+import { runScout } from "./_scout.js";
+
+const STATUSES = ["received", "in_review", "delivered"];
+const list = (v, n = 20, len = 600) => (Array.isArray(v) ? v : String(v || "").split("\n")).map((s) => String(s).trim()).filter(Boolean).slice(0, n).map((s) => s.slice(0, len));
+
+export default async function handler(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+  const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+  const op = String(req.query?.op || b.op || "session");
+
+  if (op === "session") {
+    return res.status(200).json({
+      ok: true,
+      setup: {
+        polar: polarReady(),
+        polarApi: polarApiReady(),
+        webhook: !!process.env.POLAR_WEBHOOK_SECRET,
+        accounts: storeReady(),
+        blob: !!process.env.BLOB_READ_WRITE_TOKEN,
+        screenshots: !!process.env.MICROLINK_API_KEY,
+        email: !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
+        analytics: redisReady(),
+        cron: !!process.env.CRON_SECRET,
+        siteUrl: !!process.env.SITE_URL,
+        contact: !!process.env.CONTACT_EMAIL,
+      },
+    });
+  }
+
+  if (op === "members") {
+    const emails = await members("idx:users");
+    const users = (await Promise.all(emails.slice(-500).map((e) => getUser(e)))).filter(Boolean);
+    return res.status(200).json({
+      members: users
+        .filter((u) => u.killSheet || u.stayAlive)
+        .map((u) => ({ email: u.email, createdAt: u.createdAt, killSheet: u.killSheet ? { since: u.killSheet.since, url: u.killSheet.url, active: hasKillSheet(u), restampsLeft: u.killSheet.restampsLeft } : null, stayAlive: u.stayAlive ? { status: u.stayAlive.status, since: u.stayAlive.since, renews: u.stayAlive.renews, cancelAtPeriodEnd: u.stayAlive.cancelAtPeriodEnd, url: u.stayAlive.url, active: hasStayAlive(u) } : null, stamps: (u.stamps || []).length })),
+      accounts: users.length,
+    });
+  }
+
+  if (op === "reviews") {
+    const keys = await members("idx:reviews");
+    const emails = [...new Set(keys.map((k) => k.split("|")[0]))];
+    const users = (await Promise.all(emails.map((e) => getUser(e)))).filter(Boolean);
+    const reviews = users.flatMap((u) => (u.reviews || []).map((r) => ({ ...r, email: u.email, member: { killSheet: hasKillSheet(u), stayAlive: hasStayAlive(u) } })));
+    reviews.sort((a, z) => String(z.createdAt).localeCompare(String(a.createdAt)));
+    return res.status(200).json({ reviews });
+  }
+
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
+  const email = String(b.email || "").toLowerCase();
+  const id = String(b.id || "");
+
+  if (op === "login") {
+    const u = await getUser(email);
+    const r = (u?.reviews || []).find((x) => x.id === id);
+    if (!r) return res.status(404).json({ error: "No such review." });
+    if (r.status !== "in_review") return res.status(409).json({ error: "Move the review to In review first. Test logins are only shown while you're testing." });
+    const c = await get(`cred:${id}`);
+    if (!c?.sealed) return res.status(404).json({ error: r.login === "revoked" ? "The member revoked this login." : "No test login stored." });
+    console.log(`Test login shown for review ${id}.`);
+    return res.status(200).json({ login: JSON.parse(unseal(c.sealed)) });
+  }
+
+  if (op === "review") {
+    const status = String(b.status || "");
+    if (!STATUSES.includes(status)) return res.status(400).json({ error: "Status is received, in_review, or delivered." });
+    const result = b.result
+      ? {
+          summary: String(b.result.summary || "").trim().slice(0, 2000),
+          problems: list(b.result.problems),
+          fixes: list(b.result.fixes),
+          copy: String(b.result.copy || "").trim().slice(0, 4000),
+        }
+      : null;
+    if (status === "delivered" && !(result?.summary || result?.problems.length || result?.fixes.length)) return res.status(400).json({ error: "Write the result before delivering." });
+    const now = new Date().toISOString();
+    if (status === "delivered") await remove(`cred:${id}`);
+    const u = await updateUser(email, (x) =>
+      x
+        ? {
+            ...x,
+            reviews: (x.reviews || []).map((r) =>
+              r.id === id
+                ? { ...r, status, updatedAt: now, ...(result ? { result } : {}), ...(status === "delivered" ? { deliveredAt: now, ...(r.login === "stored" ? { login: "deleted", loginGoneAt: now } : {}) } : {}) }
+                : r
+            ),
+          }
+        : undefined
+    );
+    if (!u) return res.status(404).json({ error: "No such member." });
+    return res.status(200).json({ review: u.reviews.find((r) => r.id === id) });
+  }
+
+  if (op === "rescout") {
+    const u = await getUser(email);
+    if (!hasKillSheet(u) || !u.killSheet.url) return res.status(400).json({ error: "No Kill Sheet with a page on this account." });
+    waitUntil(runScout(email, u.killSheet.url).catch((e) => console.error("Rescout failed:", e)));
+    return res.status(202).json({ started: true });
+  }
+
+  return res.status(400).json({ error: "Unknown op." });
+}

@@ -37,7 +37,7 @@ export function registerFonts() {
   fontsReady = true;
 }
 
-function roundRect(ctx, x, y, w, h, r) {
+export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -48,7 +48,7 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // Flat night ground with a faint dot grid.
-function ground(ctx, W, H) {
+export function ground(ctx, W, H) {
   ctx.fillStyle = NIGHT;
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
@@ -56,7 +56,8 @@ function ground(ctx, W, H) {
 }
 
 let MARK = null;
-function brand(ctx, x, cy, size) {
+export const loadMark = async () => (MARK ||= await loadImage(path.join(process.cwd(), "public", "brand", "smp-mark-white.png")));
+export function brand(ctx, x, cy, size) {
   if (MARK) ctx.drawImage(MARK, x, cy - size / 2, size, size);
   ctx.fillStyle = WHITE;
   ctx.font = `${size * 0.6}px ${HEAVY}`;
@@ -67,7 +68,7 @@ function brand(ctx, x, cy, size) {
   ctx.letterSpacing = "0px";
 }
 
-function label(ctx, text, x, y, size, color = SOFT, align = "left") {
+export function label(ctx, text, x, y, size, color = SOFT, align = "left") {
   ctx.font = `${size}px ${MONO}`;
   ctx.letterSpacing = `${size * 0.22}px`;
   ctx.fillStyle = color;
@@ -130,7 +131,7 @@ function frame(ctx, shot, host, cx, cy, w, h, angle) {
 }
 
 // An engraved round seal: rings, text running round the edge, the verdict and score in the middle.
-function seal(ctx, verdict, score, number, cx, cy, R, angle) {
+export function seal(ctx, verdict, score, number, cx, cy, R, angle) {
   const c = V[verdict];
   ctx.save();
   ctx.translate(cx, cy);
