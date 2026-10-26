@@ -1,12 +1,9 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import "./styles.css";
-import { BoxCat, INK, InkButton, Logo, VERDICT_COLOR, reducedMotion } from "./ui.jsx";
-import BlurText from "./bits/BlurText.jsx";
+import "./result.css";
+import { BoxCat, reducedMotion } from "./ui.jsx";
 import DecryptedText from "./bits/DecryptedText.jsx";
-import AnimatedContent from "./bits/AnimatedContent.jsx";
-import GlareHover from "./bits/GlareHover.jsx";
-import StatusMark from "./bits/StatusMark.jsx";
+import { Icon } from "./icons.jsx";
 import { track, trackView } from "./track.js";
 import { snapshotRows } from "./snapshot.js";
 import { DESK } from "./config.js";
@@ -14,10 +11,11 @@ import { TIERS, embedSvg, svgUri, tickSvg, tierFor } from "./badge.js";
 
 const still = reducedMotion();
 
+// The closing line, by verdict.
 const NEXT = {
-  DEAD: "It can come back. Fix the first screen and stamp it again.",
-  COPE: "Close. Make it clear, then stamp it again.",
-  ALIVE: "Keep it that way. Stamp the next one.",
+  DEAD: "It can come back.",
+  COPE: "Close. Not clear yet.",
+  ALIVE: "Keep it that way.",
 };
 
 function resultId() {
@@ -25,99 +23,222 @@ function resultId() {
   return fromPath || new URLSearchParams(location.search).get("id") || "";
 }
 
-function Loading() {
+function Bar() {
   return (
-    <main className="paid">
-      <div className="stack">
-        <BoxCat state="looking" />
-        <StatusMark status="running" label="Opening the box" color={INK} size={18} fontSize={13} />
-      </div>
-    </main>
+    <header className="bar">
+      <a className="mark" href="/" aria-label="Stamp My Page home">
+        <img src="/brand/smp-mark.svg" alt="" width="26" height="26" />
+        <span>Stamp My Page</span>
+      </a>
+      <a className="btn btn-line btn-sm" href="/#top">Stamp another page</a>
+    </header>
   );
 }
 
-function Missing() {
+function Foot() {
   return (
-    <main className="paid">
-      <div className="stack">
-        <BoxCat state="closed" />
-        <h1>No stamp here.</h1>
-        <p>This link is wrong or the stamp was taken down.</p>
-        <a className="link" href="/">Stamp yours free</a>
-      </div>
-    </main>
+    <footer className="foot">
+      <a className="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
+      <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href={`mailto:${DESK.contact}`}>{DESK.contact}</a></nav>
+      <span className="foot-meta">© Gofat Labs</span>
+    </footer>
   );
 }
 
-function CopyLink({ verdict }) {
+function Notice({ cat, title, text, link }) {
+  return (
+    <div className="page">
+      <Bar />
+      <main className="notice">
+        <div className="notice-card">
+          <BoxCat state={cat} />
+          <h1>{title}</h1>
+          {text && <p>{text}</p>}
+          {link}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+const Loading = () => <Notice cat="looking" title="Opening the stamp…" />;
+const Missing = () => (
+  <Notice cat="closed" title="No stamp here." text="This link is wrong or the stamp was taken down." link={<a className="btn btn-red" href="/#top">Stamp your page free <Icon name="arrow-right" /></a>} />
+);
+
+function Copy({ text, label, done = "Copied", className = "btn btn-line btn-sm", onCopy }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
+    onCopy?.();
     try {
-      track("share_copy", { v: verdict });
-      await navigator.clipboard.writeText(location.href);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch (_) {
-      prompt("Copy this link", location.href);
+      prompt("Copy this", text);
     }
   }
   return (
-    <button type="button" className="link" onClick={copy} aria-live="polite">
-      {copied ? "Link copied. Post it." : "Copy link to post"}
+    <button type="button" className={className} onClick={copy} aria-live="polite">
+      <Icon name={copied ? "check" : "copy"} /> {copied ? done : label}
     </button>
   );
 }
 
-function Snapshot({ s }) {
-  const rows = snapshotRows(s);
-  if (!rows.length) return null;
+// The verdict, the score, the sentence, and the first screen in a browser frame.
+function Hero({ r }) {
+  const v = r.verdict;
+  const tier = tierFor(v, r.score);
+  const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
+  const checks = Array.isArray(r.checks) ? r.checks : [];
+  const passed = checks.filter((k) => k.pass).length;
   return (
-    <section className="section snapshot">
-      <h2 className="kicker brand">Stack and speed</h2>
-      <dl className="snap-rows">
-        {rows.map((row) => (
-          <div key={row.label} className={row.warn ? "warn" : ""}>
-            <dt>{row.label}</dt>
-            <dd>{row.value}</dd>
+    <section className={"hero v-" + v.toLowerCase()} aria-labelledby="verdict-h">
+      <div className="hero-grid">
+        <div className="hero-copy">
+          <p className="chip-row">
+            <span className="chip">
+              We looked at <b>{r.host}</b>
+              {tier && <img src={svgUri(tickSvg(tier, 16))} alt={`${tier.name} tier`} width="16" height="16" />}
+            </span>
+            {when && <span className="chip quiet">{when}</span>}
+            {r.number ? <span className="chip quiet">Stamp #{String(r.number).padStart(4, "0")}</span> : null}
+          </p>
+          <h1 id="verdict-h" className="verdict">
+            {still ? v : <DecryptedText text={v} animateOn="view" sequential speed={90} characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" encryptedClassName="scrambled" />}
+          </h1>
+          <p className="sentence">“{r.sentence}”</p>
+          {r.score >= 0 && (
+            <div className="score">
+              <p className="score-n"><strong>{r.score}</strong>/100</p>
+              <div className="score-meta">
+                <div className="score-bar" aria-hidden="true"><span style={{ width: `${r.score}%` }}></span></div>
+                <p>{checks.length ? `${passed} of ${checks.length} checks passed` : "First-screen score"}</p>
+              </div>
+            </div>
+          )}
+          <div className="hero-actions">
+            {v === "ALIVE" ? (
+              <a className="btn btn-red" href="#status">See your status <Icon name="arrow-right" /></a>
+            ) : (
+              <a className="btn btn-red" href="#checks" onClick={() => track("result_cta", { v })}>See what failed <Icon name="arrow-right" /></a>
+            )}
+            <a className="btn btn-line" href="#share"><Icon name="share-2" /> Share</a>
           </div>
-        ))}
-      </dl>
-      <p className="fine">Checked once, when we stamped the page. Load time is how long the HTML took to arrive from our server.</p>
+        </div>
+
+        <figure className="shot">
+          <div className="shot-chrome" aria-hidden="true"><i></i><i></i><i></i><span>{r.host}</span></div>
+          <a href={r.image} target="_blank" rel="noopener noreferrer">
+            <img src={r.image} alt={`First screen of ${r.host}, stamped ${v}.`} />
+          </a>
+          <span className="shot-cat" aria-hidden="true"><BoxCat state="verdict" verdict={v} /></span>
+          <figcaption><a href={r.pageUrl} target="_blank" rel="noopener noreferrer">{r.pageUrl} <Icon name="external-link" size={14} /></a></figcaption>
+        </figure>
+      </div>
     </section>
   );
 }
 
-const SHARE_TEXT = {
-  DEAD: "My first screen got stamped DEAD. Fixing it in public.",
-  COPE: "My first screen got stamped COPE. Close, not clear yet.",
-  ALIVE: "My first screen got stamped ALIVE. A stranger gets it in five seconds.",
-};
+// G: tier card, D: tick, C: footer embed. ALIVE only; COPE sees how close it is; DEAD stays private.
+function Status({ r }) {
+  const tier = tierFor(r.verdict, r.score);
+  if (r.verdict === "COPE" && r.score >= 0) {
+    const gap = Math.max(1, TIERS.steel.min - r.score);
+    return (
+      <section className="sect wrap" id="status" aria-labelledby="status-h">
+        <div className="sect-head left">
+          <p className="eyebrow">Your status</p>
+          <h2 id="status-h">On watch. {gap} point{gap === 1 ? "" : "s"} from Steel.</h2>
+          <p className="sect-sub">Score 80 and your page earns its first ALIVE tier, a verified mark, and a footer badge. Fix what failed below, then stamp again.</p>
+        </div>
+        <div className="watch">
+          <div className="watch-track" aria-hidden="true"><span style={{ width: `${Math.min(100, r.score)}%` }}></span><i style={{ left: `${TIERS.steel.min}%` }}></i></div>
+          <div className="watch-labels"><span>You · {r.score}</span><span>Steel · {TIERS.steel.min}</span></div>
+        </div>
+      </section>
+    );
+  }
+  if (!tier) return null;
+  const origin = location.origin;
+  const link = `${origin}/v/${r.id}`;
+  const embed = (theme) =>
+    `<a href="${link}"><img src="${origin}/badge/${r.id}${theme === "steel" ? "" : `?theme=${theme}`}" alt="${tier.name}, alive on Stamp My Page" width="300" height="64"></a>`;
+  const c = tier.card;
+  return (
+    <section className="sect wrap" id="status" aria-labelledby="status-h">
+      <div className="status-grid">
+        <div>
+          <p className="eyebrow">Your status</p>
+          <h2 id="status-h">{tier.name}. {tier.line}</h2>
+          <p className="sect-sub">Steel {TIERS.steel.min}–{TIERS.steel.max} · Gold {TIERS.gold.min}–{TIERS.gold.max} · Obsidian {TIERS.obsidian.min}–{TIERS.obsidian.max}.{tier.key !== "obsidian" ? " Fix what's left and stamp again to climb." : ""}</p>
+        </div>
+        <div className={"tier-card tier-" + tier.key} style={{ background: `linear-gradient(150deg, ${c.from} 0%, ${c.mid} 50%, ${c.to} 100%)`, color: c.ink }}>
+          <p className="tier-top">
+            <img src={tier.key === "obsidian" ? "/brand/smp-mark-white.svg" : "/brand/smp-mark-ink.svg"} alt="" width="20" height="20" />
+            STAMP MY PAGE
+            <span>NO. {String(r.number || 0).padStart(4, "0")}</span>
+          </p>
+          <div>
+            <p className="tier-host"><img src={svgUri(tickSvg(tier, 20))} alt="" width="20" height="20" />{r.host}</p>
+            <p className="tier-name">{tier.name.toUpperCase()}</p>
+            <p className="tier-range" style={{ color: c.sub }}>ALIVE · {r.score} / 100</p>
+          </div>
+        </div>
+      </div>
 
-// The share card and the ways to post it. DEAD gets a way out first: not everyone posts a bad stamp.
-// The rules' scorecard: what failed first, each with the fix. Free, and the reason to want the Kill Sheet.
+      <div className="embed">
+        <div>
+          <h3>Put it in your footer</h3>
+          <p>The badge links back to this stamp. Paste the code anywhere that takes HTML.</p>
+        </div>
+        <div className="embed-grid">
+          {["steel", "dark"].map((theme) => (
+            <div key={theme} className={"embed-item " + theme}>
+              <img src={svgUri(embedSvg({ tier, score: r.score, theme }))} alt={`${tier.name}, alive on Stamp My Page (${theme} badge)`} width="300" height="64" />
+              <Copy text={embed(theme)} label={`Copy ${theme} badge`} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// The scorecard: what failed as cards with the fix, what passed as a quiet list.
 function Checks({ r }) {
   const checks = Array.isArray(r.checks) ? r.checks : [];
   if (!checks.length) return null;
   const failed = checks.filter((k) => !k.pass);
   const passed = checks.filter((k) => k.pass);
   return (
-    <section className="section checks">
-      <div className="checks-head">
-        <h2 className="kicker brand">What we checked</h2>
-        <p className="checks-score"><strong>{r.score}</strong>/100 · {passed.length} of {checks.length} passed</p>
+    <section className="sect band" id="checks" aria-labelledby="checks-h">
+      <div className="wrap">
+        <div className="sect-head">
+          <p className="eyebrow">What we checked</p>
+          <h2 id="checks-h">{failed.length ? `${failed.length} thing${failed.length === 1 ? "" : "s"} holding it back` : "Every check passed"}</h2>
+          <p className="sect-sub">13 checks a stranger runs in their first five seconds. {passed.length} passed.</p>
+        </div>
+        {failed.length > 0 && (
+          <ol className="fails">
+            {failed.map((k) => (
+              <li key={k.id}>
+                <span className="ic-tile red"><Icon name="x" size={20} /></span>
+                <h3>{k.label}</h3>
+                <p className="fail-detail">{k.detail}</p>
+                <p className="fail-fix"><b>Fix</b>{k.fix}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+        {passed.length > 0 && (
+          <ul className="passes">
+            {passed.map((k) => (
+              <li key={k.id}><span className="pass-dot"><Icon name="check" size={14} /></span><span className="pass-label">{k.label}</span><span className="pass-detail">{k.detail}</span></li>
+            ))}
+          </ul>
+        )}
       </div>
-      <ul className="check-list">
-        {[...failed, ...passed].map((k) => (
-          <li key={k.id} className={k.pass ? "pass" : "fail"}>
-            <span className="check-mark" aria-label={k.pass ? "Passed" : "Failed"}>{k.pass ? "✓" : "✕"}</span>
-            <div>
-              <p className="check-label">{k.label}</p>
-              <p className="check-detail">{k.detail}</p>
-              {!k.pass && <p className="check-fix"><strong>Fix:</strong> {k.fix}</p>}
-            </div>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
@@ -126,23 +247,13 @@ const OFFERS = {
   killSheet: {
     name: "Kill Sheet",
     pitch: "We fix it for you.",
-    points: [
-      "Your headline, subhead, and button rewritten, ready to paste",
-      "The whole page scouted, not just the first screen",
-      "3 to 5 fixes ranked by impact",
-      "A free re-stamp after you ship",
-    ],
+    points: ["Your headline, subhead, and button rewritten, ready to paste", "The whole page scouted, not just the first screen", "3 to 5 fixes ranked by impact", "A free re-stamp after you ship"],
     cta: "Get the Kill Sheet",
   },
   stayAlive: {
     name: "Stay Alive",
     pitch: "We keep watching it.",
-    points: [
-      "A fresh stamp every week",
-      "Uptime and speed checks between stamps",
-      "An alert when the page goes down or slows down",
-      "Cancel anytime",
-    ],
+    points: ["A fresh stamp every week", "Uptime and speed checks between stamps", "An alert when the page goes down or slows down", "Cancel anytime"],
     cta: "Start Stay Alive",
   },
 };
@@ -167,23 +278,26 @@ function Offers({ r }) {
   // A page in trouble needs fixing first; a page that works needs watching.
   const order = v === "ALIVE" ? ["stayAlive", "killSheet"] : ["killSheet", "stayAlive"];
   const failed = (r.checks || []).filter((k) => !k.pass).length;
-  const lead = v === "ALIVE" ? "It works today. Pages break quietly: a deploy, a slow script, a new hero." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}You can do it yourself with the list above, or hand it to us.`;
   return (
-    <section className="section offers" id="offers">
-      <h2 className="kicker brand">{v === "ALIVE" ? "Keep it alive" : "Bring it back"}</h2>
-      <p className="lede">{lead}</p>
-      <div className="offer-grid">
+    <section className="sect wrap" id="offers" aria-labelledby="offers-h">
+      <div className="sect-head">
+        <p className="eyebrow">{v === "ALIVE" ? "Keep it alive" : "Bring it back"}</p>
+        <h2 id="offers-h">{v === "ALIVE" ? "Pages break quietly. We'll watch it." : "Fix it yourself, or hand it to us."}</h2>
+        <p className="sect-sub">{v === "ALIVE" ? "A deploy, a slow script, a new hero. Stay Alive re-stamps every week and tells you first." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}The list above is free. The Kill Sheet is the rewrite, done for you.`}</p>
+      </div>
+      <div className="plans">
         {order.map((key, i) => {
           const o = OFFERS[key];
           const price = DESK.offers[key];
           return (
-            <article key={key} className={"offer" + (i === 0 ? " main" : "")}>
-              <p className="offer-name">{o.name}</p>
-              <p className="offer-price"><strong>{price.price}</strong> {price.per}</p>
-              <p className="offer-pitch">{o.pitch}</p>
-              <ul className="offer-points">{o.points.map((p) => <li key={p}>{p}</li>)}</ul>
-              <a className={"submit" + (i === 0 ? "" : " ghost")} href={offerHref(key, r)} onClick={() => track("offer_click", { v })}>
-                {o.cta}
+            <article key={key} className={"plan" + (i === 0 ? " main" : "")}>
+              <p className="plan-label">{i === 0 ? "Recommended" : "Also"}</p>
+              <h3>{o.name}</h3>
+              <p className="amount">{price.price} <span>{price.per}</span></p>
+              <p className="plan-note">{o.pitch}</p>
+              <ul className="ticks">{o.points.map((p) => <li key={p}><Icon name="check" size={16} />{p}</li>)}</ul>
+              <a className={"btn " + (i === 0 ? "btn-red" : "btn-line")} href={offerHref(key, r)} onClick={() => track("offer_click", { v })}>
+                {o.cta} <Icon name="arrow-right" />
               </a>
             </article>
           );
@@ -193,177 +307,90 @@ function Offers({ r }) {
   );
 }
 
-// The status a stamp earns (G: tier card, D: tick, C: footer embed). ALIVE only; COPE sees how close it is.
-function CopyButton({ text, label }) {
-  const [done, setDone] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setDone(true);
-      setTimeout(() => setDone(false), 1600);
-    } catch (_) {
-      prompt("Copy this", text);
-    }
-  }
-  return (
-    <button type="button" className="submit ghost small" onClick={copy} aria-live="polite">
-      {done ? "Copied" : label}
-    </button>
-  );
-}
+const SHARE_TEXT = {
+  DEAD: "My first screen got stamped DEAD. Fixing it in public.",
+  COPE: "My first screen got stamped COPE. Close, not clear yet.",
+  ALIVE: "My first screen got stamped ALIVE. A stranger gets it in five seconds.",
+};
 
-function Status({ r }) {
-  const tier = tierFor(r.verdict, r.score);
-  if (r.verdict === "COPE" && r.score >= 0) {
-    const gap = Math.max(1, TIERS.steel.min - r.score);
-    return (
-      <section className="section status">
-        <h2 className="kicker brand">Your status</h2>
-        <div className="watch-card">
-          <p className="watch-name">On watch</p>
-          <p className="watch-line"><strong>{gap} point{gap === 1 ? "" : "s"}</strong> to Steel, the first ALIVE tier. Fix what failed below, then stamp again.</p>
-          <div className="watch-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (r.score / TIERS.steel.min) * 100)}%` }}></span></div>
-        </div>
-      </section>
-    );
-  }
-  if (!tier) return null;
-  const origin = location.origin;
-  const link = `${origin}/v/${r.id}`;
-  const embed = (theme) =>
-    `<a href="${link}"><img src="${origin}/badge/${r.id}${theme === "steel" ? "" : `?theme=${theme}`}" alt="${tier.name}, alive on Stamp My Page" width="300" height="64"></a>`;
-  const c = tier.card;
-  return (
-    <section className="section status">
-      <h2 className="kicker brand">Your status</h2>
-      <div className="tier-row">
-        <div className={"tier-card tier-" + tier.key} style={{ background: `linear-gradient(150deg, ${c.from} 0%, ${c.mid} 50%, ${c.to} 100%)`, color: c.ink }}>
-          <div className="tier-top">
-            <img src={tier.key === "obsidian" ? "/brand/smp-mark-white.svg" : "/brand/smp-mark-ink.svg"} alt="" width="22" height="22" />
-            <span>STAMP MY PAGE</span>
-            <span className="tier-no">NO. {String(r.number || 0).padStart(4, "0")}</span>
-          </div>
-          <div>
-            <p className="tier-host"><img src={svgUri(tickSvg(tier, 22))} alt="" width="22" height="22" />{r.host}</p>
-            <p className="tier-name">{tier.name.toUpperCase()}</p>
-            <p className="tier-range" style={{ color: c.sub }}>ALIVE · {r.score} / 100</p>
-          </div>
-        </div>
-        <div className="tier-copy">
-          <p className="tier-line">{tier.line}</p>
-          <p className="fine">Tiers: Steel {TIERS.steel.min}–{TIERS.steel.max}, Gold {TIERS.gold.min}–{TIERS.gold.max}, Obsidian {TIERS.obsidian.min}–{TIERS.obsidian.max}.{tier.key !== "obsidian" ? " Re-stamp after you fix something to climb." : ""}</p>
-        </div>
-      </div>
-
-      <div className="embed-box">
-        <h3 className="embed-h">Put it in your footer</h3>
-        <p className="fine">The badge links back to this stamp. Paste it anywhere that takes HTML.</p>
-        <div className="embed-grid">
-          {["steel", "dark"].map((theme) => (
-            <div key={theme} className={"embed-item " + theme}>
-              <img src={svgUri(embedSvg({ tier, score: r.score, theme }))} alt={`${tier.name}, alive on Stamp My Page (${theme} badge)`} width="300" height="64" />
-              <CopyButton text={embed(theme)} label={`Copy ${theme} badge code`} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ShareCard({ r }) {
+// The share card and the ways to post it. DEAD gets a way out first: not everyone posts a bad stamp.
+function Share({ r }) {
   const v = r.verdict;
   const url = `${location.origin}/v/${r.id}`;
   const shared = () => track("share_copy", { v });
   const x = `https://x.com/intent/post?text=${encodeURIComponent(SHARE_TEXT[v])}&url=${encodeURIComponent(url)}`;
   const li = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
   return (
-    <section className="section share-card">
-      <h2 className="kicker brand">Post it</h2>
-      {v === "DEAD" && (
-        <div className="resurrect">
-          <p><strong>Not ready to post a DEAD?</strong> Fix the first screen, then post the comeback.</p>
-          <InkButton as="a" href="#offers" color={VERDICT_COLOR.DEAD} onClick={() => track("result_cta", { v })}>
-            See how to fix it
-          </InkButton>
+    <section className="sect band" id="share" aria-labelledby="share-h">
+      <div className="wrap share-grid">
+        <div>
+          <p className="eyebrow">Share</p>
+          <h2 id="share-h">{v === "DEAD" ? "Not ready to post a DEAD?" : "Post the proof."}</h2>
+          <p className="sect-sub">{v === "DEAD" ? "Fair. Fix the first screen, stamp again, then post the comeback. The link stays private until you share it." : "The link unfurls with your card on X, LinkedIn, Slack and iMessage. Only people you send it to can see it."}</p>
+          <div className="share-buttons">
+            <a className="btn btn-dark" href={x} target="_blank" rel="noopener noreferrer" onClick={shared}><img src="/logos/x.svg" alt="" width="16" height="16" className="invert" /> Post on X</a>
+            <a className="btn btn-line" href={li} target="_blank" rel="noopener noreferrer" onClick={shared}><Icon name="share-2" /> LinkedIn</a>
+            <Copy text={url} label="Copy link" done="Link copied" className="btn btn-line" onCopy={shared} />
+            {r.card && <a className="btn btn-line" href={`/api/card?id=${encodeURIComponent(r.id)}`} download onClick={shared}><Icon name="download" /> Card</a>}
+            {r.cardSquare && <a className="btn btn-line" href={`/api/card?id=${encodeURIComponent(r.id)}&size=square`} download onClick={shared}><Icon name="download" /> Square</a>}
+          </div>
         </div>
-      )}
-      <a className="card-preview" href={r.card} target="_blank" rel="noopener noreferrer">
-        <img src={r.card} width="1200" height="630" alt={`Share card: ${r.host} stamped ${v}.`} />
-      </a>
-      <div className="share-buttons">
-        <a className="submit" href={x} target="_blank" rel="noopener noreferrer" onClick={shared}>Share on X</a>
-        <a className="submit ghost" href={li} target="_blank" rel="noopener noreferrer" onClick={shared}>Share on LinkedIn</a>
-        <a className="submit ghost" href={`/api/card?id=${encodeURIComponent(r.id)}`} download onClick={shared}>Download card</a>
-        {r.cardSquare && (
-          <a className="submit ghost" href={`/api/card?id=${encodeURIComponent(r.id)}&size=square`} download onClick={shared}>Square for Instagram</a>
+        {r.card && (
+          <a className="share-card" href={r.card} target="_blank" rel="noopener noreferrer">
+            <img src={r.card} width="1200" height="630" alt={`Share card: ${r.host} stamped ${v}.`} />
+          </a>
         )}
       </div>
     </section>
   );
 }
 
+const SNAP_ICON = { "Page loads": "timer", "Page weight": "weight", "Hosted on": "server", "Built with": "layers", Security: "shield-check", Status: "circle-alert", Redirects: "link", "Share preview": "image", "Page tags": "tag", "On a phone": "smartphone" };
+
+function Snapshot({ s }) {
+  const rows = snapshotRows(s);
+  if (!rows.length) return null;
+  return (
+    <section className="sect wrap" id="stack" aria-labelledby="stack-h">
+      <div className="sect-head">
+        <p className="eyebrow">Stack and speed</p>
+        <h2 id="stack-h">Under the hood</h2>
+        <p className="sect-sub">Checked once, when we stamped the page. Load time is how long the HTML took to arrive from our server.</p>
+      </div>
+      <dl className="stats">
+        {rows.map((row) => (
+          <div key={row.label} className={row.warn ? "warn" : ""}>
+            <dt><span className="ic-tile sm"><Icon name={SNAP_ICON[row.label] || "list-checks"} size={16} /></span>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function Result({ r }) {
   const v = r.verdict;
-  const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
-
-  const shot = (
-    <GlareHover width="100%" height="auto" background="#fff" borderColor="var(--line)" borderRadius="14px" glareColor="#ffffff" glareOpacity={0.45} glareSize={300} transitionDuration={900} className="result-shot">
-      <a href={r.image} target="_blank" rel="noopener noreferrer">
-        <img src={r.image} alt={`First screen of ${r.host}, stamped ${v}.`} />
-      </a>
-    </GlareHover>
-  );
-
   return (
-    <main className={"desk result v-" + v.toLowerCase()}>
-      <Logo />
-      <div className="result-card">
-      <p className="kicker brand host-line">We looked at {r.host}{tierFor(v, r.score) && <img src={svgUri(tickSvg(tierFor(v, r.score), 16))} alt={`${tierFor(v, r.score).name} tier`} width="16" height="16" />}{when ? ` · ${when}` : ""}</p>
-      <h1 className="verdict-word" style={{ color: VERDICT_COLOR[v] }}>
-        {still ? v : (
-          <DecryptedText text={v} animateOn="view" sequential speed={90} characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" encryptedClassName="scrambled" />
-        )}
-      </h1>
-
-      <div className="companion verdict-row">
-        <BoxCat state="verdict" verdict={v} />
-        {still ? <p className="verdict-sentence">{r.sentence}</p> : (
-          <BlurText text={r.sentence} className="verdict-sentence" delay={40} direction="bottom" stepDuration={0.3} />
-        )}
-      </div>
-
-      <section className="section">
-        {still ? shot : <AnimatedContent distance={50} scale={0.97} duration={0.9} delay={0.4}>{shot}</AnimatedContent>}
-        <p className="fine">
-          <a href={r.pageUrl} target="_blank" rel="noopener noreferrer">{r.pageUrl}</a>
-        </p>
-      </section>
-      </div>
-
-      <Status r={r} />
-
-      <Checks r={r} />
-
-      <Offers r={r} />
-
-      {r.card && <ShareCard r={r} />}
-
-      <Snapshot s={r.snapshot} />
-
-      <section className="section next">
-        <h2 className="kicker brand">Next</h2>
-        <p className="lede">{NEXT[v]}</p>
-        <div className="offer-list">
-          <InkButton as="a" href="/" color={VERDICT_COLOR[v]} onClick={() => track("result_cta", { v })}>
-            Stamp another page free
-          </InkButton>
-        </div>
-        <div className="share">
-          <CopyLink verdict={v} />
-        </div>
-      </section>
-    </main>
+    <div className="page">
+      <Bar />
+      <main>
+        <Hero r={r} />
+        <Status r={r} />
+        <Checks r={r} />
+        <Offers r={r} />
+        <Share r={r} />
+        <Snapshot s={r.snapshot} />
+        <section className="final" aria-labelledby="final-h">
+          <div className="final-in">
+            <span className="app-tile"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>
+            <h2 id="final-h"><span className="h-1">{NEXT[v]}</span> <span className="h-2">Stamp the next one.</span></h2>
+            <a className="btn btn-red" href="/#top" onClick={() => track("result_cta", { v })}><Icon name="rotate-ccw" /> Stamp another page free</a>
+          </div>
+        </section>
+      </main>
+      <Foot />
+    </div>
   );
 }
 
