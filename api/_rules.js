@@ -3,7 +3,8 @@
 // (speed, phone, https, share preview). Each check has a weight; the share of weight passed is the score.
 //   ALIVE: 80+ and a clear headline.  COPE: 55+.  DEAD: below 55, or no headline at all.
 // Input: the snapshot from _inspect.js, plus what the rendered page showed (from _shot.js capture), if anything.
-// Output: { verdict, score, sentence, checks: [{ id, label, pass, detail, fix, weight }] }.
+// Output: { verdict, score, sentence, checks: [{ id, label, pass, detail, fix, weight, skip? }] }.
+// A skipped check (not measurable) counts neither way and shows as not measured.
 
 // Words that sound like a pitch deck and say nothing a stranger can picture.
 const FOG = [
@@ -137,8 +138,15 @@ export function scorePage(snapshot, rendered = null) {
     },
   ];
 
-  const total = checks.reduce((n, k) => n + k.weight, 0);
-  const got = checks.reduce((n, k) => n + (k.pass ? k.weight : 0), 0);
+  // A site that blocks direct requests can't be timed or weighed: those checks drop out instead of failing.
+  if (s.blocked) {
+    for (const k of checks) {
+      if (k.id === "speed" || k.id === "weight") Object.assign(k, { skip: true, pass: true, detail: "Not measured: the site blocks automated requests." });
+    }
+  }
+  const scored = checks.filter((k) => !k.skip);
+  const total = scored.reduce((n, k) => n + k.weight, 0);
+  const got = scored.reduce((n, k) => n + (k.pass ? k.weight : 0), 0);
   const score = Math.round((got / total) * 100);
   const passed = (id) => checks.find((k) => k.id === id).pass;
 

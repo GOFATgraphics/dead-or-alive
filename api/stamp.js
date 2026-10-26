@@ -33,6 +33,13 @@ export default async function handler(req, res) {
 
   // Random and only known to this browser, so it stands in for a login while the stamp is made.
   const job = crypto.randomUUID();
-  waitUntil(processStamp(job, page.url).catch((err) => console.error("Stamp failed:", job, err)));
+  waitUntil(
+    processStamp(job, page.url)
+      .then((out) => (out?.failed ? gate.giveBack() : null))
+      .catch((err) => {
+        console.error("Stamp failed:", job, err);
+        return gate.giveBack();
+      })
+  );
   res.status(202).json({ job });
 }

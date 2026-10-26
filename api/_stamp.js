@@ -29,6 +29,23 @@ export async function stampNote(id) {
   }
 }
 
+// A snapshot built from the rendered page alone, for sites that block direct requests.
+function fromBrowser(pageUrl, r) {
+  const missing = [];
+  if (!r.title) missing.push("title");
+  if (!r.description) missing.push("description");
+  for (const t of ["og:title", "og:image", "viewport"]) if (!r.tags?.[t]) missing.push(t);
+  return {
+    blocked: true,
+    error: "This site blocks automated requests, so speed, size, and stack weren't checked.",
+    https: pageUrl.startsWith("https:"),
+    title: r.title,
+    missing,
+    content: { h1: r.h1, ctas: r.ctas, description: r.description },
+    checkedAt: new Date().toISOString(),
+  };
+}
+
 // The screenshot is retried once; a page that never renders can't be stamped.
 async function captureTwice(pageUrl) {
   try {
@@ -47,9 +64,13 @@ export async function processStamp(jobId, pageUrl) {
   } catch (err) {
     return saveFailure(id, pageUrl, err.message);
   }
-  // Without the HTML or the rendered page there's nothing to score.
-  if (snapshot.error && !shot.rendered) return saveFailure(id, pageUrl, snapshot.error);
-  if (snapshot.status >= 400) return saveFailure(id, pageUrl, `The page answered ${snapshot.status}.`);
+  // Many sites with cookie walls or bot protection refuse our direct request (403, 503, a timeout) but
+  // show a real browser the page. Then the stamp is scored from what the browser saw, without speed and size.
+  const blocked = !!snapshot.error || snapshot.status >= 400;
+  if (blocked) {
+    if (!shot.rendered) return saveFailure(id, pageUrl, snapshot.error || `The page answered ${snapshot.status}.`);
+    snapshot = fromBrowser(pageUrl, shot.rendered);
+  }
 
   const { verdict, score, sentence, checks } = scorePage(snapshot, shot.rendered);
   try {

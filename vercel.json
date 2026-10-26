@@ -113,11 +113,11 @@
     },
     "api/publish.js": {
       "maxDuration": 60,
-      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
     },
     "api/stamp.js": {
       "maxDuration": 300,
-      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark*.png}"
     }
   }
 }

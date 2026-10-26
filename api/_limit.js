@@ -3,6 +3,8 @@
 // Env (optional): STAMP_IP_LIMIT (default 5 per visitor per day), STAMP_DAILY_LIMIT (default 300 for everyone).
 // With Upstash Redis connected the counts are shared; without it they live per function instance,
 // which slows abuse rather than stopping it, so connect Redis before sharing the site widely.
+// A stamp that fails gives its slot back. The owner (a request carrying the ADMIN_KEY, sent by the
+// homepage after /admin was unlocked in the same tab) is never limited.
 import crypto from "node:crypto";
 import { pipeline, redisReady } from "./_redis.js";
 
@@ -18,15 +20,29 @@ function visitor(req, day) {
   return crypto.createHmac("sha256", salt).update(`${day}|${ip}`).digest("base64url").slice(0, 16);
 }
 
-// Counts one stamp. Resolves { ok: true }, or { ok: false, error } with a message for the visitor.
+function isOwner(req) {
+  const key = process.env.ADMIN_KEY || "";
+  const sent = String(req.headers["x-admin-key"] || "");
+  if (key.length < 32 || !sent) return false;
+  const a = crypto.createHash("sha256").update(sent).digest();
+  const b = crypto.createHash("sha256").update(key).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+const nothing = async () => {};
+
+// Counts one stamp. Resolves { ok: true, giveBack }, or { ok: false, error } with a message for the visitor.
+// Call giveBack() when the stamp fails, so a page we couldn't stamp doesn't use up a try.
 export async function takeStamp(req) {
+  if (isOwner(req)) return { ok: true, giveBack: nothing };
   const day = new Date().toISOString().slice(0, 10);
   const ipKey = `rl:${day}:ip:${visitor(req, day)}`;
   const allKey = `rl:${day}:all`;
-  let mine, all;
+  let mine, all, shared = false;
   if (redisReady()) {
     try {
       [mine, all] = await pipeline([["INCR", ipKey], ["INCR", allKey], ["EXPIRE", ipKey, 172800], ["EXPIRE", allKey, 172800]]);
+      shared = mine != null;
     } catch (_) {}
   }
   if (mine == null) {
@@ -36,7 +52,21 @@ export async function takeStamp(req) {
     local.set(ipKey, mine);
     local.set(allKey, all);
   }
-  if (Number(all) > perDay()) return { ok: false, error: "We've stamped all we can for today. Come back tomorrow." };
-  if (Number(mine) > perIp()) return { ok: false, error: `That's ${perIp()} stamps for you today. Fix something and come back tomorrow.` };
-  return { ok: true };
+  const giveBack = async () => {
+    if (shared) {
+      await pipeline([["DECR", ipKey], ["DECR", allKey]]).catch(() => {});
+    } else {
+      local.set(ipKey, Math.max(0, (local.get(ipKey) || 1) - 1));
+      local.set(allKey, Math.max(0, (local.get(allKey) || 1) - 1));
+    }
+  };
+  if (Number(all) > perDay()) {
+    await giveBack();
+    return { ok: false, error: "We've stamped all we can for today. Come back tomorrow." };
+  }
+  if (Number(mine) > perIp()) {
+    await giveBack();
+    return { ok: false, error: `That's ${perIp()} stamps for you today. Fix something and come back tomorrow.` };
+  }
+  return { ok: true, giveBack };
 }

@@ -91,7 +91,8 @@ function Hero({ r }) {
   const tier = tierFor(v, r.score);
   const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
   const checks = Array.isArray(r.checks) ? r.checks : [];
-  const passed = checks.filter((k) => k.pass).length;
+  const measured = checks.filter((k) => !k.skip);
+  const passed = measured.filter((k) => k.pass).length;
   return (
     <section className={"hero v-" + v.toLowerCase()} aria-labelledby="verdict-h">
       <div className="hero-grid">
@@ -113,7 +114,7 @@ function Hero({ r }) {
               <p className="score-n"><strong>{r.score}</strong>/100</p>
               <div className="score-meta">
                 <div className="score-bar" aria-hidden="true"><span style={{ width: `${r.score}%` }}></span></div>
-                <p>{checks.length ? `${passed} of ${checks.length} checks passed` : "First-screen score"}</p>
+                <p>{checks.length ? `${passed} of ${measured.length} checks passed` : "First-screen score"}</p>
               </div>
             </div>
           )}
@@ -210,14 +211,15 @@ function Checks({ r }) {
   const checks = Array.isArray(r.checks) ? r.checks : [];
   if (!checks.length) return null;
   const failed = checks.filter((k) => !k.pass);
-  const passed = checks.filter((k) => k.pass);
+  const passed = checks.filter((k) => k.pass && !k.skip);
+  const skipped = checks.filter((k) => k.skip);
   return (
     <section className="sect band" id="checks" aria-labelledby="checks-h">
       <div className="wrap">
         <div className="sect-head">
           <p className="eyebrow">What we checked</p>
           <h2 id="checks-h">{failed.length ? `${failed.length} thing${failed.length === 1 ? "" : "s"} holding it back` : "Every check passed"}</h2>
-          <p className="sect-sub">13 checks a stranger runs in their first five seconds. {passed.length} passed.</p>
+          <p className="sect-sub">Checks a stranger runs in their first five seconds. {passed.length} passed{skipped.length ? `, ${skipped.length} couldn't be measured because the site blocks automated requests` : ""}.</p>
         </div>
         {failed.length > 0 && (
           <ol className="fails">
@@ -231,10 +233,13 @@ function Checks({ r }) {
             ))}
           </ol>
         )}
-        {passed.length > 0 && (
+        {passed.length + skipped.length > 0 && (
           <ul className="passes">
             {passed.map((k) => (
               <li key={k.id}><span className="pass-dot"><Icon name="check" size={14} /></span><span className="pass-label">{k.label}</span><span className="pass-detail">{k.detail}</span></li>
+            ))}
+            {skipped.map((k) => (
+              <li key={k.id} className="skipped"><span className="pass-dot"><Icon name="circle-alert" size={14} /></span><span className="pass-label">{k.label}</span><span className="pass-detail">{k.detail}</span></li>
             ))}
           </ul>
         )}

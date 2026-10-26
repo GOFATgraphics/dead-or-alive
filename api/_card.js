@@ -1,22 +1,28 @@
 // Share cards: the stamp as an image people post. Wide (1200x630, the link-preview shape on X and
 // LinkedIn) and square (1080x1080 for Instagram and LinkedIn posts), drawn at 2x so they stay sharp.
-// Same look as the site: a dotted grey canvas, the first screen in a white browser frame, the verdict big
-// in its colour, the sentence in quotes, the score with a bar, and for ALIVE the tier with its verified tick.
+// Made to stop a scroll: a near-black ground lit by a glow in the verdict colour, faint dots and grain,
+// the first screen in a tilted browser frame with an engraved seal stuck on its corner, the verdict in a
+// metallic gradient, a score ring, and for ALIVE the tier pill and verified tick.
 import path from "node:path";
 import { GlobalFonts, Path2D, createCanvas, loadImage } from "@napi-rs/canvas";
-import { COLORS } from "../src/stamp-draw.js";
 import { SCALLOP, tierFor } from "../src/badge.js";
 
 const SCALE = 2;
-const INK = "#15142a";
-const BODY = "#4f4d63";
-const SOFT = "#8e8c99";
-const CANVAS = "#f3f3f4";
-const LINE = "#e6e5ea";
+const NIGHT = "#0b0b10";
+const WHITE = "#f5f4f8";
+const SOFT = "#a3a1b3";
+const DIM = "#6e6c80";
+// Verdict colours, lifted for a dark ground. `deep` is the bottom of the metallic gradient.
+const V = {
+  DEAD: { main: "#ff5a52", light: "#ffb3ab", deep: "#c2271f", glow: "255, 76, 66" },
+  COPE: { main: "#ffb547", light: "#ffe0a8", deep: "#c97a0a", glow: "255, 170, 50" },
+  ALIVE: { main: "#35d985", light: "#b9f5d4", deep: "#13914f", glow: "40, 210, 120" },
+};
 const SANS = '"Plus Jakarta Sans"';
 const BOLD = '"Plus Jakarta Sans Bold"';
 const HEAVY = '"Plus Jakarta Sans ExtraBold"';
 const MONO = '"IBM Plex Mono"';
+const MONO_BOLD = '"IBM Plex Mono Bold"';
 
 let fontsReady = false;
 export function registerFonts() {
@@ -41,75 +47,41 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// The grey canvas with its dot grid.
-function ground(ctx, W, H) {
-  ctx.fillStyle = CANVAS;
+// Seeded, so the same stamp always draws the same grain.
+function rng(seed) {
+  let s = seed >>> 0 || 1;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+}
+const seedOf = (str) => [...String(str)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+
+// Night ground, a verdict-coloured glow behind the shot and a fainter one opposite, dots, and grain.
+function ground(ctx, W, H, verdict, glowAt, seed) {
+  const c = V[verdict];
+  ctx.fillStyle = NIGHT;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(21, 20, 42, 0.09)";
-  for (let y = 7; y < H; y += 14) for (let x = 7; x < W; x += 14) ctx.fillRect(x - 0.6, y - 0.6, 1.2, 1.2);
-}
-
-function shadowed(ctx, draw, blur = 40, offsetY = 18, alpha = 0.16) {
-  ctx.save();
-  ctx.shadowColor = `rgba(21, 20, 42, ${alpha})`;
-  ctx.shadowBlur = blur;
-  ctx.shadowOffsetY = offsetY;
-  draw();
-  ctx.restore();
-}
-
-// The browser bar's height, and the frame height that shows the whole first screen at width w (at most maxH).
-const BAR = 34;
-const frameHeight = (shot, w, maxH) => Math.min(maxH, BAR + 1 + Math.round(shot.height * (w / shot.width)));
-
-// The first screen in a white browser frame: three dots and the address, then the screenshot, cropped from the top.
-function frame(ctx, shot, host, x, y, w, h) {
-  const bar = BAR, r = 16;
-  shadowed(ctx, () => {
-    roundRect(ctx, x, y, w, h, r);
-    ctx.fillStyle = "#fff";
-    ctx.fill();
-  });
-  ctx.fillStyle = "#e3e2e8";
-  for (let i = 0; i < 3; i++) {
-    ctx.beginPath();
-    ctx.arc(x + 18 + i * 14, y + bar / 2, 4.5, 0, Math.PI * 2);
-    ctx.fill();
+  const glow = (x, y, r, a) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${c.glow}, ${a})`);
+    g.addColorStop(1, `rgba(${c.glow}, 0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  };
+  glow(glowAt.x, glowAt.y, Math.max(W, H) * 0.62, 0.34);
+  glow(W * 0.05, H * 1.05, Math.max(W, H) * 0.45, 0.12);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.055)";
+  for (let y = 9; y < H; y += 18) for (let x = 9; x < W; x += 18) ctx.fillRect(x - 0.7, y - 0.7, 1.4, 1.4);
+  const rand = rng(seed);
+  for (let i = 0; i < (W * H) / 90; i++) {
+    ctx.fillStyle = rand() > 0.5 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.12)";
+    ctx.fillRect(rand() * W, rand() * H, 1, 1);
   }
-  ctx.font = `12px ${MONO}`;
-  const label = host.length > 40 ? host.slice(0, 39) + "…" : host;
-  const lw = ctx.measureText(label).width + 22;
-  roundRect(ctx, x + 64, y + 8, lw, bar - 16, 6);
-  ctx.fillStyle = CANVAS;
-  ctx.fill();
-  ctx.fillStyle = BODY;
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, x + 75, y + bar / 2 + 0.5);
-  ctx.fillStyle = LINE;
-  ctx.fillRect(x, y + bar, w, 1);
-
-  const iy = y + bar + 1, ih = h - bar - 1;
-  ctx.save();
-  roundRect(ctx, x, y, w, h, r);
-  ctx.clip();
-  const scale = w / shot.width;
-  const srcH = Math.min(shot.height, ih / scale);
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(x, iy, w, ih);
-  ctx.drawImage(shot, 0, 0, shot.width, srcH, x, iy, w, srcH * scale);
-  ctx.restore();
-  roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = LINE;
-  ctx.stroke();
 }
 
-// The roundel and "Stamp My Page".
 let MARK = null;
 function brand(ctx, x, cy, size) {
   if (MARK) ctx.drawImage(MARK, x, cy - size / 2, size, size);
-  ctx.fillStyle = INK;
-  ctx.font = `${size * 0.62}px ${HEAVY}`;
+  ctx.fillStyle = WHITE;
+  ctx.font = `${size * 0.6}px ${HEAVY}`;
   ctx.letterSpacing = `${-size * 0.01}px`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
@@ -117,7 +89,135 @@ function brand(ctx, x, cy, size) {
   ctx.letterSpacing = "0px";
 }
 
-// The scalloped verified tick in a tier's colours, centred at (cx, cy).
+function label(ctx, text, x, y, size, color = SOFT, align = "left") {
+  ctx.font = `${size}px ${MONO}`;
+  ctx.letterSpacing = `${size * 0.22}px`;
+  ctx.fillStyle = color;
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = align;
+  ctx.fillText(text, x, y);
+  ctx.letterSpacing = "0px";
+  ctx.textAlign = "left";
+}
+
+// The first screen in a dark glass browser frame, tilted a little, with a soft drop shadow and a rim light.
+const BAR = 30;
+const frameHeight = (shot, w, maxH) => Math.min(maxH, BAR + Math.round(shot.height * (w / shot.width)));
+function frame(ctx, shot, host, cx, cy, w, h, angle) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  const x = -w / 2, y = -h / 2, r = 16;
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+  ctx.shadowBlur = 60;
+  ctx.shadowOffsetY = 30;
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = "#16161f";
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  roundRect(ctx, x, y, w, h, r);
+  ctx.clip();
+  ctx.fillStyle = "#1c1c27";
+  ctx.fillRect(x, y, w, BAR);
+  ["#ff5f57", "#febc2e", "#28c840"].forEach((col, i) => {
+    ctx.beginPath();
+    ctx.arc(x + 18 + i * 15, y + BAR / 2, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+  });
+  ctx.font = `12px ${MONO}`;
+  const lab = host.length > 38 ? host.slice(0, 37) + "…" : host;
+  const lw = ctx.measureText(lab).width + 22;
+  roundRect(ctx, x + w / 2 - lw / 2, y + 6, lw, BAR - 12, 6);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.07)";
+  ctx.fill();
+  ctx.fillStyle = SOFT;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  ctx.fillText(lab, x + w / 2, y + BAR / 2 + 0.5);
+  ctx.textAlign = "left";
+  const scale = w / shot.width;
+  const srcH = Math.min(shot.height, (h - BAR) / scale);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(x, y + BAR, w, h - BAR);
+  ctx.drawImage(shot, 0, 0, shot.width, srcH, x, y + BAR, w, srcH * scale);
+  // A sheen across the glass.
+  const sheen = ctx.createLinearGradient(x, y, x + w, y + h);
+  sheen.addColorStop(0, "rgba(255, 255, 255, 0.10)");
+  sheen.addColorStop(0.35, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+  roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+  ctx.stroke();
+  ctx.restore();
+}
+
+// An engraved round seal: rings, text running round the edge, the verdict and score in the middle.
+function seal(ctx, verdict, score, number, cx, cy, R, angle) {
+  const c = V[verdict];
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 14;
+  const g = ctx.createLinearGradient(-R, -R, R, R);
+  g.addColorStop(0, "#1d1d28");
+  g.addColorStop(1, "#0d0d13");
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
+  const ring = (r, wdt, dash) => {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.setLineDash(dash || []);
+    ctx.lineWidth = wdt;
+    ctx.strokeStyle = c.main;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  ring(R - 4, 2);
+  ring(R - 10, 1, [1.5, 3.5]);
+  ring(R * 0.62, 1);
+  // Text round the edge.
+  const text = `STAMP MY PAGE · FIRST SCREEN · NO. ${String(number || 0).padStart(4, "0")} · `;
+  const size = R * 0.105;
+  ctx.font = `${size}px ${MONO_BOLD}`;
+  ctx.fillStyle = c.main;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  const rt = R * 0.8;
+  const step = (Math.PI * 2) / text.length;
+  for (let i = 0; i < text.length; i++) {
+    const a = -Math.PI / 2 + i * step;
+    ctx.save();
+    ctx.rotate(a + Math.PI / 2);
+    ctx.fillText(text[i], 0, -rt);
+    ctx.restore();
+  }
+  // Centre.
+  ctx.font = `${R * 0.3}px ${HEAVY}`;
+  ctx.letterSpacing = `${R * 0.01}px`;
+  ctx.fillStyle = c.light;
+  ctx.fillText(verdict, 0, -R * 0.06);
+  ctx.letterSpacing = "0px";
+  if (score >= 0) {
+    ctx.font = `${R * 0.14}px ${MONO_BOLD}`;
+    ctx.fillStyle = c.main;
+    ctx.fillText(`${score} / 100`, 0, R * 0.24);
+  }
+  ctx.textAlign = "left";
+  ctx.restore();
+}
+
 function tick(ctx, tier, cx, cy, size) {
   const s = size / 100;
   ctx.save();
@@ -141,56 +241,72 @@ function tick(ctx, tier, cx, cy, size) {
   ctx.restore();
 }
 
-// A white pill with the host (and the tick, for a tier). Returns its width.
-function hostChip(ctx, r, tier, x, y, size) {
+// A glass pill with the host, and the tick for a tier. Returns its width.
+function hostChip(ctx, host, tier, x, y, size) {
   const h = size * 2.1;
   ctx.font = `${size}px ${BOLD}`;
-  const host = r.host.length > 34 ? r.host.slice(0, 33) + "…" : r.host;
-  const tw = ctx.measureText(host).width;
-  const w = tw + size * 1.6 + (tier ? size * 1.5 : 0);
-  shadowed(ctx, () => {
-    roundRect(ctx, x, y, w, h, h / 2);
-    ctx.fillStyle = "#fff";
-    ctx.fill();
-  }, 10, 3, 0.08);
-  ctx.fillStyle = INK;
+  const name = host.length > 30 ? host.slice(0, 29) + "…" : host;
+  const tw = ctx.measureText(name).width;
+  const w = tw + size * 1.7 + (tier ? size * 1.5 : 0);
+  roundRect(ctx, x, y, w, h, h / 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.07)";
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+  ctx.stroke();
+  ctx.fillStyle = WHITE;
   ctx.textBaseline = "middle";
-  ctx.fillText(host, x + size * 0.8, y + h / 2 + 1);
-  if (tier) tick(ctx, tier, x + size * 0.8 + tw + size * 0.85, y + h / 2, size * 1.15);
+  ctx.fillText(name, x + size * 0.85, y + h / 2 + 1);
+  if (tier) tick(ctx, tier, x + size * 0.85 + tw + size * 0.85, y + h / 2, size * 1.15);
   return w;
 }
 
-// For ALIVE: a small metal pill with the tier name, in the tier card's colours.
+// A metal pill with the tier name, in the tier card's colours.
 function tierChip(ctx, tier, x, y, size) {
-  const label = tier.name.toUpperCase();
+  const name = tier.name.toUpperCase();
   ctx.font = `${size}px ${HEAVY}`;
-  ctx.letterSpacing = `${size * 0.14}px`;
-  const tw = ctx.measureText(label).width;
-  const h = size * 2.2, w = tw + size * 1.8;
+  ctx.letterSpacing = `${size * 0.16}px`;
+  const tw = ctx.measureText(name).width;
+  const h = size * 2.3, w = tw + size * 2;
   const c = tier.card;
   const g = ctx.createLinearGradient(x, y, x + w, y + h);
   g.addColorStop(0, c.from);
   g.addColorStop(0.5, c.mid);
   g.addColorStop(1, c.to);
-  shadowed(ctx, () => {
-    roundRect(ctx, x, y, w, h, h / 2);
-    ctx.fillStyle = g;
-    ctx.fill();
-  }, 12, 4, 0.18);
-  ctx.fillStyle = c.ink;
+  roundRect(ctx, x, y, w, h, h / 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  if (tier.key === "obsidian") {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#c9a24a";
+    ctx.stroke();
+  }
+  ctx.fillStyle = tier.key === "obsidian" ? "#e9cf8a" : c.ink;
   ctx.textBaseline = "middle";
-  ctx.fillText(label, x + size * 0.9, y + h / 2 + 1);
+  ctx.fillText(name, x + size, y + h / 2 + 1);
   ctx.letterSpacing = "0px";
   return w;
 }
 
-function verdictWord(ctx, verdict, x, y, size) {
+// The verdict in a metallic gradient with a soft glow. Returns its width.
+function verdictWord(ctx, verdict, x, baseline, size) {
+  const c = V[verdict];
   ctx.font = `${size}px ${HEAVY}`;
-  ctx.letterSpacing = `${-size * 0.055}px`;
-  ctx.fillStyle = COLORS[verdict];
+  ctx.letterSpacing = `${-size * 0.05}px`;
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(verdict, x - size * 0.03, y);
+  const w = ctx.measureText(verdict).width;
+  const g = ctx.createLinearGradient(0, baseline - size * 0.8, 0, baseline);
+  g.addColorStop(0, c.light);
+  g.addColorStop(0.55, c.main);
+  g.addColorStop(1, c.deep);
+  ctx.save();
+  ctx.shadowColor = `rgba(${c.glow}, 0.45)`;
+  ctx.shadowBlur = size * 0.35;
+  ctx.fillStyle = g;
+  ctx.fillText(verdict, x - size * 0.03, baseline);
+  ctx.restore();
   ctx.letterSpacing = "0px";
+  return w;
 }
 
 function wrap(ctx, text, max) {
@@ -213,7 +329,7 @@ function quote(ctx, text, x, y, maxW, sizes, maxLines) {
   let lines, size;
   for (size of sizes) {
     ctx.font = `${size}px ${BOLD}`;
-    ctx.letterSpacing = `${-size * 0.02}px`;
+    ctx.letterSpacing = `${-size * 0.015}px`;
     lines = wrap(ctx, said, maxW);
     if (lines.length <= maxLines) break;
   }
@@ -221,110 +337,119 @@ function quote(ctx, text, x, y, maxW, sizes, maxLines) {
     lines = lines.slice(0, maxLines);
     lines[maxLines - 1] = lines[maxLines - 1].replace(/\s+\S*$/, "") + "…”";
   }
-  const lh = size * 1.24;
-  ctx.fillStyle = INK;
+  const lh = size * 1.26;
+  ctx.fillStyle = WHITE;
   ctx.textBaseline = "alphabetic";
   lines.forEach((line, i) => ctx.fillText(line, x, y + size + i * lh));
   ctx.letterSpacing = "0px";
   return y + size + (lines.length - 1) * lh;
 }
 
-// "92/100" and a bar in the verdict colour. Older stamps without a score skip it.
-function score(ctx, r, x, y, w, size) {
-  if (!(r.score >= 0)) return;
-  ctx.font = `${size}px ${HEAVY}`;
-  ctx.letterSpacing = `${-size * 0.05}px`;
-  ctx.fillStyle = INK;
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(String(r.score), x, y);
-  const nw = ctx.measureText(String(r.score)).width;
+// A ring gauge with the score in the middle, then a small label beside it. Older stamps without a score skip it.
+function ring(ctx, verdict, score, cx, cy, R) {
+  if (!(score >= 0)) return;
+  const c = V[verdict];
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.lineWidth = R * 0.16;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.09)";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * Math.min(100, score)) / 100);
+  ctx.lineCap = "round";
+  ctx.save();
+  ctx.shadowColor = `rgba(${c.glow}, 0.6)`;
+  ctx.shadowBlur = R * 0.4;
+  ctx.strokeStyle = c.main;
+  ctx.stroke();
+  ctx.restore();
+  ctx.lineCap = "butt";
+  ctx.font = `${R * 0.72}px ${HEAVY}`;
+  ctx.letterSpacing = `${-R * 0.03}px`;
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(score), cx, cy + R * 0.04);
   ctx.letterSpacing = "0px";
-  ctx.font = `${size * 0.42}px ${BOLD}`;
-  ctx.fillStyle = SOFT;
-  ctx.fillText("/100", x + nw + 4, y);
-  const sw = ctx.measureText("/100").width;
-  const bx = x + nw + sw + size * 0.5, bw = Math.max(40, w - (bx - x)), bh = size * 0.16, by = y - size * 0.32;
-  roundRect(ctx, bx, by, bw, bh, bh / 2);
-  ctx.fillStyle = "rgba(21, 20, 42, 0.08)";
-  ctx.fill();
-  roundRect(ctx, bx, by, Math.max(bh, (bw * Math.min(100, r.score)) / 100), bh, bh / 2);
-  ctx.fillStyle = COLORS[r.verdict];
-  ctx.fill();
+  ctx.textAlign = "left";
 }
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-const fmtNumber = (n) => `#${String(n || 0).padStart(4, "0")}`;
 
 function footer(ctx, r, x, y, right, size) {
-  ctx.font = `${size}px ${MONO}`;
-  ctx.fillStyle = BODY;
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "left";
-  ctx.fillText(`Stamp ${fmtNumber(r.number)}  ·  ${fmtDate(r.createdAt)}`, x, y);
+  label(ctx, `STAMP #${String(r.number || 0).padStart(4, "0")}  ·  ${fmtDate(r.createdAt).toUpperCase()}`, x, y, size * 0.8, DIM);
   ctx.font = `${size}px ${BOLD}`;
-  ctx.fillStyle = INK;
+  ctx.fillStyle = WHITE;
   ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
   ctx.fillText("stampmypage.com", right, y);
   ctx.textAlign = "left";
 }
 
+function scoreBlock(ctx, r, tier, x, cy, R) {
+  if (!(r.score >= 0)) return;
+  ring(ctx, r.verdict, r.score, x + R, cy, R);
+  const lx = x + R * 2 + R * 0.55;
+  label(ctx, "SCORE / 100", lx, cy - R * 0.18, R * 0.24);
+  if (tier) tierChip(ctx, tier, lx, cy + R * 0.04, R * 0.26);
+  else label(ctx, r.verdict === "COPE" ? `${80 - r.score} TO ALIVE` : "NOT YET", lx, cy + R * 0.42, R * 0.24, V[r.verdict].main);
+}
+
 function wide(shot, r) {
-  const W = 1200, H = 630, M = 56;
+  const W = 1200, H = 630, M = 60;
   const c = createCanvas(W * SCALE, H * SCALE);
   const ctx = c.getContext("2d");
   ctx.scale(SCALE, SCALE);
   const tier = tierFor(r.verdict, r.score);
-  ground(ctx, W, H);
-  brand(ctx, M, 58, 30);
+  ground(ctx, W, H, r.verdict, { x: W * 0.78, y: H * 0.35 }, seedOf(r.id || r.host));
 
-  // Right: the first screen, centred in its column.
-  const fw = W - M - 600, fh = frameHeight(shot, fw, 470);
-  frame(ctx, shot, r.host, 600, Math.round(300 - fh / 2), fw, fh);
+  // Right: the first screen, tilted, with the seal on its corner.
+  const fw = 500, fh = frameHeight(shot, fw, 420);
+  frame(ctx, shot, r.host, 880, 300, fw, fh, -0.045);
+  seal(ctx, r.verdict, r.score, r.number, 660, 300 + fh / 2 - 6, 74, -0.18);
 
-  // Left: host, verdict, sentence, score.
-  const cw = 600 - M - 40;
-  let x = M;
-  x += hostChip(ctx, r, tier, M, 110, 17) + 10;
-  if (tier) tierChip(ctx, tier, x, 112, 13);
-  verdictWord(ctx, r.verdict, M, 268, 124);
-  const bottom = quote(ctx, r.sentence, M, 292, cw, [28, 26, 24, 22], 4);
-  score(ctx, r, M, bottom + 72, cw, 44);
+  // Left.
+  brand(ctx, M, 66, 30);
+  label(ctx, "FIRST-SCREEN VERDICT", M, 136, 12);
+  verdictWord(ctx, r.verdict, M, 250, 118);
+  const bottom = quote(ctx, r.sentence, M, 276, 500, [27, 25, 23, 21], 3);
+  const chipX = M + hostChip(ctx, r.host, tier, M, Math.min(bottom + 26, 440), 15);
+  void chipX;
+  scoreBlock(ctx, r, tier, M, 520, 34);
 
-  footer(ctx, r, M, 588, W - M, 15);
+  footer(ctx, r, M, 600, W - M, 15);
   return c;
 }
 
 function square(shot, r) {
-  const W = 1080, H = 1080, M = 64;
+  const W = 1080, H = 1080, M = 72;
   const c = createCanvas(W * SCALE, H * SCALE);
   const ctx = c.getContext("2d");
   ctx.scale(SCALE, SCALE);
   const tier = tierFor(r.verdict, r.score);
-  ground(ctx, W, H);
-  brand(ctx, M, 70, 34);
+  ground(ctx, W, H, r.verdict, { x: W * 0.62, y: H * 0.3 }, seedOf(r.id || r.host));
 
-  frame(ctx, shot, r.host, M, 120, W - M * 2, frameHeight(shot, W - M * 2, 470));
+  brand(ctx, M, 80, 34);
+  label(ctx, "FIRST-SCREEN VERDICT", W - M, 86, 13, SOFT, "right");
 
-  let x = M;
-  x += hostChip(ctx, r, tier, M, 630, 19) + 12;
-  if (tier) tierChip(ctx, tier, x, 633, 14);
-  verdictWord(ctx, r.verdict, M, 790, 128);
-  ctx.font = `128px ${HEAVY}`;
-  ctx.letterSpacing = `${-128 * 0.055}px`;
-  const vw = ctx.measureText(r.verdict).width;
-  ctx.letterSpacing = "0px";
-  score(ctx, r, M + vw + 48, 786, W - M - (M + vw + 48), 52);
-  quote(ctx, r.sentence, M, 820, W - M * 2, [38, 36, 34, 32, 30], 3);
+  const fw = 760, fh = frameHeight(shot, fw, 470);
+  frame(ctx, shot, r.host, W / 2 + 40, 140 + fh / 2 + 20, fw, fh, -0.035);
+  seal(ctx, r.verdict, r.score, r.number, W - 150, 140 + fh + 10, 92, 0.14);
 
-  footer(ctx, r, M, 1024, W - M, 17);
+  verdictWord(ctx, r.verdict, M, 790, 132);
+  quote(ctx, r.sentence, M, 812, W - M * 2, [34, 32, 30, 28], 2);
+  hostChip(ctx, r.host, tier, M, 920, 17);
+  scoreBlock(ctx, r, tier, W - M - 290, 940, 36);
+
+  footer(ctx, r, M, 1030, W - M, 17);
   return c;
 }
 
 // shot: the screenshot (no stamp, no sentence).
-// r: { verdict, sentence, host, createdAt, number, score?, focus? }. Returns JPEG buffers.
+// r: { id?, verdict, sentence, host, createdAt, number, score? }. Returns JPEG buffers.
 export async function renderCards(shot, r) {
   registerFonts();
-  if (!MARK) MARK = await loadImage(path.join(process.cwd(), "public", "brand", "smp-mark.png"));
+  if (!MARK) MARK = await loadImage(path.join(process.cwd(), "public", "brand", "smp-mark-white.png"));
   const img = await loadImage(shot);
-  return { wide: await wide(img, r).encode("jpeg", 90), square: await square(img, r).encode("jpeg", 90) };
+  return { wide: await wide(img, r).encode("jpeg", 92), square: await square(img, r).encode("jpeg", 92) };
 }

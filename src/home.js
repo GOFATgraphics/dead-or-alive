@@ -67,6 +67,16 @@ form.addEventListener("focusin", () => {
   }
 });
 
+// The owner skips the daily limit: /admin keeps its key in this tab's session storage.
+function ownerHeader() {
+  try {
+    const key = sessionStorage.getItem("doa.key");
+    return key ? { "x-admin-key": key } : {};
+  } catch (_) {
+    return {};
+  }
+}
+
 let busy = false;
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -85,7 +95,7 @@ form.addEventListener("submit", async (e) => {
   try {
     const r = await fetch("/api/stamp", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...ownerHeader() },
       body: JSON.stringify({ page_url: page.url }),
     });
     const body = await r.json().catch(() => ({}));

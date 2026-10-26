@@ -232,6 +232,8 @@ ol, ul { padding: 0; list-style: none; }
 .passes li { display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.6rem; align-items: center; padding: 0.75rem 0.9rem; border-radius: 14px; background: rgba(255, 255, 255, 0.6); }
 .pass-dot { display: grid; place-items: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: #e3f2e9; color: var(--alive); }
 .pass-label { font-size: 0.875rem; font-weight: 600; }
+.passes .skipped .pass-dot { background: var(--canvas); color: var(--soft); }
+.passes .skipped .pass-label { color: var(--body); }
 .pass-detail { grid-column: 2; font-size: 0.8125rem; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Offers */
