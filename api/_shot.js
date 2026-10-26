@@ -67,6 +67,8 @@ async function microlink(pageUrl, { phone = false, read = false } = {}) {
           "data.ogImage.attr": "content",
           "data.viewport.selector": "meta[name='viewport']",
           "data.viewport.attr": "content",
+          "data.iconHref.selector": "link[rel~='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']",
+          "data.iconHref.attr": "href",
           "data.layout.selector": "html",
           "data.layout.attr": "data-smp",
         }
@@ -116,6 +118,13 @@ export async function capture(pageUrl) {
     description: clean(data?.pageDescription).slice(0, 300),
     tags: { "og:title": !!clean(data?.ogTitle), "og:image": !!clean(data?.ogImage), viewport: !!clean(data?.viewport) },
     layout: parseLayout(data?.layout),
+    icon: (() => {
+      try {
+        return data?.iconHref ? new URL(clean(data.iconHref), pageUrl).toString() : "";
+      } catch (_) {
+        return "";
+      }
+    })(),
   };
   return { jpg, rendered: h1 || ctas.length || title ? rendered : null };
 }

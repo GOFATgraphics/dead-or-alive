@@ -99,7 +99,7 @@ function Hero({ r }) {
         <div className="hero-copy">
           <p className="chip-row">
             <span className="chip">
-              We looked at <b>{r.host}</b>
+              We looked at {r.icon && <img className="site-icon" src={r.icon} alt="" width="16" height="16" />}<b>{r.host}</b>
               {tier && <img src={svgUri(tickSvg(tier, 16))} alt={`${tier.name} tier`} width="16" height="16" />}
             </span>
             {when && <span className="chip quiet">{when}</span>}

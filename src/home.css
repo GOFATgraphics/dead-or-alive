@@ -159,6 +159,8 @@ ol, ul { padding: 0; list-style: none; }
 .dot-tile.red { background: var(--red); }
 .dot-tile.amber { background: var(--amber); }
 .dot-tile.green { background: var(--green); }
+.dot-tile.icon { background: var(--card); box-shadow: 0 0 0 1px var(--line); overflow: hidden; }
+.dot-tile.icon img { width: 100%; height: 100%; object-fit: contain; }
 .row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .row-bar { height: 5px; border-radius: 3px; background: var(--canvas); overflow: hidden; }
 .row-bar i { display: block; height: 100%; border-radius: 3px; }

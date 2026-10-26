@@ -1,4 +1,4 @@
-// The latest ALIVE and COPE stamps for the homepage's "Latest stamps" card: domain, verdict, and score only.
+// The latest ALIVE and COPE stamps for the homepage's "Latest stamps" card: domain, icon, verdict, and score only.
 // Served by /api/status?recent=1 (Vercel's Hobby plan allows 12 functions, so this one rides along).
 // DEAD stamps are never listed, and no private result link leaves the server.
 // Reads the Redis list _publish.js keeps; without Redis, reads the newest published records from Blob.
@@ -30,8 +30,11 @@ async function fromBlob() {
   const recs = await Promise.all(
     blobs.slice(0, 30).map((b) => fetch(b.url).then((r) => (r.ok ? r.json() : null)).catch(() => null))
   );
-  return recs.filter(Boolean).map((r) => ({ id: r.id, host: r.host, verdict: r.verdict, score: r.score ?? null, at: r.createdAt }));
+  return recs.filter(Boolean).map((r) => ({ id: r.id, host: r.host, verdict: r.verdict, score: r.score ?? null, icon: r.icon || "", at: r.createdAt }));
 }
+
+// Only icons we stored ourselves go to the page.
+const safeIcon = (u) => (/^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\/icons\//i.test(String(u || "")) ? u : "");
 
 // Newest first, ALIVE always on the card when there is one: up to two ALIVE and one COPE, then whatever is newer.
 function pick(items) {
@@ -44,7 +47,7 @@ function pick(items) {
   return chosen
     .slice(0, SHOW)
     .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .map(({ host, verdict, score, at }) => ({ host, verdict, score, at }));
+    .map(({ host, verdict, score, icon, at }) => ({ host, verdict, score, icon: safeIcon(icon), at }));
 }
 
 export async function recentStamps(req, res) {

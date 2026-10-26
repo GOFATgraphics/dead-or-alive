@@ -8,6 +8,7 @@ import { inspect } from "./_inspect.js";
 import { capture } from "./_shot.js";
 import { scorePage } from "./_rules.js";
 import { publishStamp, publicOrigin } from "./_publish.js";
+import { saveIcon } from "./_icon.js";
 
 const notePath = (id) => `stamps/${id}.json`;
 const BLOB_OPTS = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60, contentType: "application/json" };
@@ -114,7 +115,10 @@ export async function processStamp(jobId, pageUrl) {
     const { renderStamp } = await import("./_render.js");
     // The result page frames the first screen itself, so the circled screenshot (no stamp, no strip) is the image.
     const boxes = circlesFor(shot.rendered?.layout, verdict, checks);
-    const { shot: clean } = await renderStamp({ jpg: shot.jpg, boxes, verdict, sentence });
+    const [{ shot: clean }, icon] = await Promise.all([
+      renderStamp({ jpg: shot.jpg, boxes, verdict, sentence }),
+      saveIcon(id, pageUrl, [snapshot.icon, shot.rendered?.icon]).catch(() => ""),
+    ]);
     return await publishStamp({
       orderId: jobId,
       pageUrl,
@@ -125,7 +129,7 @@ export async function processStamp(jobId, pageUrl) {
       focus: boxes.length ? { top: Math.min(...boxes.map((b) => b.y)) / 1000, bottom: Math.max(...boxes.map((b) => b.y + b.h)) / 1000 } : null,
       sendMail: false,
       origin: publicOrigin(),
-      extra: { snapshot, score, checks },
+      extra: { snapshot, score, checks, icon },
     });
   } catch (err) {
     console.error("Publish failed:", jobId, err);

@@ -69,6 +69,25 @@ async function safeFetch(start) {
   throw new Error("Too many redirects.");
 }
 
+// A small file (an icon) from a public address, following redirects with the same private-network checks.
+// Resolves { buf, type }, or throws.
+export async function fetchPublicFile(start, maxBytes = 256 * 1024) {
+  let url = start;
+  for (let hop = 0; hop <= MAX_HOPS; hop++) {
+    await assertPublic(url);
+    const r = await fetch(url, { redirect: "manual", headers: { "user-agent": UA, accept: "image/*" }, signal: AbortSignal.timeout(8000) });
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+      url = new URL(r.headers.get("location"), url).toString();
+      continue;
+    }
+    if (!r.ok) throw new Error(`status ${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > maxBytes) throw new Error("too big");
+    return { buf, type: (r.headers.get("content-type") || "").split(";")[0].trim().toLowerCase() };
+  }
+  throw new Error("Too many redirects.");
+}
+
 function hostOf(h) {
   const get = (k) => (h.get(k) || "").toLowerCase();
   if (get("x-vercel-id") || get("server") === "vercel") return "Vercel";
@@ -134,6 +153,22 @@ function text(fragment) {
 
 // What the raw HTML says: the headline, the button labels, and the description. Pages built in the browser
 // may have none of this in their HTML; the rendered capture fills it in then.
+// The best icon the page declares: the Apple touch icon (big and square), else the largest sized icon, else any.
+export function iconHref(html) {
+  const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
+  const attr = (tag, name) => (new RegExp(`\\b${name}=["']([^"']*)["']`, "i").exec(tag) || [])[1] || "";
+  let best = null, bestRank = -1;
+  for (const tag of links) {
+    const rel = attr(tag, "rel").toLowerCase();
+    const href = attr(tag, "href");
+    if (!href || !/\bicon\b/.test(rel)) continue;
+    const size = parseInt((attr(tag, "sizes").match(/(\d+)x\d+/) || [])[1] || "0", 10);
+    const rank = (rel.includes("apple-touch-icon") ? 1000 : 0) + Math.min(size, 512) + (/\.svg(\?|$)/i.test(href) ? 0 : 1);
+    if (rank > bestRank) (best = href), (bestRank = rank);
+  }
+  return best;
+}
+
 export function content(html, tags) {
   const body = html.replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, " ");
   const h1s = [...body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)].map((m) => text(m[1])).filter(Boolean);
@@ -181,6 +216,14 @@ export async function inspect(pageUrl) {
     title: tags.title.slice(0, 160),
     missing: Object.entries(tags).filter(([, v]) => !v).map(([k]) => k),
     content: content(html, tags),
+    icon: (() => {
+      const href = iconHref(html);
+      try {
+        return href ? new URL(href, f.finalUrl).toString() : "";
+      } catch (_) {
+        return "";
+      }
+    })(),
     checkedAt: new Date().toISOString(),
   };
 }

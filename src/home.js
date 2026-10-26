@@ -267,6 +267,17 @@ if (location.hash === "#top" && !location.search) requestAnimationFrame(() => fo
         const tile = document.createElement("span");
         tile.className = `dot-tile ${v === "alive" ? "green" : "amber"}`;
         tile.textContent = (s.host || "?").charAt(0).toUpperCase();
+        // The site's own icon when we have it; the letter stays if it fails to load.
+        if (s.icon) {
+          const img = new Image(24, 24);
+          img.alt = "";
+          img.decoding = "async";
+          img.onload = () => {
+            tile.className = "dot-tile icon";
+            tile.replaceChildren(img);
+          };
+          img.src = s.icon;
+        }
         const name = document.createElement("span");
         name.className = "row-name";
         name.textContent = s.host;
