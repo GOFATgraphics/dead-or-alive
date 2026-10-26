@@ -12,7 +12,8 @@ export const EVENTS = new Set([
   "queue_closed", // saw the "stamping paused" state
   "cta_click", // a "Judge my page" button outside the form
   "share_copy", // shared a result: copied the link, posted to X or LinkedIn, or downloaded the card
-  "result_cta", // "Judge another page" from a result page
+  "result_cta", // "Stamp another page" or "See how to fix it" from a result page
+  "offer_click", // pressed Kill Sheet or Stay Alive on a result page
 ]);
 const PAGES = new Set(["home", "result", "privacy", "terms"]);
 const VERDICTS = new Set(["DEAD", "COPE", "ALIVE"]);

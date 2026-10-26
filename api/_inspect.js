@@ -119,6 +119,33 @@ function meta(html, key) {
   );
 }
 
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", mdash: "—", ndash: "–", hellip: "…" };
+function text(fragment) {
+  return String(fragment || "")
+    .replace(/<(script|style|svg)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => {
+      if (e[0] === "#") return String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
+      return ENTITIES[e.toLowerCase()] ?? m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// What the raw HTML says: the headline, the button labels, and the description. Pages built in the browser
+// may have none of this in their HTML; the rendered capture fills it in then.
+export function content(html, tags) {
+  const body = html.replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, " ");
+  const h1s = [...body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)].map((m) => text(m[1])).filter(Boolean);
+  const ctas = [
+    ...body.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/gi),
+    ...body.matchAll(/<a\b[^>]*(?:class|role)=["'][^"']*(?:btn|button|cta)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi),
+  ]
+    .map((m) => text(m[1]))
+    .filter((t) => t && t.length <= 60);
+  return { h1: (h1s[0] || "").slice(0, 300), h1Count: h1s.length, ctas: ctas.slice(0, 40), description: tags.description.slice(0, 300) };
+}
+
 export async function inspect(pageUrl) {
   // App stores serve their own page, so their stack says nothing about the customer's product.
   if (["appstore", "playstore"].includes(pageKind(pageUrl))) return { skipped: "App store page. The store's stack isn't yours, so there's no snapshot." };
@@ -153,6 +180,7 @@ export async function inspect(pageUrl) {
     built: FRAMEWORKS.filter(([, re]) => re.test(html)).map(([name]) => name).slice(0, 3),
     title: tags.title.slice(0, 160),
     missing: Object.entries(tags).filter(([, v]) => !v).map(([k]) => k),
+    content: content(html, tags),
     checkedAt: new Date().toISOString(),
   };
 }

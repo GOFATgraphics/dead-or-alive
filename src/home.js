@@ -76,7 +76,8 @@ form.addEventListener("submit", async (e) => {
   const urlField = $("#page_url");
   const page = checkPageUrl(urlField.value);
   if (!page.url) return fail(page.error, urlField, page.code);
-  if (pageKind(page.url) === "download") return fail(KIND_HINT.download, urlField, "download");
+  const kind = pageKind(page.url);
+  if (["download", "appstore", "playstore"].includes(kind)) return fail(KIND_HINT[kind], urlField, kind);
 
   busy = true;
   const button = form.querySelector("button[type=submit]");

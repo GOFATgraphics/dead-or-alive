@@ -1,50 +1,21 @@
 // The automated half of a stamp: screenshot the first screen (desktop and phone), take the stack and speed
 // snapshot, have Claude read the screenshots, and save a draft.
-// Stamps are free: a confident, problem-free draft is published straight away. If it isn't, the whole run
-// is tried once more, and if that still fails a note says why.
+// Optional AI drafts for the admin desk (Ask AI on an order). Free homepage stamps don't use this: they're scored
+// by rules in _rules.js.
 // Env: ANTHROPIC_API_KEY, BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY (paid screenshot plan).
 import Anthropic from "@anthropic-ai/sdk";
 import { head, list, put } from "@vercel/blob";
 import { VERDICTS, resultId } from "./_lib.js";
 import { inspect } from "./_inspect.js";
-import { publishStamp, publicOrigin } from "./_publish.js";
+import { VIEWPORT, screenshot } from "./_shot.js";
+export { VIEWPORT, screenshot };
 import { checkPageUrl, pageKind } from "../src/url.js";
 
-export const VIEWPORT = { width: 1440, height: 900 };
-const PHONE = { width: 390, height: 844, scale: 2 };
 const MODEL = "claude-opus-5-5";
 
 export const aiReady = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
 export const draftPaths = (id) => ({ json: `drafts/${id}.json`, image: `drafts/${id}.jpg` });
-
-// One first screen, no scrolling. Microlink runs the browser; with a key it uses the paid plan.
-export async function screenshot(pageUrl, phone = false) {
-  const key = process.env.MICROLINK_API_KEY;
-  const api = new URL(key ? "https://pro.microlink.io/" : "https://api.microlink.io/");
-  const q = {
-    url: pageUrl,
-    screenshot: "true",
-    meta: "false",
-    "viewport.width": String(phone ? PHONE.width : VIEWPORT.width),
-    "viewport.height": String(phone ? PHONE.height : VIEWPORT.height),
-    "viewport.deviceScaleFactor": String(phone ? PHONE.scale : 1),
-    "viewport.isMobile": String(phone),
-    "viewport.hasTouch": String(phone),
-    "screenshot.type": "jpeg",
-    waitForTimeout: "1500",
-  };
-  for (const [k, v] of Object.entries(q)) api.searchParams.set(k, v);
-  const r = await fetch(api, { headers: key ? { "x-api-key": key } : {} });
-  const data = await r.json().catch(() => ({}));
-  const shot = data?.data?.screenshot?.url;
-  if (!r.ok || data.status !== "success" || !shot) {
-    throw new Error(`Screenshot failed: ${data.message || data.code || `status ${r.status}`}.`);
-  }
-  const img = await fetch(shot);
-  if (!img.ok) throw new Error(`Screenshot download failed: status ${img.status}.`);
-  return Buffer.from(await img.arrayBuffer());
-}
 
 const SYSTEM = `You run the first read for Stamp My Page. Someone wants to know whether a stranger understands their offer from the first screen of their page, in five seconds, before scrolling. The page can be a website, web app, SaaS homepage, or an app store listing.
 
@@ -272,65 +243,6 @@ async function buildDraft(orderId, rawPageUrl) {
 
 export async function makeDraft(orderId, rawPageUrl) {
   return (await buildDraft(orderId, rawPageUrl)).draft;
-}
-
-// A draft goes out on its own when the AI is reasonably sure and flagged nothing (error page, login wall, blank).
-export const autoPublishable = (d) => d.confidence !== "low" && !d.problem;
-
-const BLOB_OPTS = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
-const saveNote = (orderId, note) =>
-  put(draftPaths(resultId(orderId)).json, JSON.stringify(note), { ...BLOB_OPTS, contentType: "application/json" });
-
-// When a step fails, the order isn't lost: a note is saved in its place so it shows in the desk with the reason.
-async function saveFailure(orderId, pageUrl, err, extra = {}) {
-  const note = { orderId, pageUrl, failed: String(err?.message || err || "Unknown error").slice(0, 300), createdAt: new Date().toISOString(), ...extra };
-  await saveNote(orderId, note).catch(() => {});
-  return note;
-}
-
-// A free stamp from the homepage. Draft it, publish it when the AI is confident, otherwise run the whole
-// thing once more. If that still fails, a note with the reason is saved and the homepage says so.
-export async function processStamp(jobId, pageUrl) {
-  let built = null, reason = "";
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      built = await buildDraft(jobId, pageUrl);
-      if (autoPublishable(built.draft)) break;
-      reason = built.draft.problem || `The AI wasn't sure (${built.draft.confidence} confidence).`;
-    } catch (err) {
-      console.error("Draft failed:", jobId, `attempt ${attempt}`, err);
-      built = null;
-      reason = err.message || String(err);
-    }
-  }
-  if (!built || !autoPublishable(built.draft)) return saveFailure(jobId, pageUrl, reason);
-
-  const { draft, jpg } = built;
-  try {
-    // Loaded only here, so routes that just read drafts don't carry the canvas library.
-    const { renderStamp } = await import("./_render.js");
-    const { image, shot } = await renderStamp({ jpg, boxes: draft.marks, verdict: draft.verdict, sentence: draft.sentence });
-    const out = await publishStamp({
-      orderId: jobId,
-      pageUrl: draft.pageUrl,
-      verdict: draft.verdict,
-      sentence: draft.sentence,
-      image,
-      shot,
-      focus: draft.marks.length
-        ? { top: Math.min(...draft.marks.map((m) => m.y)) / 1000, bottom: Math.max(...draft.marks.map((m) => m.y + m.h)) / 1000 }
-        : null,
-      sendMail: false,
-      origin: publicOrigin(),
-      extra: { snapshot: draft.snapshot },
-    });
-    const done = { ...draft, autoPublished: { at: new Date().toISOString(), url: out.url } };
-    await saveNote(jobId, done);
-    return done;
-  } catch (err) {
-    console.error("Publish failed:", jobId, err);
-    return saveFailure(jobId, pageUrl, `Publishing failed: ${err.message || err}`);
-  }
 }
 
 // The saved draft or note for one result id, or null. Reads one file, so it's cheap enough to poll.

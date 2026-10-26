@@ -6,11 +6,28 @@ First screen. Five seconds. One stamp. Free.
 
 ## How a stamp runs
 
-No checkout and no account. The homepage form posts the URL to `/api/stamp`, which answers with a random job id and, in the background, screenshots the page, has Claude judge it, and publishes the stamp at `/v/<id>`. The homepage polls `/api/status?job=` and opens the stamp when it's ready (about a minute). If the page can't be stamped after one retry, the homepage says so and nothing is published.
+No checkout, no account, no AI. The homepage form posts the URL to `/api/stamp`, which answers with a random job id and, in the background:
 
-Needed in Vercel: `ANTHROPIC_API_KEY` and a **Blob** store (`BLOB_READ_WRITE_TOKEN`). Without them the form says the stamp is resting.
+1. screenshots the first screen with Microlink and reads its rendered headline and button labels ([api/_shot.js](api/_shot.js)),
+2. loads the page once for speed, size, https, and tags ([api/_inspect.js](api/_inspect.js)),
+3. scores 13 weighted checks ([api/_rules.js](api/_rules.js)): headline present, plain English (no pitch-deck words), short, says who it's for, a clear next step, buttons that don't compete, speed, weight, phone viewport, https, title, description, share preview. 80+ with a plain headline is ALIVE, 55+ is COPE, the rest DEAD. The sentence comes from the most important failed check.
+4. draws and publishes the stamp at `/v/<id>` ([api/_stamp.js](api/_stamp.js)).
 
-Free stamps cost us screenshots and AI calls, so they're limited:
+The homepage polls `/api/status?job=` and opens the stamp in about a minute. If the page can't be captured after one retry, the homepage says so and nothing is published. App Store and Google Play links are refused for now.
+
+Needed in Vercel: a **Blob** store (`BLOB_READ_WRITE_TOKEN`). Optional: `MICROLINK_API_KEY` (the free tier allows about 50 screenshots a day).
+
+## The offers
+
+The result page shows every check with its fix, then sells the follow-up: the **Kill Sheet** ($19) first after a DEAD or COPE, **Stay Alive** ($20/month) first after an ALIVE. The homepage lists both under "After the stamp".
+
+1. In Polar, create both products. Give each a required custom field with slug `page_url` (the result page fills it in).
+2. Paste their checkout links into `offers` in [src/config.js](src/config.js). Until a link is there, its button opens an email to `contact` instead.
+3. Success URLs: Kill Sheet → `https://<your-domain>/paid/sheet`, Stay Alive → `https://<your-domain>/paid/alive`.
+
+You deliver the Kill Sheet and run Stay Alive yourself for now; paid orders show in `/admin` once `POLAR_ACCESS_TOKEN` is set.
+
+Free stamps cost screenshots, so they're limited:
 
 - `STAMP_IP_LIMIT`: stamps per visitor per day (default 5).
 - `STAMP_DAILY_LIMIT`: stamps for the whole site per day (default 300).
@@ -22,10 +39,10 @@ Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `
 
 ## Admin desk and result pages
 
-`/admin` is the back room: visitor analytics, setup status, and (if Polar is still connected) any old paid orders to stamp by hand. Free stamps don't appear in its order list; they publish straight to `/v/<id>`: the verdict, Box holding it up, and the circled screenshot. Shared links show the stamp as their preview image.
+`/admin` is the back room: visitor analytics (including offer clicks), setup status, and Polar orders. Free stamps don't appear in its order list; they publish straight to `/v/<id>`. Shared links show the stamp as their preview image.
 
 1. In Vercel, add **Blob** storage to the project (Storage tab). It sets `BLOB_READ_WRITE_TOKEN`.
-2. Optional, only for old paid orders: a Polar organization access token with `orders:read`.
+2. In Polar, create an organization access token with `orders:read`, so Kill Sheet and Stay Alive orders show in the desk.
 3. Optional, for desk emails: in [Resend](https://resend.com), verify your sending domain and create an API key.
 4. In Vercel project env vars, set:
    - `ADMIN_KEY`: the password for `/admin`. At least 32 characters, random. Make one with `openssl rand -base64 36`. Without it (or if it's shorter), the admin API answers 503.
@@ -44,7 +61,7 @@ Only `ADMIN_KEY` is needed to open the desk. Everything else lights up as it's c
 The first screen only.
 
 The form reads the link as the visitor types (`pageKind` in `src/url.js`) and says what will be stamped:
-- `apps.apple.com` / `play.google.com/store/apps`: the App Store or Google Play listing (icon, title, subtitle, first screenshots). The AI is told to judge it as a store listing, and the stack snapshot is skipped.
+- `apps.apple.com` / `play.google.com/store/apps`: refused for now, with a note to send the app's website.
 - `app.`, `dashboard.`, `/login`, `/dashboard` and similar: a warning that only the logged-out view gets stamped.
 - Installer files (`.dmg`, `.exe`, `.apk`, ...): refused, with a note to send the download page.
 - Anything else: the first screen of the page.
@@ -56,36 +73,13 @@ Publishing a stamp (by hand or automatically) also draws two share cards on the 
 - **Wide, 1200×630**: a flat white card with a verdict-coloured rule, the brand, the circled first screen (left uncovered), the verdict badge, the sentence in quotes, and the domain, date, stamp number (#0042), and stampmypage.com. It's the link preview (`og:image`, `twitter:image`) for `/v/<id>`, so a pasted link shows the card on X, LinkedIn, Slack, and iMessage.
 - **Square, 1080×1080** for Instagram and LinkedIn posts.
 
-They're stored in Blob next to the stamp (`verdicts/<id>-card.jpg`, `-square.jpg`). The result page shows the card with **Share on X**, **Share on LinkedIn**, **Download card**, and **Square for Instagram** (`/api/card?id=…&size=wide|square`). DEAD results lead with "Not ready to post a DEAD?" and a **Resurrect it** button that goes to the Kill Sheet or Resurrection checkout when one is set in `src/config.js`, otherwise back to the homepage for a re-stamp.
+They're stored in Blob next to the stamp (`verdicts/<id>-card.jpg`, `-square.jpg`). The result page shows the card with **Share on X**, **Share on LinkedIn**, **Download card**, and **Square for Instagram** (`/api/card?id=…&size=wide|square`). DEAD results lead with "Not ready to post a DEAD?" and a **See how to fix it** button that jumps to the offers.
 
 Stamp numbers count up with Redis (`stamp:number`) and fall back to the number of published stamps. Republishing keeps the number. The card's bold type uses `server-fonts/` (Plus Jakarta Sans Bold and ExtraBold, OFL) and the mark from `public/brand/smp-mark.png`, both bundled only with the functions that draw.
 
-### AI drafts
+### AI drafts (desk only, optional)
 
-Every stamp starts as an AI draft. In auto mode (production) it goes out on its own; in review mode it waits in the desk.
-
-1. Polar calls `/api/polar-webhook` when an order is paid (event `order.paid`). The webhook checks Polar's signature and answers at once.
-2. In the background, [Microlink](https://microlink.io) opens the page logged out and screenshots the first screen at 1440×900 and on a 390×844 phone. At the same time the server loads the page once for the stack and speed snapshot (`api/_inspect.js`): HTML load time and size, host, framework, missing title/description/share/viewport tags. Every address and redirect is checked so it can't reach a private network.
-3. Claude (`claude-opus-5-5`) reads both screenshots and returns the stamp, one sentence, what a stranger gets (product, buyer, reason), up to four boxes to circle, whether the first screen works on a phone, a confidence, and any problem (error page, cookie wall, login).
-**AI chooses what, code does how.** The AI only decides the verdict, the sentence, and which regions to circle (up to 3 boxes in pixels of the desktop screenshot, each with a short label). Code does the rest and checks it: the screenshots are taken at fixed sizes, every box is checked against the image's real size, a bad answer (broken JSON, a box outside the image, no verdict) gets one retry that names the problem, and boxes that still don't fit are dropped so the stamp goes out without circles rather than failing. The first screen is always captured. If a step can't recover (screenshot fails, AI unusable twice, AI declines), a note with the reason is saved in the draft's place. In auto mode the whole run is then tried once more, and if that also fails the order is refunded through Polar (`POST /v1/refunds`, reason `service_disruption`) and the customer gets a short email; the desk shows `AI: refunded`. If Polar refuses the refund the order shows `AI: failed` with the reason.
-
-The $1 tier skips a scouting step. Scouting the whole page (the AI reading its text and links and choosing extra sections to capture, like pricing or signup) belongs to the Kill Sheet and Stay Alive.
-
-4. The draft is saved to Blob under `drafts/`. In the desk the order shows `AI: COPE`; opening it loads the screenshot with the circles drawn, the stamp picked, and the sentence filled in. Edit anything, then **Publish verdict** as before.
-
-**Modes.** `STAMP_MODE=review` (the default): every draft waits in the desk. `STAMP_MODE=auto`: a draft with high or medium confidence and no flagged problem is drawn on the server (`api/_render.js`, the same drawing code as the editor in `src/stamp-draw.js`), published, and emailed right away. Anything else is retried once from scratch, then refunded. The desk shows which ones went out automatically, and publishing again replaces them.
-
-The stack and speed snapshot appears on the result page, in the email, and in the desk.
-
-**On screen.** Polar sends the buyer to `/paid?checkout_id=…` (set as the checkout link's success URL). That page polls `/api/status`, which finds the order for the checkout and answers `working`, `ready` (with the `/v/<id>` link, which the page opens), or `refunded`. The access token needs `orders:read` and `refunds:write`.
-
-**Ask AI** in the composer makes or remakes a draft by hand, which is also how to stamp orders that came in before the webhook was set up.
-
-Env vars:
-- `ANTHROPIC_API_KEY`: from console.anthropic.com. A draft costs a few cents.
-- `POLAR_WEBHOOK_SECRET`: Polar → Settings → Webhooks → add endpoint `https://stampmypage.com/api/polar-webhook`, format Raw, event `order.paid`, then copy its secret here.
-- `MICROLINK_API_KEY` (optional): without it, Microlink's free tier allows about 50 screenshots a day, which is about 25 orders (two screenshots each).
-- `STAMP_MODE` (optional): `auto` or `review` (default).
+Free stamps never use AI. In the desk, **Ask AI** on a Polar order can still make a draft with Claude (screenshot, verdict, sentence, circles) for you to edit and publish by hand. It needs `ANTHROPIC_API_KEY`; without it, stamp by hand in the editor.
 
 ### Analytics
 

@@ -50,6 +50,8 @@ export default defineConfig({
         home: page("index.html"),
         privacy: page("privacy/index.html"),
         terms: page("terms/index.html"),
+        sheet: page("paid/sheet/index.html"),
+        alive: page("paid/alive/index.html"),
         verdict: page("v/index.html"),
         admin: page("admin/index.html"),
       },

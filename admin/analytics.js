@@ -167,7 +167,7 @@ export function renderAnalytics(root, data) {
     tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Connect Polar"),
     tile("Median turnaround", hours(b?.turnaround.medianHours), b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}% within 24 h` : "No stamps yet"),
     tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Connect Redis"),
-    tile("Came back from a stamp", num(t?.totals.result_cta), t ? "Clicked “Judge another page”" : "Connect Redis")
+    tile("Offer clicks", num(t?.totals.offer_click), t ? `${pct(t.totals.offer_click, t.totals["view:result"])} of result views · Kill Sheet or Stay Alive` : "Connect Redis")
   );
   out.push(tiles);
 
@@ -181,6 +181,7 @@ export function renderAnalytics(root, data) {
       { label: "Stamps started", value: t?.totals.stamp_start },
       { label: "Stamped", value: b?.totals.stamped, missing: "Connect Polar" },
       { label: "Result page views", value: t?.totals["view:result"] },
+      { label: "Clicked an offer", value: t?.totals.offer_click },
       { label: "Shares (link, X, LinkedIn, card)", value: t?.totals.share_copy },
     ])
   );

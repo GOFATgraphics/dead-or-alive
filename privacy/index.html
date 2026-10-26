@@ -27,16 +27,20 @@
       <p>The page URL (your site, app, or store page) you type into the form. We use it for one thing: to look at that page's first screen and show you the result. We don't ask for your name, your email, or a card.</p>
 
       <h2>How we read your page</h2>
-      <p>When you press the button, a screenshot service opens your page logged out and captures the first screen on a desktop and on a phone. Our server also loads the page once to time it and read its public tags (title, description, share preview) and what it's built and hosted on. Our AI reads that screenshot and makes the stamp, the sentence, and the circles. If the AI can't produce a confident stamp, it retries once automatically. If it still can't, nothing is published and the page tells you so. Only the screenshot and the page address go to the AI.</p>
+      <p>When you press the button, a screenshot service opens your page logged out and captures the first screen, and reads its main headline and button labels. Our server also loads the page once to time it and read its public tags (title, description, share preview) and what it's built and hosted on. Fixed rules score what we found and pick the stamp and the sentence. No AI reads your page for the free stamp. If the page can't be captured, it retries once; if it still can't, nothing is published and the page tells you so.</p>
+
+      <h2>If you buy the Kill Sheet or Stay Alive</h2>
+      <p>Checkout runs on <a href="https://polar.sh">Polar</a>, which handles the payment as merchant of record. We never see your card number. Polar shares your order with us: your email, the page URL, the product, and the amount. We use your email only to deliver what you bought.</p>
 
       <h2>What we make</h2>
-      <p>A screenshot of your page's first screen, circles on it, one sentence, the stamp, a share card, and the stack and speed check. We publish it at an unlisted link and open it for you. Anyone who has the link can open it. It is not listed anywhere, and we ask search engines not to index it.</p>
+      <p>A screenshot of your page's first screen, the stamp, one sentence, the score and the checks behind it, a share card, and the stack and speed check. We publish it at an unlisted link and open it for you. Anyone who has the link can open it. It is not listed anywhere, and we ask search engines not to index it.</p>
 
       <h2>Who processes it</h2>
       <ul>
         <li><strong>Vercel</strong>: hosts this site and stores the screenshots, drafts, and published stamps.</li>
         <li><strong>Microlink</strong>: opens your page and takes the first-screen screenshot.</li>
-        <li><strong>Anthropic</strong>: its AI, Claude, reads the screenshot and drafts the stamp.</li>
+        <li><strong>Polar</strong>: payment and order details, only if you buy something.</li>
+        <li><strong>Resend</strong>: sends what you bought by email, only if you buy something.</li>
         <li><strong>Upstash</strong>: stores the anonymous visit counts and daily stamp limits described below.</li>
       </ul>
 

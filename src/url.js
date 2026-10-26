@@ -68,8 +68,8 @@ export function pageKind(url) {
 // What the form says under the URL field for each kind.
 export const KIND_HINT = {
   web: "We'll check the first screen of this page.",
-  appstore: "We'll check your App Store page: icon, title, subtitle, and first screenshots.",
-  playstore: "We'll check your Google Play page: icon, title, short description, and first screenshots.",
+  appstore: "Store listings can't be stamped yet. Send your app's website instead.",
+  playstore: "Store listings can't be stamped yet. Send your app's website instead.",
   login: "That looks like it's behind a login. We stamp what a logged-out stranger sees, so send your public landing page.",
   download: "That's a file, not a page. Send the download page instead.",
 };

@@ -1,4 +1,4 @@
-// Stamps are free, so each one is paid for by us (screenshots + AI). This keeps that bounded:
+// Stamps are free, so each one is paid for by us (screenshots). This keeps that bounded:
 // a few stamps per visitor per day, and a cap for the whole site per day.
 // Env (optional): STAMP_IP_LIMIT (default 5 per visitor per day), STAMP_DAILY_LIMIT (default 300 for everyone).
 // With Upstash Redis connected the counts are shared; without it they live per function instance,

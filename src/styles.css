@@ -527,3 +527,30 @@ input[aria-invalid="true"] { border-color: var(--dead); }
 .price-list { margin: 1.25rem 0 0 !important; padding-left: 1.2rem; display: grid; gap: 0.4rem; }
 .price-meta { font-size: 0.9375rem; color: var(--muted) !important; margin-top: 1.25rem !important; }
 .price-cta { display: inline-flex; margin-top: 1.25rem; text-decoration: none; }
+
+/* Result page: the rules' scorecard and the offers that follow it */
+.checks-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
+.checks-score { margin: 0; color: var(--muted); font-size: 0.9375rem; }
+.checks-score strong { color: var(--ink); font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; }
+.check-list { list-style: none; margin: 1rem 0 0; padding: 0; border-top: 1px solid var(--line); }
+.check-list li { display: grid; grid-template-columns: 1.75rem 1fr; gap: 0.75rem; padding: 0.85rem 0; border-bottom: 1px solid var(--line); }
+.check-mark { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; font-size: 0.8125rem; font-weight: 800; }
+.check-list .fail .check-mark { background: var(--dead-soft); color: var(--dead); }
+.check-list .pass .check-mark { background: var(--alive-soft); color: var(--alive); }
+.check-list p { margin: 0; }
+.check-label { font-weight: 700; }
+.check-list .pass .check-label { font-weight: 600; color: var(--muted); }
+.check-detail { color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.check-fix { margin-top: 0.3rem !important; font-size: 0.875rem; }
+.offers .lede { margin-top: 0.5rem; }
+.offer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.offer { display: flex; flex-direction: column; padding: 1.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-sm); }
+.offer.main { border: 2px solid var(--ink); box-shadow: var(--shadow); }
+.offer p { margin: 0; }
+.offer-name { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.offer-price { margin-top: 0.5rem !important; color: var(--muted); font-size: 0.875rem; }
+.offer-price strong { color: var(--ink); font-size: 2.25rem; font-weight: 800; letter-spacing: -0.04em; }
+.offer-pitch { margin-top: 0.5rem !important; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.015em; }
+.offer-points { margin: 1rem 0 1.5rem; padding-left: 1.1rem; display: grid; gap: 0.4rem; font-size: 0.9375rem; }
+.offer .submit { margin-top: auto; width: 100%; text-align: center; }
+@media (max-width: 640px) { .offer-grid { grid-template-columns: 1fr; } }

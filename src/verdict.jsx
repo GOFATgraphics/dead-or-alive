@@ -9,6 +9,7 @@ import GlareHover from "./bits/GlareHover.jsx";
 import StatusMark from "./bits/StatusMark.jsx";
 import { track, trackView } from "./track.js";
 import { snapshotRows } from "./snapshot.js";
+import { DESK } from "./config.js";
 
 const still = reducedMotion();
 
@@ -92,6 +93,105 @@ const SHARE_TEXT = {
 };
 
 // The share card and the ways to post it. DEAD gets a way out first: not everyone posts a bad stamp.
+// The rules' scorecard: what failed first, each with the fix. Free, and the reason to want the Kill Sheet.
+function Checks({ r }) {
+  const checks = Array.isArray(r.checks) ? r.checks : [];
+  if (!checks.length) return null;
+  const failed = checks.filter((k) => !k.pass);
+  const passed = checks.filter((k) => k.pass);
+  return (
+    <section className="section checks">
+      <div className="checks-head">
+        <h2 className="kicker brand">What we checked</h2>
+        <p className="checks-score"><strong>{r.score}</strong>/100 · {passed.length} of {checks.length} passed</p>
+      </div>
+      <ul className="check-list">
+        {[...failed, ...passed].map((k) => (
+          <li key={k.id} className={k.pass ? "pass" : "fail"}>
+            <span className="check-mark" aria-label={k.pass ? "Passed" : "Failed"}>{k.pass ? "✓" : "✕"}</span>
+            <div>
+              <p className="check-label">{k.label}</p>
+              <p className="check-detail">{k.detail}</p>
+              {!k.pass && <p className="check-fix"><strong>Fix:</strong> {k.fix}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const OFFERS = {
+  killSheet: {
+    name: "Kill Sheet",
+    pitch: "We fix it for you.",
+    points: [
+      "Your headline, subhead, and button rewritten, ready to paste",
+      "The whole page scouted, not just the first screen",
+      "3 to 5 fixes ranked by impact",
+      "A free re-stamp after you ship",
+    ],
+    cta: "Get the Kill Sheet",
+  },
+  stayAlive: {
+    name: "Stay Alive",
+    pitch: "We keep watching it.",
+    points: [
+      "A fresh stamp every week",
+      "Uptime and speed checks between stamps",
+      "An alert when the page goes down or slows down",
+      "Cancel anytime",
+    ],
+    cta: "Start Stay Alive",
+  },
+};
+
+// Polar checkout with the page attached, or an email asking to be told when the offer is ready.
+function offerHref(key, r) {
+  const link = (DESK.offers[key]?.url || "").trim();
+  if (link) {
+    try {
+      const u = new URL(link);
+      u.searchParams.set("custom_field_data.page_url", r.pageUrl);
+      return u.toString();
+    } catch (_) {}
+  }
+  const subject = `${OFFERS[key].name} for ${r.host}`;
+  const body = `I'd like the ${OFFERS[key].name} for ${r.pageUrl} (stamped ${r.verdict}).`;
+  return `mailto:${DESK.contact}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function Offers({ r }) {
+  const v = r.verdict;
+  // A page in trouble needs fixing first; a page that works needs watching.
+  const order = v === "ALIVE" ? ["stayAlive", "killSheet"] : ["killSheet", "stayAlive"];
+  const failed = (r.checks || []).filter((k) => !k.pass).length;
+  const lead = v === "ALIVE" ? "It works today. Pages break quietly: a deploy, a slow script, a new hero." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}You can do it yourself with the list above, or hand it to us.`;
+  return (
+    <section className="section offers" id="offers">
+      <h2 className="kicker brand">{v === "ALIVE" ? "Keep it alive" : "Bring it back"}</h2>
+      <p className="lede">{lead}</p>
+      <div className="offer-grid">
+        {order.map((key, i) => {
+          const o = OFFERS[key];
+          const price = DESK.offers[key];
+          return (
+            <article key={key} className={"offer" + (i === 0 ? " main" : "")}>
+              <p className="offer-name">{o.name}</p>
+              <p className="offer-price"><strong>{price.price}</strong> {price.per}</p>
+              <p className="offer-pitch">{o.pitch}</p>
+              <ul className="offer-points">{o.points.map((p) => <li key={p}>{p}</li>)}</ul>
+              <a className={"submit" + (i === 0 ? "" : " ghost")} href={offerHref(key, r)} onClick={() => track("offer_click", { v })}>
+                {o.cta}
+              </a>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ShareCard({ r }) {
   const v = r.verdict;
   const url = `${location.origin}/v/${r.id}`;
@@ -104,8 +204,8 @@ function ShareCard({ r }) {
       {v === "DEAD" && (
         <div className="resurrect">
           <p><strong>Not ready to post a DEAD?</strong> Fix the first screen, then post the comeback.</p>
-          <InkButton as="a" href="/" color={VERDICT_COLOR.DEAD} onClick={() => track("result_cta", { v })}>
-            Fix it, then stamp it again
+          <InkButton as="a" href="#offers" color={VERDICT_COLOR.DEAD} onClick={() => track("result_cta", { v })}>
+            See how to fix it
           </InkButton>
         </div>
       )}
@@ -131,7 +231,7 @@ function Result({ r }) {
   const shot = (
     <GlareHover width="100%" height="auto" background="#fff" borderColor="var(--line)" borderRadius="14px" glareColor="#ffffff" glareOpacity={0.45} glareSize={300} transitionDuration={900} className="result-shot">
       <a href={r.image} target="_blank" rel="noopener noreferrer">
-        <img src={r.image} alt={`First screen of ${r.host}, circled and stamped ${v}.`} />
+        <img src={r.image} alt={`First screen of ${r.host}, stamped ${v}.`} />
       </a>
     </GlareHover>
   );
@@ -161,6 +261,10 @@ function Result({ r }) {
         </p>
       </section>
       </div>
+
+      <Checks r={r} />
+
+      <Offers r={r} />
 
       {r.card && <ShareCard r={r} />}
 
