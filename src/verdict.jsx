@@ -352,7 +352,7 @@ function Offers({ r }) {
       </div>
       <ol className="pc-steps" aria-label="How buying works">
         <li><b>1</b><span>Create a free account with your email.</span></li>
-        <li><b>2</b><span>Pay on Polar with the same email.</span></li>
+        <li><b>2</b><span>Check out with the same email.</span></li>
         <li><b>3</b><span>Your dashboard opens with everything marked Instant already running.</span></li>
       </ol>
       <div className="pc-review">

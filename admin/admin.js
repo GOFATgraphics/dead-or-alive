@@ -53,7 +53,7 @@ import { renderAnalytics } from "./analytics.js";
       setup = (await call("session")).setup || {};
     } catch (err) {
       alert.hidden = false;
-      alert.textContent = err.message === "Not available." ? "The desk is off: the admin key isn't set up in Vercel yet." : err.message || "Could not open the desk.";
+      alert.textContent = err.message === "Not available." ? "The desk is off: the admin key isn't set up yet." : err.message || "Could not open the desk.";
       if (/key/i.test(String(err.message))) session.set("");
       return;
     }
@@ -228,23 +228,10 @@ import { renderAnalytics } from "./analytics.js";
 
   // Setup
 
+  // The checklist text comes from the server, so the public script names no services.
   function renderSetup() {
-    const items = [
-      ["Admin key", true, "Set. You're in."],
-      ["Free stamps", true, "Homepage stamps are scored by rules (no AI): headline, audience, next step, buttons, speed, phone, https, tags."],
-      ["Accounts", setup.accounts, setup.accounts ? (setup.analytics ? "Accounts, sessions, and reviews are stored in Upstash Redis." : "Accounts are stored in Vercel Blob under hashed paths. Connect Upstash Redis for faster sign-ins.") : "Connect Upstash Redis (or Blob plus RESULT_SECRET) so people can create accounts."],
-      ["Polar webhook", setup.webhook, setup.webhook ? "Payments switch memberships on instantly." : "Add POLAR_WEBHOOK_SECRET (Polar → Settings → Webhooks → the stampmypage.com/api/polar endpoint → Secret). Until then, payments don't reach dashboards."],
-      ["Polar API token", setup.polarApi, setup.polarApi ? "Checkouts are confirmed the moment the buyer lands back, and members can cancel from the dashboard." : "Optional: POLAR_ACCESS_TOKEN (scopes: checkouts:read, subscriptions:read, subscriptions:write). Without it, the webhook switches plans on and Cancel opens Polar's customer portal."],
-      ["Email", setup.email, setup.email ? "Sign-in links and down alerts are emailed." : "Add RESEND_API_KEY and MAIL_FROM for email sign-in links and down alerts. Passwords work without it."],
-      ["Daily monitoring", true, setup.cron ? "Vercel cron runs Stay Alive checks every day, signed with CRON_SECRET." : "Vercel cron runs Stay Alive checks every day. Optional: set CRON_SECRET so only Vercel can trigger it."],
-      ["Screenshots", true, setup.screenshots ? "Using your Microlink plan." : "Using Microlink's free tier (about 50 a day). Add MICROLINK_API_KEY for more."],
-      ["Stamp storage", setup.blob, setup.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
-      ["Visitor analytics", setup.analytics, setup.analytics ? "Visits and clicks are being counted." : "Add Upstash Redis from the Vercel Marketplace (Storage → Upstash). It adds KV_REST_API_URL and KV_REST_API_TOKEN."],
-      ["Site address", setup.siteUrl, setup.siteUrl ? "Links and share previews use SITE_URL." : "Optional: set SITE_URL to your domain. Vercel's production domain is used until then."],
-      ["Contact email", setup.contact, setup.contact ? "Shown on the privacy and terms pages, and told when a review comes in." : "Set CONTACT_EMAIL so the privacy and terms pages show it and you hear about new reviews."],
-    ];
     $("setup-list").replaceChildren(
-      ...items.map(([name, ok, text]) =>
+      ...(setup.items || []).map(([name, ok, text]) =>
         el("li", { className: ok ? "ok" : "todo" }, el("span", { className: "setup-badge", textContent: ok ? "Connected" : "Missing" }), el("strong", { textContent: name }), el("p", { textContent: text }))
       )
     );

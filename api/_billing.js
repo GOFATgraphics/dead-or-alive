@@ -3,7 +3,7 @@
 // Env: POLAR_WEBHOOK_SECRET (required for the webhook). Optional: POLAR_ACCESS_TOKEN (confirms a checkout the
 // moment the buyer lands back, and cancels from the dashboard), POLAR_API_BASE (sandbox).
 import crypto from "node:crypto";
-import { PLANS } from "../src/config.js";
+import { CHECKOUT } from "./_plans.js";
 import { emailForId, ensureUser, getUser, updateUser } from "./_account.js";
 import { addTo } from "./_store.js";
 import { runScout } from "./_scout.js";
@@ -25,11 +25,11 @@ async function polar(path, { method = "GET", body } = {}) {
   return data;
 }
 
-const planOf = (productId) => Object.keys(PLANS).find((k) => PLANS[k].productId === productId) || "";
+const planOf = (productId) => Object.keys(CHECKOUT).find((k) => CHECKOUT[k].productId === productId) || "";
 
 // The Polar checkout for a plan, with the account's email filled in and its id attached.
 export function checkoutUrl(plan, user, pageUrl) {
-  const u = new URL(PLANS[plan].checkout);
+  const u = new URL(CHECKOUT[plan].url);
   u.searchParams.set("customer_email", user.email);
   u.searchParams.set("reference_id", user.id);
   if (pageUrl) u.searchParams.set("custom_field_data.page_url", pageUrl);

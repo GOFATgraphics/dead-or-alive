@@ -25,23 +25,23 @@
 
       <h2>What you give us</h2>
       <p>For the free stamp: only the page URL you type into the form. We use it to look at that page's first screen and show you the result. The free stamp asks for no name, no email, and no card.</p>
-      <p>If you create an account (optional and free): your email and a password, which we store only as a salted scrypt hash, never as the password itself. You can sign in with an email link instead. We keep a list of the stamps you save, and a session cookie keeps you signed in.</p>
+      <p>If you create an account (optional and free): your email and a password, which we store only as a salted hash, never as the password itself. You can sign in with an email link instead. We keep a list of the stamps you save, and a session cookie keeps you signed in.</p>
 
       <h2>How we read your page</h2>
       <p>When you press the button, a screenshot service opens your page logged out and captures the first screen, and reads its main headline and button labels. Our server also loads the page once to time it and read its public tags (title, description, share preview) and what it's built and hosted on. Fixed rules score what we found and pick the stamp and the sentence. No AI reads your page for the free stamp. If the page can't be captured, it retries once; if it still can't, nothing is published and the page tells you so.</p>
 
       <h2>If you buy the Kill Sheet or Stay Alive</h2>
-      <p>You create a free account first, then pay on <a href="https://polar.sh">Polar</a>, which handles the payment as merchant of record. We never see your card number. Polar sends us your email, the page URL, the product, your account's reference, and for Stay Alive the subscription dates. We use them to switch your membership on in your dashboard and to show your next billing date. Everything you bought is delivered in the dashboard, not by email.</p>
+      <p>You create a free account first, then pay through our payment provider, which handles the payment as merchant of record. We never see your card number. The provider sends us your email, the page URL, the product, your account's reference, and for Stay Alive the subscription dates. We use them to switch your membership on in your dashboard and to show your next billing date. Everything you bought is delivered in the dashboard, not by email.</p>
 
       <h2>What happens instantly</h2>
-      <p>When Polar confirms a payment, your dashboard switches on at once. The Kill Sheet's automated report (a scout of your whole page, rewrites, and ranked fixes) starts running immediately and is ready in about a minute. Stay Alive's monitoring switches on immediately: the first uptime check and re-stamp run right away, then a daily check and a weekly re-stamp. To do this we screenshot and load the page you gave us, the same way as the free stamp.</p>
+      <p>When a payment is confirmed, your dashboard switches on at once. The Kill Sheet's automated report (a scout of your whole page, rewrites, and ranked fixes) starts running immediately and is ready in about a minute. Stay Alive's monitoring switches on immediately: the first uptime check and re-stamp run right away, then a daily check and a weekly re-stamp. To do this we screenshot and load the page you gave us, the same way as the free stamp.</p>
 
       <h2>App reviews and test accounts</h2>
       <p>If you ask for an app review from your dashboard, we keep what you send: your site or app link, what to test, and, only if a login is needed, a test account.</p>
       <ul>
         <li><strong>It must be a throwaway test account, never your main account, with no real data and no saved card.</strong></li>
         <li><strong>We encrypt it, use it only for that review, and delete it after, and you can revoke it anytime.</strong></li>
-        <li>It is encrypted (AES-256-GCM) before it's stored. It can only be viewed by the person doing your review, and only while the review is In review.</li>
+        <li>It is encrypted before it's stored. It can only be viewed by the person doing your review, and only while the review is In review.</li>
         <li>It is deleted automatically when the review is marked Delivered, or when you press Revoke in your dashboard, whichever comes first. If neither happens, it expires on its own after 60 days.</li>
         <li>We don't use it to change settings, buy anything, invite anyone, or contact anyone. We test the flow you asked us to test, and nothing else.</li>
       </ul>
@@ -51,13 +51,14 @@
       <p>A screenshot of your page's first screen, the stamp, one sentence, the score and the checks behind it, a share card, and the stack and speed check. We publish it at an unlisted link and open it for you. Anyone who has the link can open it. The stamp itself is not listed anywhere, and we ask search engines not to index it. If your page is stamped ALIVE or COPE, its domain, verdict, and score may appear in the "Latest stamps" list on our homepage; the stamp itself and its link do not. DEAD stamps are never listed. Ask us and we remove yours.</p>
 
       <h2>Who processes it</h2>
+      <p>A small number of service providers process data for us, each only for its job and under its own data protection terms:</p>
       <ul>
-        <li><strong>Vercel</strong>: hosts this site and stores the screenshots, published stamps, and Kill Sheet reports.</li>
-        <li><strong>Microlink</strong>: opens your page and takes the first-screen screenshot.</li>
-        <li><strong>Polar</strong>: payment and order details, only if you buy something.</li>
-        <li><strong>Resend</strong>: sends sign-in links and Stay Alive down alerts, only if you ask for them or are a member.</li>
-        <li><strong>Upstash</strong>: stores accounts, sessions, memberships, app reviews (with test logins encrypted), and the anonymous visit counts described below.</li>
+        <li><strong>Hosting and storage</strong>: runs this site and stores screenshots, published stamps, accounts, reports, and app reviews (test logins encrypted).</li>
+        <li><strong>Screenshot service</strong>: opens the page you give us and captures it.</li>
+        <li><strong>Payment provider</strong>: payment and order details, only if you buy something. It is the merchant of record for your purchase.</li>
+        <li><strong>Email delivery</strong>: sends sign-in links and down alerts, only if you ask for them or are a member.</li>
       </ul>
+      <p>Ask us and we'll tell you who they are.</p>
 
       <h2>Visit counts</h2>
       <p>We count visits and clicks on this site to see what works: which page and button, the country your connection comes from, phone or computer, and the site that sent you. We do it on our own server, without cookies and without storing your IP address. Each day's visits are counted with a code made from your connection and browser that changes every day, so we can't recognize you from one day to the next. The same kind of daily code counts how many free stamps each visitor has used today, so nobody can use them all up. If your browser sends Global Privacy Control or Do Not Track, we don't count you at all. Counts are deleted after about a year.</p>
@@ -66,7 +67,7 @@
       <p>No ads, no third-party trackers, and no cookies except the one that keeps you signed in, which is only set when you sign in. We don't sell or share anything you give us, and there's no mailing list to land on.</p>
 
       <h2>Deleting it</h2>
-      <p>We keep your stamp until you ask us to remove it. You can delete your account from your dashboard at any time: that deletes your account, your saved stamps list, your Kill Sheet report, your monitoring history, and any test logins still stored. Payment records stay with Polar as the law requires. To take a stamp down or delete anything else, contact us at %CONTACT%. We will confirm when it's done.</p>
+      <p>We keep your stamp until you ask us to remove it. You can delete your account from your dashboard at any time: that deletes your account, your saved stamps list, your Kill Sheet report, your monitoring history, and any test logins still stored. Payment records stay with our payment provider as the law requires. To take a stamp down or delete anything else, contact us at %CONTACT%. We will confirm when it's done.</p>
 
       <p class="doc-foot"><a class="link" href="/terms">Terms</a> · <a class="link" href="/">Back home</a></p>
       <p class="fine">© Gofat Labs</p>

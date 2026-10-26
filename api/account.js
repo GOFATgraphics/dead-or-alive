@@ -22,7 +22,8 @@ import {
 import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, resumeStayAlive } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
 import { readMonitor, runMonitor } from "./_monitor.js";
-import { PLANS, POLAR_PORTAL } from "../src/config.js";
+import { PLANS } from "../src/config.js";
+import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
 
 const mailReady = () => !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
@@ -61,7 +62,7 @@ async function me(email) {
 }
 
 function setup() {
-  return { ready: storeReady(), emailLinks: mailReady(), polarApi: polarApiReady(), portal: POLAR_PORTAL };
+  return { ready: storeReady(), emailLinks: mailReady(), polarApi: polarApiReady(), portal: PORTAL };
 }
 
 async function sendLink(email, next) {
@@ -244,7 +245,7 @@ export default async function handler(req, res) {
       return res.status(202).json(await me(email));
     }
     if (op === "cancel" || op === "resume") {
-      if (!polarApiReady()) return res.status(200).json({ portal: POLAR_PORTAL });
+      if (!polarApiReady()) return res.status(200).json({ portal: PORTAL });
       await (op === "cancel" ? cancelStayAlive(email) : resumeStayAlive(email));
       return res.status(200).json(await me(email));
     }

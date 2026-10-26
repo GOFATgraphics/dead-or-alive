@@ -162,12 +162,12 @@ export function renderAnalytics(root, data) {
   // Summary
   const tiles = el("div", "an-tiles");
   tiles.append(
-    tile("Visitors", num(t?.totals.visitors), t ? `${num(t.totals.view)} page views` : "Connect Redis"),
-    tile("Stamps started", num(t?.totals.stamp_start), t ? `${pct(t.totals.stamp_start, t.totals.homeVisitors)} of homepage visitors` : "Connect Redis"),
-    tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Connect Polar"),
+    tile("Visitors", num(t?.totals.visitors), t ? `${num(t.totals.view)} page views` : "Not connected"),
+    tile("Stamps started", num(t?.totals.stamp_start), t ? `${pct(t.totals.stamp_start, t.totals.homeVisitors)} of homepage visitors` : "Not connected"),
+    tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Not connected"),
     tile("Median turnaround", hours(b?.turnaround.medianHours), b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}% within 24 h` : "No stamps yet"),
-    tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Connect Redis"),
-    tile("Offer clicks", num(t?.totals.offer_click), t ? `${pct(t.totals.offer_click, t.totals["view:result"])} of result views · Kill Sheet or Stay Alive` : "Connect Redis")
+    tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Not connected"),
+    tile("Offer clicks", num(t?.totals.offer_click), t ? `${pct(t.totals.offer_click, t.totals["view:result"])} of result views · Kill Sheet or Stay Alive` : "Not connected")
   );
   out.push(tiles);
 
@@ -179,7 +179,7 @@ export function renderAnalytics(root, data) {
       { label: "Clicked into the form", value: t?.totals.form_start },
       { label: "Pressed “Judge my page”", value: t?.totals.submit_try },
       { label: "Stamps started", value: t?.totals.stamp_start },
-      { label: "Stamped", value: b?.totals.stamped, missing: "Connect Polar" },
+      { label: "Stamped", value: b?.totals.stamped, missing: "Not connected" },
       { label: "Result page views", value: t?.totals["view:result"] },
       { label: "Clicked an offer", value: t?.totals.offer_click },
       { label: "Shares (link, X, LinkedIn, card)", value: t?.totals.share_copy },

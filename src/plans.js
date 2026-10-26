@@ -1,5 +1,5 @@
 // The pricing cards as HTML, from PLANS in config.js: one source for the homepage, /pricing, and the result page,
-// so every card says exactly what Polar sells. Used at build time (vite.config.js) and in the browser.
+// so every card says exactly what checkout sells. Used at build time (vite.config.js) and in the browser.
 import { PLANS } from "./config.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -42,7 +42,7 @@ export function plansHtml({ free = false } = {}) {
   return `<div class="pc-grid${free ? " three" : ""}">${free ? FREE : ""}${card("killSheet", { main: true })}${card("stayAlive")}</div>
 <ol class="pc-steps" aria-label="How buying works">
   <li><b>1</b><span>Create a free account with your email.</span></li>
-  <li><b>2</b><span>Pay on Polar with the same email. One-time or monthly, no surprises.</span></li>
+  <li><b>2</b><span>Check out with the same email. One-time or monthly, no surprises.</span></li>
   <li><b>3</b><span>Your dashboard opens with everything marked Instant already running.</span></li>
 </ol>`;
 }

@@ -77,10 +77,6 @@ They're stored in Blob next to the stamp (`verdicts/<id>-card.jpg`, `-square.jpg
 
 Stamp numbers count up with Redis (`stamp:number`) and fall back to the number of published stamps. Republishing keeps the number. The card's bold type uses `server-fonts/` (Plus Jakarta Sans Bold and ExtraBold, OFL) and the mark from `public/brand/smp-mark.png`, both bundled only with the functions that draw.
 
-### AI drafts (desk only, optional)
-
-Free stamps never use AI. In the desk, **Ask AI** on a Polar order can still make a draft with Claude (screenshot, verdict, sentence, circles) for you to edit and publish by hand. It needs `ANTHROPIC_API_KEY`; without it, stamp by hand in the editor.
-
 ### Analytics
 
 The desk's **Analytics** tab covers the last 7, 30, or 90 days:
@@ -90,9 +86,6 @@ The desk's **Analytics** tab covers the last 7, 30, or 90 days:
 
 Counting is anonymous and cookieless: no IPs are stored, a visitor is a hash that changes daily, visitors with Global Privacy Control or Do Not Track aren't counted, and counts expire after about a year. The privacy page says so. `/api/track` accepts events from anyone, so treat counts as a guide, not an audit.
 
-Per order: **Stamp**, paste or drop the first-screen screenshot, mark it up, pick DEAD / COPE / ALIVE, write one sentence, **Publish verdict**.
-
-The editor: **Circle** draws a marker ring, **Pen** draws freehand, S / M / L sets the marker size. Click a mark to select it, drag to move it, pull a corner to resize a circle. Drag the stamp to move it. Undo with Ctrl+Z, redo with Ctrl+Shift+Z, Delete removes the selected mark. Publishing again replaces the stamp at the same link. Without Resend set up, publishing still works; use **Draft email** to send the link yourself.
 
 Result-page buttons come from `offers` in `src/config.js`: Resurrection and Kill Sheet for DEAD, Kill Sheet for COPE, Stay Alive for ALIVE. An empty link hides its button.
 

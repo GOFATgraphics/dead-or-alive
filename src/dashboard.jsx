@@ -9,7 +9,7 @@ import { REVIEW_STEPS, planHref, point } from "./plans.js";
 import { track, trackView } from "./track.js";
 
 // The dashboard: sign up or in, then everything a membership includes, in one place.
-// URL: ?plan=killSheet|stayAlive&url=… (buying: account first, then Polar), ?paid=…&checkout_id=… (back from Polar),
+// URL: ?plan=killSheet|stayAlive&url=… (buying: account first, then checkout), ?paid=…&checkout_id=… (back from checkout),
 // ?save=<stamp id> (save a free stamp), ?mode=signup|login, ?link=expired.
 
 const params = new URLSearchParams(location.search);
@@ -111,8 +111,8 @@ function Auth({ setup, onIn }) {
         {plan ? (
           <>
             <p className="eyebrow">Step 1 of 2</p>
-            <h1>Create your free account, then pay on Polar.</h1>
-            <p className="sect-sub">Your {plan.name} lands in this dashboard the moment Polar confirms the payment. Use the email you'll pay with, so the payment finds your account.</p>
+            <h1>Create your free account, then check out.</h1>
+            <p className="sect-sub">Your {plan.name} lands in this dashboard the moment your payment is confirmed. Use the email you'll pay with, so the payment finds your account.</p>
             <div className="auth-plan">
               <p><b>{plan.name}</b> · {plan.price} {plan.per}</p>
               <ul>{plan.points.map(point).map((x) => <li key={x.text}><Icon name="check" size={15} />{x.instant && <b className="pc-tag">Instant</b>} {x.text}</li>)}</ul>
@@ -587,7 +587,7 @@ function Dashboard({ data, setData, onOut }) {
     if (r.ok) setData(await r.json());
   }, [setData]);
 
-  // Buying: account done, so straight to Polar with this email.
+  // Buying: account done, so straight to checkout with this email.
   useEffect(() => {
     if (!PLAN) return;
     if ((PLAN === "stayAlive" && user.stayAliveActive) || (PLAN === "killSheet" && user.killSheetActive && !params.get("again"))) {
@@ -605,7 +605,7 @@ function Dashboard({ data, setData, onOut }) {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Back from Polar: confirm right away when the server can, and watch for the webhook either way.
+  // Back from checkout: confirm right away when the server can, and watch for the webhook either way.
   useEffect(() => {
     if (!PAID) return;
     const id = params.get("checkout_id");
@@ -642,9 +642,9 @@ function Dashboard({ data, setData, onOut }) {
 
   return (
     <main className="dash wrap">
-      {banner === "checkout" && <div className="banner"><Working text={`Taking you to Polar checkout for the ${PLANS[PLAN].name}, with ${user.email} filled in…`} /></div>}
-      {banner === "confirming" && <div className="banner"><Working text="Payment received on Polar. Switching your membership on…" /></div>}
-      {banner === "slow" && <div className="banner warn">Polar hasn't confirmed the payment to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
+      {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for the ${PLANS[PLAN].name}, with ${user.email} filled in…`} /></div>}
+      {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
+      {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
       {banner === "active" && <div className="banner ok"><Icon name="check" /> {PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running below." : "You're a Stay Alive member. Monitoring is on."}</div>}
       {err && <p className="alert" role="alert">{err}</p>}
 
