@@ -1,6 +1,7 @@
-// Stamps are free, so each one is paid for by us (screenshots). This keeps that bounded:
+// Stamps are free, so each one is paid for by us (screenshots). This can keep that bounded:
 // a few stamps per visitor per day, and a cap for the whole site per day.
-// Env (optional): STAMP_IP_LIMIT (default 5 per visitor per day), STAMP_DAILY_LIMIT (default 300 for everyone).
+// Off for now: no limit applies unless one is set.
+// Env (optional): STAMP_IP_LIMIT (stamps per visitor per day), STAMP_DAILY_LIMIT (stamps for everyone per day).
 // With Upstash Redis connected the counts are shared; without it they live per function instance,
 // which slows abuse rather than stopping it, so connect Redis before sharing the site widely.
 // A stamp that fails gives its slot back. The owner (a request carrying the ADMIN_KEY, sent by the
@@ -8,9 +9,10 @@
 import crypto from "node:crypto";
 import { pipeline, redisReady } from "./_redis.js";
 
-const num = (v, d) => Math.max(1, parseInt(v || "", 10) || d);
-const perIp = () => num(process.env.STAMP_IP_LIMIT, 5);
-const perDay = () => num(process.env.STAMP_DAILY_LIMIT, 300);
+// A limit that isn't set (or isn't a positive number) is off.
+const num = (v) => Math.max(0, parseInt(v || "", 10) || 0);
+const perIp = () => num(process.env.STAMP_IP_LIMIT);
+const perDay = () => num(process.env.STAMP_DAILY_LIMIT);
 
 const local = new Map();
 
@@ -34,7 +36,7 @@ const nothing = async () => {};
 // Counts one stamp. Resolves { ok: true, giveBack }, or { ok: false, error } with a message for the visitor.
 // Call giveBack() when the stamp fails, so a page we couldn't stamp doesn't use up a try.
 export async function takeStamp(req) {
-  if (isOwner(req)) return { ok: true, giveBack: nothing };
+  if (isOwner(req) || (!perIp() && !perDay())) return { ok: true, giveBack: nothing };
   const day = new Date().toISOString().slice(0, 10);
   const ipKey = `rl:${day}:ip:${visitor(req, day)}`;
   const allKey = `rl:${day}:all`;
@@ -60,11 +62,11 @@ export async function takeStamp(req) {
       local.set(allKey, Math.max(0, (local.get(allKey) || 1) - 1));
     }
   };
-  if (Number(all) > perDay()) {
+  if (perDay() && Number(all) > perDay()) {
     await giveBack();
     return { ok: false, error: "We've stamped all we can for today. Come back tomorrow." };
   }
-  if (Number(mine) > perIp()) {
+  if (perIp() && Number(mine) > perIp()) {
     await giveBack();
     return { ok: false, error: `That's ${perIp()} stamps for you today. Fix something and come back tomorrow.` };
   }

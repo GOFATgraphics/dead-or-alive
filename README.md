@@ -27,11 +27,11 @@ The result page shows every check with its fix, then sells the follow-up: the **
 
 You deliver the Kill Sheet and run Stay Alive yourself for now; paid orders show in `/admin` once `POLAR_ACCESS_TOKEN` is set.
 
-Free stamps cost screenshots, so they're limited:
+Free stamps cost screenshots. There's no limit for now; to add one:
 
-- `STAMP_IP_LIMIT`: stamps per visitor per day (default 5).
-- `STAMP_DAILY_LIMIT`: stamps for the whole site per day (default 300).
-- Connect Upstash Redis (below) so these counts are shared across function instances. Without it they're per instance, which slows abuse but doesn't stop it.
+- `STAMP_IP_LIMIT`: stamps per visitor per day.
+- `STAMP_DAILY_LIMIT`: stamps for the whole site per day.
+- Connect Upstash Redis (below) so these counts are shared across function instances. Without it they're per instance, which slows abuse but doesn't stop it. Failed stamps never count, and the owner (with `/admin` unlocked in the same tab) is never limited.
 
 To pause stamping by hand, set `queueOpen` to `false` in [src/config.js](src/config.js).
 

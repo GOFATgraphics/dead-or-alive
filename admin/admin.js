@@ -115,7 +115,7 @@ import { snapshotRows } from "../src/snapshot.js";
       ["Free stamps", true, "Homepage stamps are scored by rules (no AI): headline, audience, next step, buttons, speed, phone, https, tags."],
       ["Offer checkout", !!(DESK.offers.killSheet.url && DESK.offers.stayAlive.url), DESK.offers.killSheet.url && DESK.offers.stayAlive.url ? "Kill Sheet and Stay Alive go to Polar checkout." : "Paste the Kill Sheet and Stay Alive Polar checkout links into src/config.js. Until then, their buttons open an email to you."],
       ["AI drafts (optional)", setup.ai, setup.ai ? "Ask AI works on desk orders." : "Only for Ask AI in the desk. Add ANTHROPIC_API_KEY if you want it."],
-      ["Daily limits", true, "Each visitor gets STAMP_IP_LIMIT stamps a day (default 5) and the whole site STAMP_DAILY_LIMIT (default 300). Connect Redis so the counts are shared."],
+      ["Daily limits", true, "Off. Set STAMP_IP_LIMIT (stamps per visitor per day) or STAMP_DAILY_LIMIT (for the whole site) in Vercel to turn one on. Connect Redis so the counts are shared."],
       ["Screenshots", true, setup.screenshots ? "Using your Microlink plan." : "Using Microlink's free tier (about 50 a day). Add MICROLINK_API_KEY for more."],
       ["Stamp storage", setup.blob, setup.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
       ["Email", setup.email, setup.email ? "Customers get their link by email." : "Add RESEND_API_KEY and MAIL_FROM. Until then, use Draft email."],
