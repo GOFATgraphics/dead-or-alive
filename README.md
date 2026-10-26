@@ -19,7 +19,7 @@ Needed in Vercel: a **Blob** store (`BLOB_READ_WRITE_TOKEN`). Optional: `MICROLI
 
 ## The offers
 
-The result page shows every check with its fix, then sells the follow-up: the **Kill Sheet** ($19) first after a DEAD or COPE, **Stay Alive** ($20/month) first after an ALIVE. The homepage lists both under "After the stamp".
+The result page shows every check with its fix, then sells the follow-up: the **Kill Sheet** ($19) first after a DEAD or COPE, **Stay Alive** ($20/month) first after an ALIVE. Prices appear only there, after a stamp; the homepage never shows them.
 
 1. In Polar, create both products. Give each a required custom field with slug `page_url` (the result page fills it in).
 2. Paste their checkout links into `offers` in [src/config.js](src/config.js). Until a link is there, its button opens an email to `contact` instead.

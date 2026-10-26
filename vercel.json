@@ -7,7 +7,7 @@
   "redirects": [
     {
       "source": "/pricing",
-      "destination": "/#offers",
+      "destination": "/",
       "permanent": false
     },
     {

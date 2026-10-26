@@ -243,23 +243,6 @@ ol, ul { padding: 0; list-style: none; }
 .diff s { text-decoration-color: var(--dead); text-decoration-thickness: 2px; }
 .diff dd:last-of-type { font-weight: 700; color: var(--alive); }
 
-/* Offers: free stamp, then the two paid follow-ups */
-.plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 2px solid var(--bone); background: var(--bg); }
-.plan { display: flex; flex-direction: column; padding: 2rem 1.75rem; }
-.plan + .plan { border-left: 2px solid var(--bone); }
-.plan.main { background: var(--bone); color: var(--bg); }
-.plan.main .label { color: #fff; opacity: 0.7; }
-.plan h3 { margin-top: 0.75rem; font-size: 1.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; }
-.amount { margin-top: 0.75rem; font-size: clamp(2.75rem, 5vw, 3.75rem); font-weight: 800; letter-spacing: -0.05em; line-height: 1; }
-.amount span { font: 500 var(--t-sm) var(--mono); letter-spacing: 0.06em; margin-left: 0.25rem; opacity: 0.7; }
-.plan-note { margin-top: 0.9rem; font-weight: 600; }
-.ticks { display: grid; gap: 0.7rem; margin: 1.5rem 0 2rem; padding-top: 1.25rem; border-top: 2px solid currentColor; font-size: var(--t-sm); }
-.ticks li { position: relative; padding-left: 1.6rem; }
-.ticks li::before { content: ""; position: absolute; left: 0.1rem; top: 0.38em; width: 0.65rem; height: 0.35rem; border-left: 2px solid var(--acid); border-bottom: 2px solid var(--acid); transform: rotate(-45deg); }
-.plan .btn { margin-top: auto; width: 100%; }
-.plan.main .btn-line { border-color: var(--bg); color: var(--bg); }
-.plan.main .btn-line:hover { background: var(--bg); color: var(--bone); }
-
 /* FAQ */
 .faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 2rem; }
 .faq .aside { margin-top: 1rem; }
@@ -289,8 +272,7 @@ ol, ul { padding: 0; list-style: none; }
   .scard.sm { font-size: clamp(5px, 1.5vw, 9px); }
   .hero-card figcaption { text-align: left; }
   .head-row { flex-direction: column; align-items: start; gap: 0.75rem; }
-  .stamps, .ba, .faq, .plans { grid-template-columns: minmax(0, 1fr); }
-  .plan + .plan { border-left: 0; border-top: 2px solid var(--bone); }
+  .stamps, .ba, .faq { grid-template-columns: minmax(0, 1fr); }
   .stamps li + li { border-left: 0; border-top: 2px solid var(--bg); }
   .flow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .flow li + li { border-left: 0; }
