@@ -24,10 +24,13 @@ const CONSENT_CSS = `${CONSENT.join(",")}{display:none!important}html,body{overf
 // Buttons and button-like links, as a visitor sees them.
 const CTA_SELECTOR = 'button, [role="button"], a[class*="btn"], a[class*="button"], a[class*="cta"], input[type="submit"]';
 
-// Runs in the page: measures where the headline's text and the visible buttons sit on the first screen and
-// leaves it on <html data-smp>, which the data rules then read. Measured a few times, for pages that build late.
-// If a site's security policy blocks injected scripts, there are simply no circles.
-const MEASURE = `(function(){var S=${JSON.stringify(CTA_SELECTOR)};function box(b,W,H){if(!b||!b.width||!b.height||b.bottom<0||b.top>H||b.right<0||b.left>W)return null;return[Math.round(b.left),Math.round(b.top),Math.round(b.width),Math.round(b.height)]}function go(){try{var W=innerWidth,H=innerHeight,h=document.querySelector("h1"),hb=null;if(h){var r=document.createRange();r.selectNodeContents(h);hb=box(r.getBoundingClientRect(),W,H)||box(h.getBoundingClientRect(),W,H)}var bs=[].slice.call(document.querySelectorAll(S)).map(function(e){var t=(e.innerText||e.value||"").trim();var b=box(e.getBoundingClientRect(),W,H);return b&&t&&t.length<=60?b.concat([t]):null}).filter(Boolean).slice(0,16);document.documentElement.setAttribute("data-smp",JSON.stringify({w:W,h:H,head:hb,buttons:bs}))}catch(e){}}go();setTimeout(go,500);setTimeout(go,1200)})();`;
+// Runs in the page (public/measure.js, served from this site and passed by address to keep the request short):
+// where the headline and buttons sit, the subhead, which tools are running, real browser performance numbers,
+// third-party hosts, and fonts in use. It leaves them on <html data-smp>, which a data rule reads back.
+// If a site's security policy blocks it, the stamp simply has no circles and fewer stack facts.
+const siteBase = () =>
+  (process.env.SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://stampmypage.com")).replace(/\/$/, "");
+const MEASURE_URL = () => `${siteBase()}/measure.js`;
 
 // How much to ask for. "full": banner hiding, the measuring script, and the data rules. "safe": the same
 // without the script. "bare": just the screenshot and the headline and buttons. capture() steps down
@@ -53,7 +56,7 @@ async function microlink(pageUrl, { phone = false, read = false, tier = "full" }
     "screenshot.type": "jpeg",
     waitForTimeout: "1500",
     ...(tier !== "bare" ? { adblock: "true", styles: CONSENT_CSS } : {}),
-    ...(read && tier === "full" ? { scripts: MEASURE } : {}),
+    ...(read && tier === "full" ? { scripts: MEASURE_URL() } : {}),
     ...(read
       ? {
           "data.h1.selector": "h1",
@@ -81,6 +84,11 @@ async function microlink(pageUrl, { phone = false, read = false, tier = "full" }
           "data.viewport.attr": "content",
           "data.iconHref.selector": "link[rel~='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']",
           "data.iconHref.attr": "href",
+          "data.subhead.selector": "h1 ~ p",
+          "data.subhead.attr": "text",
+          "data.subhead.type": "string",
+          "data.scriptSrcs.selectorAll": "script[src]",
+          "data.scriptSrcs.attr": "src",
         }
       : {}),
     ...(read && tier === "full" ? { "data.layout.selector": "html", "data.layout.attr": "data-smp" } : {}),
@@ -103,13 +111,35 @@ export async function screenshot(pageUrl, phone = false) {
 
 const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
 
-// { w, h, head: [x, y, w, h] | null, buttons: [[x, y, w, h, label]] } in CSS pixels of the viewport, or null.
+// What measure.js left on the page, checked and trimmed: { w, h, head, buttons, sub, globals, frameworks,
+// perf, fonts, scripts } (boxes in CSS pixels of the viewport), or null.
+const strs = (a, n, len = 160) => (Array.isArray(a) ? a.filter((x) => typeof x === "string" && x).map((x) => x.slice(0, len)).slice(0, n) : []);
+const num = (x) => (Number.isFinite(Number(x)) && Number(x) >= 0 ? Number(x) : null);
 function parseLayout(raw) {
   try {
     const l = JSON.parse(String(raw || ""));
     const ok = (b) => Array.isArray(b) && b.slice(0, 4).every((n) => Number.isFinite(n));
     if (!(l?.w > 0 && l?.h > 0)) return null;
-    return { w: l.w, h: l.h, head: ok(l.head) ? l.head.slice(0, 4) : null, buttons: (Array.isArray(l.buttons) ? l.buttons : []).filter(ok).slice(0, 16) };
+    const p = l.perf && typeof l.perf === "object" ? l.perf : null;
+    return {
+      w: l.w,
+      h: l.h,
+      head: ok(l.head) ? l.head.slice(0, 4) : null,
+      buttons: (Array.isArray(l.buttons) ? l.buttons : []).filter(ok).slice(0, 16),
+      sub: typeof l.sub === "string" ? l.sub.slice(0, 320) : "",
+      globals: strs(l.g, 80, 40),
+      frameworks: strs(l.fw, 10, 20),
+      perf: p
+        ? {
+            ttfb: num(p.ttfb), dcl: num(p.dcl), load: num(p.load), lcp: num(p.lcp), cls: num(p.cls), requests: num(p.requests),
+            kb: Object.fromEntries(Object.entries(p.kb || {}).map(([k, v]) => [k, num(v)]).filter(([k]) => ["html", "js", "css", "img", "font", "other"].includes(k))),
+            third: strs(p.third, 60, 80),
+            res: strs(p.res, 120, 140),
+          }
+        : null,
+      fonts: strs(l.fonts, 12, 60),
+      scripts: strs(l.scripts, 60),
+    };
   } catch (_) {
     return null;
   }
@@ -139,6 +169,8 @@ export async function capture(pageUrl) {
     ctas,
     title,
     description: clean(data?.pageDescription).slice(0, 300),
+    subhead: clean(data?.subhead).slice(0, 320),
+    scriptSrcs: strs(data?.scriptSrcs, 60),
     tags: { "og:title": !!clean(data?.ogTitle), "og:image": !!clean(data?.ogImage), viewport: !!clean(data?.viewport) },
     layout: parseLayout(data?.layout),
     icon: (() => {

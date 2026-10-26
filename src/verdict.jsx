@@ -352,24 +352,156 @@ function Share({ r }) {
 
 const SNAP_ICON = { "Page loads": "timer", "Page weight": "weight", "Hosted on": "server", "Built with": "layers", Security: "shield-check", Status: "circle-alert", Redirects: "link", "Share preview": "image", "Page tags": "tag", "On a phone": "smartphone" };
 
+const secs = (ms) => `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)}s`;
+const kb = (n) => (n >= 1024 ? `${(n / 1024).toFixed(1)} MB` : `${n} KB`);
+
+// Real numbers from the browser that took the screenshot: what a visitor waited for, not a guess.
+function speedRows(b) {
+  if (!b) return [];
+  const rows = [];
+  if (b.lcp > 0) rows.push({ label: "Main content visible", value: secs(b.lcp), note: "Largest contentful paint. Good is under 2.5s.", warn: b.lcp > 2500 });
+  if (b.ttfb > 0) rows.push({ label: "Server answered", value: secs(b.ttfb), note: "Time to first byte. Good is under 0.8s.", warn: b.ttfb > 800 });
+  if (b.cls != null) rows.push({ label: "Layout shift", value: String(b.cls), note: "How much the page jumps while loading. Good is under 0.1.", warn: b.cls > 0.1 });
+  if (b.load > 0) rows.push({ label: "Fully loaded", value: secs(b.load), note: "Every script and image finished.", warn: b.load > 6000 });
+  const k = b.kb || {};
+  const total = Object.values(k).reduce((a, n) => a + (n || 0), 0);
+  if (total > 0) {
+    const parts = [["JS", k.js], ["Images", k.img], ["CSS", k.css], ["Fonts", k.font], ["HTML", k.html], ["Other", k.other]].filter(([, n]) => n > 0).map(([l, n]) => `${l} ${kb(n)}`);
+    rows.push({ label: "Page weight", value: kb(total), note: parts.join(" · "), warn: total > 3072 });
+  }
+  if (b.requests > 0) rows.push({ label: "Requests", value: String(b.requests), note: `${(b.thirdParty || []).length} other domains`, warn: b.requests > 120 });
+  return rows;
+}
+
+function factRows(s) {
+  const rows = [];
+  const seo = s.seo, sec = s.security, d = s.delivery;
+  if (seo) {
+    rows.push(["Search engines", seo.noindex ? "Told not to index this page" : "Allowed to index", seo.noindex]);
+    rows.push(["Headlines (h1)", seo.h1Count === 1 ? "One, as it should be" : seo.h1Count ? `${seo.h1Count} on one page` : "None in the HTML", seo.h1Count !== 1]);
+    rows.push(["Page title", seo.titleLength ? `${seo.titleLength} characters` : "Missing", !seo.titleLength || seo.titleLength > 65]);
+    rows.push(["Description", seo.descriptionLength ? `${seo.descriptionLength} characters` : "Missing", !seo.descriptionLength || seo.descriptionLength > 170]);
+    rows.push(["Canonical link", seo.canonical ? "Set" : "Not set", !seo.canonical]);
+    rows.push(["Language", seo.lang || "Not set", !seo.lang]);
+    if (seo.images) rows.push(["Image alt text", seo.imagesWithoutAlt ? `${seo.imagesWithoutAlt} of ${seo.images} images have none` : `All ${seo.images} images`, seo.imagesWithoutAlt > 0]);
+  }
+  if (sec) {
+    const on = [["HSTS", sec.hsts], ["CSP", sec.csp], ["Frame protection", sec.frameOptions], ["nosniff", sec.noSniff], ["Referrer policy", sec.referrerPolicy]];
+    const missing = on.filter(([, v]) => !v).map(([n]) => n);
+    rows.push(["Security headers", missing.length ? `Missing ${missing.join(", ")}` : "All five set", missing.length > 2]);
+  }
+  if (d) {
+    rows.push(["Compression", d.compression || "None", !d.compression]);
+    if (d.cacheControl) rows.push(["Cache policy", d.cacheControl, false]);
+  }
+  return rows.map(([label, value, warn]) => ({ label, value, warn }));
+}
+
+// Grouped in a fixed order; each tool carries the evidence it was found by.
+const STACK_ORDER = ["Built with", "Framework", "Hosting & CDN", "Server", "Analytics", "Ads & pixels", "Payments", "Auth & backend", "Support & chat", "Email & forms", "Scheduling", "Monitoring", "Testing & experiments", "UI & libraries", "Fonts", "Video", "Reviews", "Cookie consent"];
+
+function Stack({ stack }) {
+  if (!stack?.length) return null;
+  const groups = STACK_ORDER.map((cat) => [cat, stack.filter((t) => t.category === cat)]).filter(([, ts]) => ts.length);
+  return (
+    <div className="stack">
+      {groups.map(([cat, tools]) => (
+        <div key={cat} className="stack-group">
+          <h3>{cat}</h3>
+          <ul>
+            {tools.map((t) => (
+              <li key={t.name}>
+                <b>{t.name}</b>
+                <span>{t.evidence}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Snapshot({ s }) {
   const rows = snapshotRows(s);
-  if (!rows.length) return null;
+  if (!rows.length && !s?.stack?.length) return null;
+  const speed = speedRows(s?.browser);
+  const facts = s ? factRows(s) : [];
+  const third = s?.browser?.thirdParty || [];
   return (
     <section className="sect wrap" id="stack" aria-labelledby="stack-h">
       <div className="sect-head">
         <p className="eyebrow">Stack and speed</p>
         <h2 id="stack-h">Under the hood</h2>
-        <p className="sect-sub">Checked once, when we stamped the page. Load time is how long the HTML took to arrive from our server.</p>
+        <p className="sect-sub">Measured once, when we stamped the page, in a real browser and from its HTML and headers. Every tool listed shows what it was found by. Nothing is guessed.</p>
       </div>
-      <dl className="stats">
-        {rows.map((row) => (
-          <div key={row.label} className={row.warn ? "warn" : ""}>
-            <dt><span className="ic-tile sm"><Icon name={SNAP_ICON[row.label] || "list-checks"} size={16} /></span>{row.label}</dt>
-            <dd>{row.value}</dd>
-          </div>
-        ))}
-      </dl>
+
+      {s?.stack?.length > 0 && (
+        <div className="hood-block">
+          <h3 className="hood-h"><Icon name="layers" /> Tech stack <span>{s.stack.length} found</span></h3>
+          <Stack stack={s.stack} />
+        </div>
+      )}
+
+      {speed.length > 0 && (
+        <div className="hood-block">
+          <h3 className="hood-h"><Icon name="gauge" /> Real speed <span>measured in the browser</span></h3>
+          <dl className="stats">
+            {speed.map((row) => (
+              <div key={row.label} className={row.warn ? "warn" : ""}>
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
+                <dd className="stat-note">{row.note}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {facts.length > 0 && (
+        <div className="hood-block">
+          <h3 className="hood-h"><Icon name="search" /> Search, security, delivery</h3>
+          <dl className="stats compact">
+            {facts.map((row) => (
+              <div key={row.label} className={row.warn ? "warn" : ""}>
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {(third.length > 0 || s?.fonts?.length > 0) && (
+        <div className="hood-block hood-two">
+          {third.length > 0 && (
+            <div>
+              <h3 className="hood-h"><Icon name="globe" /> Other domains loaded <span>{third.length}</span></h3>
+              <p className="hood-list">{third.slice(0, 24).join(" · ")}{third.length > 24 ? ` · and ${third.length - 24} more` : ""}</p>
+            </div>
+          )}
+          {s?.fonts?.length > 0 && (
+            <div>
+              <h3 className="hood-h"><Icon name="type" /> Fonts in use</h3>
+              <p className="hood-list">{s.fonts.join(" · ")}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="hood-block">
+          <h3 className="hood-h"><Icon name="server" /> From our own request</h3>
+          <dl className="stats">
+            {rows.map((row) => (
+              <div key={row.label} className={row.warn ? "warn" : ""}>
+                <dt><span className="ic-tile sm"><Icon name={SNAP_ICON[row.label] || "list-checks"} size={16} /></span>{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
     </section>
   );
 }

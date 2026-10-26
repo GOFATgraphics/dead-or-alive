@@ -240,7 +240,17 @@ export function content(html, tags) {
   ]
     .map((m) => text(m[1]))
     .filter((t) => t && t.length <= 60);
-  return { h1: (h1s[0] || "").slice(0, 300), h1Count: h1s.length, ctas: ctas.slice(0, 40), description: tags.description.slice(0, 300) };
+  // The line under the headline: the first paragraph after the first h1.
+  const h1End = body.search(/<\/h1>/i);
+  const after = h1End >= 0 ? body.slice(h1End, h1End + 6000) : "";
+  const sub = (after.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i) || [])[1];
+  return {
+    h1: (h1s[0] || "").slice(0, 300),
+    h1Count: h1s.length,
+    subhead: text(sub).slice(0, 320),
+    ctas: ctas.slice(0, 40),
+    description: tags.description.slice(0, 300),
+  };
 }
 
 export async function inspect(pageUrl) {
@@ -264,7 +274,40 @@ export async function inspect(pageUrl) {
     canonical: attr(html, /<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']*)["']/i),
     lang: attr(html, /<html[^>]+lang=["']([^"']*)["']/i),
   };
+  const h = f.res.headers;
+  const header = (k) => h.get(k) || "";
+  const robots = `${meta(html, "robots")} ${header("x-robots-tag")}`.toLowerCase();
+  const imgs = html.match(/<img\b[^>]*>/gi) || [];
   return {
+    // Raw material for stack detection in _stamp.js; removed before the stamp is saved.
+    _raw: {
+      html: html.slice(0, 600000),
+      headers: Object.fromEntries([...h.entries()].filter(([k]) => k !== "set-cookie")),
+      cookies: (typeof h.getSetCookie === "function" ? h.getSetCookie() : [header("set-cookie")]).map((c) => String(c).split("=")[0].trim()).filter(Boolean),
+      generator: meta(html, "generator"),
+    },
+    seo: {
+      lang: tags.lang,
+      canonical: !!tags.canonical,
+      noindex: /noindex/.test(robots),
+      h1Count: (html.match(/<h1\b/gi) || []).length,
+      titleLength: tags.title.trim().length,
+      descriptionLength: tags.description.trim().length,
+      images: imgs.length,
+      imagesWithoutAlt: imgs.filter((t) => !/\balt=/i.test(t)).length,
+    },
+    security: {
+      hsts: !!header("strict-transport-security"),
+      csp: !!header("content-security-policy"),
+      frameOptions: !!header("x-frame-options") || /frame-ancestors/i.test(header("content-security-policy")),
+      noSniff: /nosniff/i.test(header("x-content-type-options")),
+      referrerPolicy: !!header("referrer-policy"),
+    },
+    delivery: {
+      compression: header("content-encoding"),
+      cacheControl: header("cache-control").slice(0, 120),
+      server: header("server").slice(0, 60),
+    },
     status: f.res.status,
     finalUrl: f.finalUrl !== pageUrl ? f.finalUrl : "",
     redirects: f.hops,

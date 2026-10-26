@@ -14,7 +14,10 @@ const FOG = [
   "the way you work", "what's next", "limitless", "frictionless", "holistic", "paradigm", "leverage", "disrupt",
 ];
 const ACTION = /\b(try|start|get|sign ?up|join|book|buy|order|shop|download|install|request|subscribe|create|build|launch|claim|see pricing|pricing|demo|contact|talk to|apply|register)\b/i;
-const AUDIENCE = /\bfor (?!free\b|you\b|good\b|example\b|more\b|less\b|all\b|everyone\b)[a-z]/i;
+// Who it's for: "for <someone>" (not "for free", "for you", "for everyone"…), or a named audience anywhere in the
+// headline, subhead, description, or title. The words found are quoted back, so the result shows its evidence.
+const FOR = /\b(?:made |built |designed |perfect |ideal |tools? |software |platform |app )?for\s+(?!free\b|you\b|your\s?self\b|yourself\b|everyone\b|anyone\b|everybody\b|all\b|good\b|example\b|more\b|less\b|life\b|now\b|today\b|real\b|years?\b|minutes?\b|seconds?\b|days?\b|the (?:first|best|price|win|future|rest)\b|a (?:fraction|few|while)\b|every(?:one|thing)?\b|whatever\b|instance\b)([a-z][\w'’-]*(?:\s+(?:and\s+|&\s+|on\s+|in\s+|of\s+|who\s+|at\s+)?[a-z][\w'’-]*){0,4})/i;
+const WHO = /\b(founders?|co-?founders?|startups?|indie (?:hackers?|makers?|devs?)|solo(?:preneurs?| founders?)|makers?|creators?|developers?|devs|engineers?|engineering teams?|designers?|marketers?|marketing teams?|growth teams?|sales (?:teams?|reps?)|recruiters?|hr teams?|product (?:teams?|managers?)|freelancers?|agencies|consultants?|coaches|small business(?:es)?|smbs?|enterprises?|e-?commerce (?:brands?|stores?)|shopify (?:stores?|merchants?|brands?)|online stores?|sellers?|merchants?|creators?|youtubers?|podcasters?|writers?|bloggers?|newsletter (?:writers?|creators?)|students?|teachers?|educators?|parents?|families|doctors?|clinics?|dentists?|therapists?|lawyers?|law firms?|accountants?|bookkeepers?|real estate (?:agents?|teams?)|realtors?|landlords?|restaurants?|cafes|gyms?|nonprofits?|churches|b2b|saas (?:founders?|teams?|companies)|remote teams?|support teams?|ops teams?|finance teams?|investors?|traders?|gamers?|streamers?|musicians?|artists?|photographers?|travell?ers?)\b/i;
 
 const words = (s) => String(s || "").split(/\s+/).filter(Boolean);
 const fogIn = (s) => FOG.filter((w) => String(s || "").toLowerCase().includes(w));
@@ -26,7 +29,16 @@ export function scorePage(snapshot, rendered = null) {
   const h1 = (rendered?.h1 || c.h1 || "").trim();
   const ctas = unique([...(rendered?.ctas || []), ...(rendered ? [] : c.ctas || [])]);
   const actions = ctas.filter((t) => ACTION.test(t));
-  const pitch = `${h1} ${c.description || ""} ${s.title || ""}`;
+  const subhead = (rendered?.layout?.sub || rendered?.subhead || c.subhead || "").trim();
+  const pitch = `${h1} ${subhead} ${c.description || ""} ${s.title || ""}`;
+  // Where the audience is named, in order of how visible that place is.
+  const audience = (() => {
+    for (const [where, text] of [["headline", h1], ["subhead", subhead], ["description", c.description], ["title", s.title]]) {
+      const m = String(text || "").match(FOR) || String(text || "").match(WHO);
+      if (m) return { where, words: m[0].trim().slice(0, 80) };
+    }
+    return null;
+  })();
   const missing = new Set(s.missing || []);
   const fog = fogIn(h1);
   const h1Words = words(h1).length;
@@ -60,8 +72,10 @@ export function scorePage(snapshot, rendered = null) {
       id: "who",
       label: "It says who it's for",
       weight: 3,
-      pass: AUDIENCE.test(pitch),
-      detail: AUDIENCE.test(pitch) ? "Names an audience." : "No “for …” anywhere in the headline, title, or description.",
+      pass: !!audience,
+      detail: audience
+        ? `Names an audience in the ${audience.where}: “${audience.words}”.`
+        : `No audience named in the headline${subhead ? ", subhead" : ""}, description, or title.`,
       fix: "Say who it's for in the headline or the line under it: “for sales teams on Zoom”.",
     },
     {
@@ -84,9 +98,14 @@ export function scorePage(snapshot, rendered = null) {
       id: "speed",
       label: "It loads fast",
       weight: 3,
-      pass: s.loadMs > 0 && s.loadMs <= 2500,
-      detail: s.loadMs ? `HTML arrived in ${(s.loadMs / 1000).toFixed(1)}s.` : "Couldn't time it.",
-      fix: "Aim for under 2.5 seconds: cache the page, trim redirects, move heavy scripts below the fold.",
+      // A real browser's largest contentful paint when we have it; otherwise how fast the HTML arrived.
+      pass: s.browser?.lcp > 0 ? s.browser.lcp <= 2500 : s.loadMs > 0 && s.loadMs <= 2500,
+      detail: s.browser?.lcp > 0
+        ? `Main content appeared in ${(s.browser.lcp / 1000).toFixed(1)}s (largest contentful paint, measured in a real browser).`
+        : s.loadMs
+          ? `HTML arrived in ${(s.loadMs / 1000).toFixed(1)}s.`
+          : "Couldn't time it.",
+      fix: "Get the main content on screen in under 2.5 seconds: compress the hero image, trim redirects, and move heavy scripts below the fold.",
     },
     {
       id: "weight",
@@ -141,7 +160,8 @@ export function scorePage(snapshot, rendered = null) {
   // A site that blocks direct requests can't be timed or weighed: those checks drop out instead of failing.
   if (s.blocked) {
     for (const k of checks) {
-      if (k.id === "speed" || k.id === "weight") Object.assign(k, { skip: true, pass: true, detail: "Not measured: the site blocks automated requests." });
+      const measured = k.id === "speed" && s.browser?.lcp > 0;
+      if ((k.id === "speed" || k.id === "weight") && !measured) Object.assign(k, { skip: true, pass: true, detail: "Not measured: the site blocks automated requests." });
     }
   }
   const scored = checks.filter((k) => !k.skip);

@@ -9,6 +9,7 @@ import { capture, isBusy } from "./_shot.js";
 import { scorePage } from "./_rules.js";
 import { publishStamp, publicOrigin } from "./_publish.js";
 import { saveIcon } from "./_icon.js";
+import { detectStack } from "./_stack.js";
 
 const notePath = (id) => `stamps/${id}.json`;
 const BLOB_OPTS = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60, contentType: "application/json" };
@@ -30,6 +31,32 @@ export async function stampNote(id) {
   }
 }
 
+// Adds what the real browser measured (stack, performance, fonts, third parties) to the snapshot, and drops
+// the raw HTML and headers our own request carried for detection: the stamp keeps facts, not the page.
+function enrich(snapshot, pageUrl, rendered) {
+  const raw = snapshot._raw || {};
+  const layout = rendered?.layout || null;
+  const perf = layout?.perf || null;
+  const stack = detectStack({
+    url: snapshot.finalUrl || pageUrl,
+    html: raw.html || "",
+    headers: raw.headers || {},
+    cookies: raw.cookies || [],
+    generator: raw.generator || "",
+    scripts: [...(layout?.scripts || []), ...(rendered?.scriptSrcs || [])],
+    resources: perf?.res || [],
+    globals: layout?.globals || [],
+    frameworks: layout?.frameworks || [],
+  });
+  const out = { ...snapshot, stack, built: [...new Set([...stack.filter((t) => ["Built with", "Framework"].includes(t.category)).map((t) => t.name), ...(snapshot.built || [])])].slice(0, 4) };
+  const hosting = stack.find((t) => t.category === "Hosting & CDN");
+  if (hosting && !out.host) out.host = hosting.name;
+  if (perf) out.browser = { ttfb: perf.ttfb, dcl: perf.dcl, load: perf.load, lcp: perf.lcp, cls: perf.cls, requests: perf.requests, kb: perf.kb, thirdParty: perf.third };
+  if (layout?.fonts?.length) out.fonts = layout.fonts;
+  delete out._raw;
+  return out;
+}
+
 // A snapshot built from the rendered page alone, for sites that block direct requests.
 function fromBrowser(pageUrl, r) {
   const missing = [];
@@ -42,7 +69,7 @@ function fromBrowser(pageUrl, r) {
     https: pageUrl.startsWith("https:"),
     title: r.title,
     missing,
-    content: { h1: r.h1, ctas: r.ctas, description: r.description },
+    content: { h1: r.h1, ctas: r.ctas, description: r.description, subhead: r.layout?.sub || r.subhead || "" },
     checkedAt: new Date().toISOString(),
   };
 }
@@ -118,6 +145,7 @@ export async function processStamp(jobId, pageUrl) {
     snapshot = fromBrowser(pageUrl, shot.rendered);
   }
 
+  snapshot = enrich(snapshot, pageUrl, shot.rendered);
   const { verdict, score, sentence, checks } = scorePage(snapshot, shot.rendered);
   try {
     // Loaded only here, so routes that just read stamps don't carry the canvas library.

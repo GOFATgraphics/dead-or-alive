@@ -293,3 +293,21 @@ ol, ul { padding: 0; list-style: none; }
 
 /* Rounded bands never touch the hero or each other. */
 .hero + .band, .band + .final, .band + .band { margin-top: 1rem; }
+
+/* Under the hood: stack with evidence, real speed, facts */
+.hood-block { margin-top: 2rem; }
+.hood-block:first-of-type { margin-top: 0; }
+.hood-h { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; font-size: 1.0625rem; font-weight: 800; letter-spacing: -0.01em; }
+.hood-h span { font: 500 0.75rem var(--mono); letter-spacing: 0.04em; color: var(--soft); }
+.stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem; }
+.stack-group { padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+.stack-group h3 { font: 500 0.75rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.stack-group ul { display: grid; gap: 0.55rem; margin-top: 0.7rem; }
+.stack-group li { display: grid; gap: 0.1rem; }
+.stack-group b { font-weight: 700; }
+.stack-group span { font-size: 0.8125rem; color: var(--body); overflow-wrap: anywhere; }
+.stats .stat-note { margin-top: 0.25rem; font-size: 0.8125rem; font-weight: 500; color: var(--soft); }
+.stats.compact dd { margin-top: 0.4rem; font-size: 0.9375rem; }
+.hood-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+.hood-list { padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--card); font-size: 0.875rem; line-height: 1.7; color: var(--body); overflow-wrap: anywhere; }
+@media (max-width: 700px) { .hood-two { grid-template-columns: minmax(0, 1fr); } }
