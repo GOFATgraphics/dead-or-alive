@@ -140,3 +140,20 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
   const mail = sendMail && email ? await sendEmail(email, { ...record, link }) : { emailed: false };
   return { url: link, ...mail };
 }
+
+// Redraws one published stamp's share cards in the current design, from its saved first-screen image.
+// Each card gets a new ?v= so link previews fetch the new one. Returns true when the cards were redrawn.
+export async function redrawCards(id) {
+  const r = await readResult(id);
+  if (!r?.image) return false;
+  const img = await fetch(r.image, { cache: "no-store" }).catch(() => null);
+  if (!img?.ok) return false;
+  const { renderCards } = await import("./_card.js");
+  const cards = await renderCards(Buffer.from(await img.arrayBuffer()), r);
+  const p = paths(id);
+  const opts = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60, contentType: "image/jpeg" };
+  const v = Date.now();
+  const [wide, square] = await Promise.all([put(p.card, cards.wide, opts), put(p.square, cards.square, opts)]);
+  await put(p.json, JSON.stringify({ ...r, card: `${wide.url}?v=${v}`, cardSquare: `${square.url}?v=${v}` }), { ...opts, contentType: "application/json" });
+  return true;
+}

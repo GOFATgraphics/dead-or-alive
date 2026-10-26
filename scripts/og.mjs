@@ -1,4 +1,4 @@
-// Draws the site's own share card (public/og-image-1200x630.png): what shows when someone shares stampmypage.com.
+// Draws the site's own share card (public/og-card.png): what shows when someone shares stampmypage.com.
 // Same look as the stamp cards. Run: node scripts/og.mjs
 import { writeFileSync } from "node:fs";
 import { createCanvas } from "@napi-rs/canvas";
@@ -50,6 +50,6 @@ ctx.textAlign = "right";
 ctx.fillText("stampmypage.com", W - M, 572);
 
 const png = await c.encode("png");
-writeFileSync(new URL("../public/og-image-1200x630.png", import.meta.url), png);
+writeFileSync(new URL("../public/og-card.png", import.meta.url), png);
 writeFileSync(new URL("../public/brand/og-image-1200x630.png", import.meta.url), png);
 console.log("og image", png.length);

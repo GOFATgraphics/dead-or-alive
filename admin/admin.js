@@ -250,5 +250,24 @@ import { renderAnalytics } from "./analytics.js";
     );
   }
 
+  $("recards").addEventListener("click", async () => {
+    const btn = $("recards"), note = $("recards-note");
+    btn.disabled = true;
+    let cursor = "", total = 0;
+    try {
+      do {
+        const out = await call("recards", { cursor });
+        total += out.done;
+        cursor = out.cursor;
+        note.textContent = `Redrawn ${total} so far…`;
+      } while (cursor);
+      note.textContent = `Done. ${total} stamps have the new share cards.`;
+    } catch (err) {
+      note.textContent = `Stopped after ${total}: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   if (key) openDesk();
 })();

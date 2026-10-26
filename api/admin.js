@@ -5,6 +5,7 @@
 //   POST login { email, id }       shows a review's test login, only while it's In review
 //   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
 //   POST rescout { email }         runs a member's Kill Sheet again
+//   POST recards { cursor }        redraws published stamps' share cards in the current design, about 10 per call
 // Env: ADMIN_KEY.
 import { waitUntil } from "@vercel/functions";
 import { polarReady, requireAdmin } from "./_lib.js";
@@ -13,6 +14,8 @@ import { get, members, remove, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
 import { polarApiReady } from "./_billing.js";
 import { runScout } from "./_scout.js";
+import { redrawCards } from "./_publish.js";
+import { list as listBlobs } from "@vercel/blob";
 
 const STATUSES = ["received", "in_review", "delivered"];
 const list = (v, n = 20, len = 600) => (Array.isArray(v) ? v : String(v || "").split("\n")).map((s) => String(s).trim()).filter(Boolean).slice(0, n).map((s) => s.slice(0, len));
@@ -111,6 +114,14 @@ export default async function handler(req, res) {
     if (!hasKillSheet(u) || !u.killSheet.url) return res.status(400).json({ error: "No Kill Sheet with a page on this account." });
     waitUntil(runScout(email, u.killSheet.url).catch((e) => console.error("Rescout failed:", e)));
     return res.status(202).json({ started: true });
+  }
+
+  if (op === "recards") {
+    const page = await listBlobs({ prefix: "verdicts/", limit: 40, cursor: b.cursor || undefined });
+    const ids = page.blobs.map((x) => (/^verdicts\/([A-Za-z0-9_-]+)\.json$/.exec(x.pathname) || [])[1]).filter(Boolean);
+    let done = 0;
+    for (const id of ids) if (await redrawCards(id).catch((e) => console.error("Redraw failed:", id, e))) done++;
+    return res.status(200).json({ done, cursor: page.hasMore ? page.cursor : "" });
   }
 
   return res.status(400).json({ error: "Unknown op." });
