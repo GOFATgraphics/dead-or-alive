@@ -1,5 +1,5 @@
-// Publishing a stamp: save the image and record, then email the customer their link.
-// Used by automatic mode and by the desk's Publish button.
+// Publishing a stamp: save the image and record, and email a link when there's an address (desk stamps).
+// Used by free stamps from the homepage and by the desk's Publish button.
 import { put } from "@vercel/blob";
 import { escapeHtml, paths, readResult, resultId } from "./_lib.js";
 import { pipeline, redisReady } from "./_redis.js";
@@ -70,29 +70,6 @@ const sendEmail = (to, data) =>
       "Stamp My Page",
     ].filter(Boolean).join("\n\n"),
   });
-
-// Sent when the AI couldn't stamp a page twice and the order was refunded.
-export function sendRefundEmail(to, { pageUrl }) {
-  const e = escapeHtml;
-  let host = pageUrl;
-  try {
-    host = new URL(pageUrl).hostname.replace(/^www\./, "");
-  } catch (_) {}
-  const lines = [
-    `We couldn't stamp ${host}, so we've refunded your $1.`,
-    "This usually means the page didn't load for us, showed a login or cookie wall, or came up blank. You can try again once a logged-out visitor can see it.",
-  ];
-  return mail(to, {
-    subject: `Refunded: we couldn't stamp ${host}`,
-    html: `<!doctype html><html><body style="margin:0;background:#f6f5fc;color:#12132a;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
-<table role="presentation" width="100%" style="max-width:560px" cellpadding="0" cellspacing="0">
-${lines.map((l) => `<tr><td style="padding-top:12px;font-size:15px;line-height:1.5">${e(l)}</td></tr>`).join("")}
-<tr><td style="padding-top:32px;font-size:12px;color:#5d6180">Stamp My Page</td></tr>
-</table></td></tr></table></body></html>`,
-    text: [...lines, "Stamp My Page"].join("\n\n"),
-  });
-}
 
 // Stamp numbers make cards feel collectible (#0042). Republishing keeps the number.
 // Redis counts when it's connected; otherwise the count of published stamps stands in.

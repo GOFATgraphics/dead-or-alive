@@ -4,21 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stamp My Page: is your page dead or alive?</title>
-    <meta name="description" content="Website, web app, SaaS, or app store page: your first screen gets five seconds. We stamp whether a visitor gets the offer before they scroll: DEAD, COPE, or ALIVE. $1, in about a minute." />
+    <meta name="description" content="Free. Paste a URL and our AI gives your first screen five seconds, the way a stranger would. Then it stamps it DEAD, COPE, or ALIVE. No signup, no card, about a minute." />
     <meta name="theme-color" content="#f5f3ee" />
     <link rel="canonical" href="%SITE_URL%/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Stamp My Page" />
     <meta property="og:url" content="%SITE_URL%/" />
     <meta property="og:title" content="Is your page dead or alive?" />
-    <meta property="og:description" content="Website, web app, SaaS, or app store page. Your first screen gets five seconds. We stamp whether a visitor gets the offer. $1, in about a minute." />
+    <meta property="og:description" content="Free and brutally honest. Your first screen gets five seconds and one stamp: DEAD, COPE, or ALIVE." />
     <meta property="og:image" content="%SITE_URL%/og-image-1200x630.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Stamp My Page: the SMP roundel. First-screen verdicts, $1." />
+    <meta property="og:image:alt" content="Stamp My Page: the SMP roundel. Free first-screen verdicts." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Is your page dead or alive?" />
-    <meta name="twitter:description" content="Website, web app, SaaS, or app store page. Your first screen gets five seconds. We stamp whether a visitor gets the offer. $1, in about a minute." />
+    <meta name="twitter:description" content="Free and brutally honest. Your first screen gets five seconds and one stamp: DEAD, COPE, or ALIVE." />
     <meta name="twitter:image" content="%SITE_URL%/og-image-1200x630.png" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -35,43 +35,67 @@
         <span>Stamp My Page</span>
       </a>
       <nav class="bar-links" aria-label="Sections">
+        <a href="#stamps">Stamps</a>
         <a href="#how">How it works</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#example">Example</a>
         <a href="#faq">FAQ</a>
       </nav>
-      <a class="btn btn-line" href="#top" data-focus-form>Stamp a page <span class="mono">$1</span></a>
+      <a class="btn btn-acid" href="#top" data-focus-form>Stamp it free</a>
     </header>
+
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span>Free</span><span class="dead">Dead</span><span>No signup</span><span class="cope">Cope</span><span>No card</span><span class="alive">Alive</span><span>Five seconds</span><span>One stamp</span><span>No mercy</span>
+        <span>Free</span><span class="dead">Dead</span><span>No signup</span><span class="cope">Cope</span><span>No card</span><span class="alive">Alive</span><span>Five seconds</span><span>One stamp</span><span>No mercy</span>
+      </div>
+    </div>
 
     <main>
       <section class="hero wrap" id="top">
-        <div class="hero-copy">
-          <p class="label">First-screen verdicts · $1</p>
-          <h1>Is your page <span class="nowrap"><span class="mk-word">dead</span> or alive?</span></h1>
-          <p class="lede">Paste a URL. Our AI screenshots your first screen and stamps it in about a minute.</p>
+        <p class="label"><span class="dot"></span>Free first-screen verdicts · no signup</p>
+        <h1>
+          <span class="h-line">Is your page</span>
+          <span class="h-line"><span class="w-dead">dead</span> <span class="w-or">or</span> <span class="w-alive">alive?</span></span>
+        </h1>
 
-          <div class="form-box" id="hero-form">
-            <p class="closed" id="queue-closed" hidden>Paused for a moment. Try again shortly.</p>
-            <form id="judge-form" novalidate>
-              <label class="field">
-                <span class="label">Page URL</span>
-                <input id="page_url" name="page_url" type="text" inputmode="url" autocomplete="url" required placeholder="https://acme-notes.app" aria-describedby="form-alert" />
-              </label>
-              <div class="field-row">
-                <label class="field">
-                  <span class="label">Email for your copy</span>
-                  <input id="email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" aria-describedby="form-alert" />
-                </label>
-                <button class="btn btn-red" type="submit"><span class="mono">$1</span> · Stamp my page</button>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="lede">Paste a URL. Our AI gives your first screen five seconds, the way a stranger would, then stamps it. It doesn’t do polite. It doesn’t charge.</p>
+
+            <div class="form-box" id="hero-form">
+              <p class="closed" id="queue-closed" hidden>The stamp is resting. Try again shortly.</p>
+              <form id="judge-form" novalidate>
+                <label class="field" for="page_url"><span class="label">Your page</span></label>
+                <div class="field-row">
+                  <input id="page_url" name="page_url" type="text" inputmode="url" autocomplete="url" required placeholder="yourstartup.com" aria-describedby="form-alert url-hint" />
+                  <button class="btn btn-acid btn-big" type="submit">Stamp it <span aria-hidden="true">→</span></button>
+                </div>
+                <p class="alert" id="form-alert" role="alert" hidden></p>
+                <p class="url-hint" id="url-hint" aria-live="polite" hidden></p>
+              </form>
+
+              <div class="run" id="run" hidden aria-live="polite">
+                <div class="run-head">
+                  <p class="label" id="run-label">Stamping</p>
+                  <p class="run-host mono" id="run-host"></p>
+                  <p class="run-time mono" id="run-time">0s</p>
+                </div>
+                <ol class="run-steps" id="run-steps">
+                  <li data-at="0">Opening your page logged out</li>
+                  <li data-at="6">Capturing the first screen, desktop and phone</li>
+                  <li data-at="18">Claude is giving it five seconds</li>
+                  <li data-at="40">Inking the stamp</li>
+                </ol>
+                <div class="run-bar"><span id="run-bar"></span></div>
+                <p class="run-note" id="run-note">Stay here. Your stamp opens on this page.</p>
+                <button class="btn btn-line" type="button" id="run-again" hidden>Try another page</button>
               </div>
-              <p class="alert" id="form-alert" role="alert" hidden></p>
-              <p class="url-hint" id="url-hint" aria-live="polite" hidden></p>
-            </form>
+            </div>
+            <p class="meta" id="trust-line"><b>$0</b> · no account · result in ~60s · public pages only</p>
           </div>
-          <p class="meta" id="trust-line"><b>$1 one-time</b> · result in ~60s · secure checkout by Polar</p>
-        </div>
 
-        <figure class="hero-card">
-          <div class="scard tilt" data-v="dead" aria-hidden="true">
+          <figure class="hero-card">
+            <div class="scard tilt" data-v="dead" aria-hidden="true">
             <div class="sc-shot">
               <div class="sc-chrome"><i></i><i></i><i></i><span class="sc-url">acme-notes.app</span><span class="sc-dim">FIRST SCREEN · 1440 × 900</span></div>
               <div class="sc-site">
@@ -101,43 +125,43 @@
               </dl>
             </div>
           </div>
-          <figcaption class="meta">Sample stamp card · acme-notes.app is fictional</figcaption>
-        </figure>
+            <figcaption class="meta">Sample stamp card · acme-notes.app is fictional</figcaption>
+          </figure>
+        </div>
       </section>
 
-      <section class="band" id="stamps" aria-labelledby="stamps-h">
+      <section class="stamps-sect" id="stamps" aria-labelledby="stamps-h">
         <div class="wrap">
           <div class="head-row">
-            <h2 id="stamps-h">One page, one of three stamps.</h2>
-            <p class="aside">The stamp is decided by what fits in the first screen, before anyone scrolls.</p>
+            <h2 id="stamps-h">Three stamps.<br />No participation trophies.</h2>
+            <p class="aside">Decided by what fits on the first screen, before anyone scrolls.</p>
           </div>
-          <ol class="stamps">
-            <li><span class="stamp dead">DEAD</span><p class="label red">DEAD · Nothing lands</p><p>A stranger can’t tell what you sell or who it’s for.</p></li>
-            <li><span class="stamp cope">COPE</span><p class="label amber">COPE · Close, not there</p><p>The offer is clear, but something gets in the way of the click.</p></li>
-            <li><span class="stamp alive">ALIVE</span><p class="label green">ALIVE · It works</p><p>What it does, who it’s for, and the next step are all visible.</p></li>
-          </ol>
         </div>
+        <ol class="stamps">
+          <li class="s-dead"><span class="stamp">DEAD</span><p class="s-title">Nothing lands.</p><p>A stranger can’t tell what you sell or who it’s for. They’re gone.</p></li>
+          <li class="s-cope"><span class="stamp">COPE</span><p class="s-title">Close. Not there.</p><p>The offer is in there somewhere, but something blocks the click.</p></li>
+          <li class="s-alive"><span class="stamp">ALIVE</span><p class="s-title">It works.</p><p>What it does, who it’s for, and the next step. All in five seconds.</p></li>
+        </ol>
       </section>
 
       <section class="wrap sect" id="how" aria-labelledby="how-h">
         <div class="head-row">
-          <h2 id="how-h">How it works</h2>
-          <p class="aside">No account and no setup. Everything after checkout runs automatically.</p>
+          <h2 id="how-h">Sixty seconds.<br />Zero dollars.</h2>
+          <p class="aside">No account, no setup, no card. Paste and wait.</p>
         </div>
         <ol class="flow">
-          <li><span class="box">01</span><p class="label">0s</p><h3>Paste a URL and pay $1</h3><p>Any public homepage, landing page, or App Store and Google Play listing. Checkout runs on Polar.</p></li>
-          <li><span class="box">02</span><p class="label">~15s</p><h3>A headless browser captures your first screen</h3><p>Desktop at 1440 × 900 and phone at 390 × 844, exactly what loads before scrolling.</p></li>
-          <li><span class="box">03</span><p class="label">~40s</p><h3>Claude reads and marks the problems</h3><p>Anthropic’s Claude picks the stamp, writes a one-line verdict, and circles up to three problem areas.</p></li>
-          <li><span class="box">04</span><p class="label">~60s</p><h3>Your stamp card renders</h3><p>With a stack and speed snapshot. Download the card, share the link, and get a copy by email.</p></li>
+          <li><span class="num">01</span><p class="label">0s</p><h3>Paste a URL</h3><p>Any public homepage, landing page, or App Store and Google Play listing.</p></li>
+          <li><span class="num">02</span><p class="label">~15s</p><h3>We capture the first screen</h3><p>Desktop at 1440 × 900 and phone at 390 × 844. Exactly what loads before scrolling.</p></li>
+          <li><span class="num">03</span><p class="label">~40s</p><h3>Claude judges it</h3><p>Anthropic’s Claude picks the stamp, writes one honest line, and circles up to three problems.</p></li>
+          <li><span class="num">04</span><p class="label">~60s</p><h3>You get the card</h3><p>With a stack and speed check. Share it, or quietly fix things first.</p></li>
         </ol>
-        <p class="strip meta"><span><b>Capture failed?</b> Automatic retry.</span><span><b>Still failing?</b> Automatic $1 refund.</span><span><b>Behind a login?</b> Public pages only.</span><span><b>Total</b> ≈ 60 seconds.</span></p>
       </section>
 
       <section class="band" id="example" aria-labelledby="ex-h">
         <div class="wrap">
           <div class="head-row">
-            <h2 id="ex-h">Same page, one week apart.</h2>
-            <p class="aside">An illustration: acme-notes.app is fictional. It rewrote the first screen and stamped the page again.</p>
+            <h2 id="ex-h">Dead on Monday.<br />Alive by Friday.</h2>
+            <p class="aside">An illustration: acme-notes.app is fictional. It rewrote the first screen and stamped again.</p>
           </div>
           <div class="ba">
             <figure><div class="scard sm" data-v="dead" aria-hidden="true">
@@ -209,88 +233,34 @@
         </div>
       </section>
 
-      <section class="wrap sect" id="pricing" aria-labelledby="pricing-h">
-        <div class="head-row">
-          <h2 id="pricing-h">Pricing</h2>
-          <p class="aside">Start with the $1 verdict. Kill Sheet and Stay Alive are coming soon.</p>
-        </div>
-        <div class="plans">
-          <article class="plan main">
-            <p class="label red">Start here</p>
-            <h3>Verdict</h3>
-            <p class="amount">$1 <span class="label">one-time</span></p>
-            <p class="plan-note">Your first screen, stamped and explained in about a minute.</p>
-            <ul class="ticks">
-              <li>First screen captured on desktop and phone</li>
-              <li>DEAD, COPE, or ALIVE stamp with up to 3 problems circled</li>
-              <li>One-line verdict written by Claude</li>
-              <li>Stack and speed snapshot: framework, host, load time, HTML size</li>
-              <li>Stamp card, share link, and email copy</li>
-            </ul>
-            <a class="btn btn-red" href="#top" data-focus-form><span class="mono">$1</span> · Stamp my page</a>
-          </article>
-          <article class="plan">
-            <p class="label">After a bad stamp</p>
-            <h3>Kill Sheet</h3>
-            <p class="amount">$19 <span class="label">one-time</span></p>
-            <p class="plan-note">The whole page scouted, plus copy you can paste in today.</p>
-            <ul class="ticks">
-              <li>Everything in Verdict</li>
-              <li>Full-page scout of every section below the fold</li>
-              <li>Rewritten headline, subhead, and button text</li>
-              <li>3 to 5 fixes, ranked by impact</li>
-              <li>One free re-stamp after you ship</li>
-            </ul>
-            <span class="btn btn-line soon" aria-disabled="true">Coming soon</span>
-          </article>
-          <article class="plan">
-            <p class="label">Ongoing</p>
-            <h3>Stay Alive</h3>
-            <p class="amount">$20 <span class="label">per month</span></p>
-            <p class="plan-note">Automated weekly checks, so you hear about problems before visitors do.</p>
-            <ul class="ticks">
-              <li>Weekly re-capture of your first screen</li>
-              <li>Uptime and load-time checks between reports</li>
-              <li>A new stamp card whenever the first screen changes</li>
-              <li>Instant email alert if the page goes down</li>
-              <li>Weekly report by email, cancel anytime</li>
-            </ul>
-            <span class="btn btn-line soon" aria-disabled="true">Coming soon</span>
-          </article>
-        </div>
-        <p class="meta">Prices in USD. Payments and tax handled by Polar.</p>
-      </section>
-
-      <section class="band" id="faq" aria-labelledby="faq-h">
-        <div class="wrap faq">
+      <section class="wrap sect" id="faq" aria-labelledby="faq-h">
+        <div class="faq">
           <div>
             <h2 id="faq-h">Questions</h2>
             <p class="aside">Anything else: <a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></p>
           </div>
           <dl>
-            <div><dt>Is a human involved?</dt><dd>No. Capture, analysis, and the stamp card are fully automated. Your result opens on screen the moment it’s ready.</dd></div>
-            <div><dt>How fast is it?</dt><dd>About 60 seconds from payment to stamp card. The results page waits with you and opens the stamp as soon as it’s done.</dd></div>
-            <div><dt>What if it fails?</dt><dd>It retries automatically. If the page still can’t be captured, for example because it’s down or blocks bots, your $1 is refunded automatically.</dd></div>
-            <div><dt>Does it work for apps?</dt><dd>Yes. Paste an App Store or Google Play link and the stamp judges the store listing, which is the first screen people see before they install.</dd></div>
+            <div><dt>Is it really free?</dt><dd>Yes. No card, no account, no trial that turns into a bill. There’s a daily limit per person so the stamp keeps working for everyone.</dd></div>
+            <div><dt>Is a human involved?</dt><dd>No. Capture, judging, and the stamp card are automatic. Your result opens on screen the moment it’s ready.</dd></div>
+            <div><dt>What if it fails?</dt><dd>It retries once by itself. If your page still can’t be captured, usually because it’s down, blocks bots, or sits behind a login, we tell you on the spot.</dd></div>
+            <div><dt>Does it work for apps?</dt><dd>Yes. Paste an App Store or Google Play link and the stamp judges the store listing, the first screen people see before they install.</dd></div>
+            <div><dt>Who sees my stamp?</dt><dd>Only people you give the link to. It isn’t listed anywhere, and search engines are asked not to index it.</dd></div>
           </dl>
         </div>
       </section>
 
       <section class="final">
         <div class="wrap final-row">
-          <div>
-            <h2>Stamp your first screen.</h2>
-            <p class="meta"><b>$1 one-time</b> · result in ~60s · secure checkout by Polar</p>
-          </div>
-          <a class="btn btn-red" href="#top" data-focus-form><span class="mono">$1</span> · Stamp my page</a>
+          <h2>Stop guessing.<br /><span class="acid">Get stamped.</span></h2>
+          <a class="btn btn-acid btn-big" href="#top" data-focus-form>Stamp my page free <span aria-hidden="true">→</span></a>
         </div>
       </section>
     </main>
 
     <footer class="foot wrap">
       <a class="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
-      <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></nav>
-      <span class="meta">Payments by Polar · © Gofat Labs</span>
+      <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></nav>
+      <span class="meta">Free forever-ish · © Gofat Labs</span>
     </footer>
 
     <script type="module" src="/src/home.js"></script>

@@ -4,6 +4,18 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/pricing",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/paid/:path*",
+      "destination": "/",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/v/:id",
@@ -75,27 +87,18 @@
           "value": "noindex"
         }
       ]
-    },
-    {
-      "source": "/paid(.*)",
-      "headers": [
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex"
-        }
-      ]
     }
   ],
   "functions": {
     "api/draft.js": {
       "maxDuration": 120
     },
-    "api/polar-webhook.js": {
-      "maxDuration": 300,
-      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
-    },
     "api/publish.js": {
       "maxDuration": 60,
+      "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
+    },
+    "api/stamp.js": {
+      "maxDuration": 300,
       "includeFiles": "{public/fonts/**,server-fonts/**,public/brand/smp-mark.png}"
     }
   }

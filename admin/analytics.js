@@ -12,7 +12,7 @@ const ERROR_LABELS = {
   ip: "IP address instead of a domain",
   not_public: "Not a public address",
   email: "Email didn't look right",
-  no_checkout_link: "Checkout link not connected",
+  limit: "Hit the daily stamp limit",
   other: "Other",
 };
 const VERDICTS = ["DEAD", "COPE", "ALIVE"];
@@ -163,9 +163,7 @@ export function renderAnalytics(root, data) {
   const tiles = el("div", "an-tiles");
   tiles.append(
     tile("Visitors", num(t?.totals.visitors), t ? `${num(t.totals.view)} page views` : "Connect Redis"),
-    tile("Sent to checkout", num(t?.totals.checkout), t ? `${pct(t.totals.checkout, t.totals.homeVisitors)} of homepage visitors` : "Connect Redis"),
-    tile("Paid orders", num(b?.totals.orders), b ? (t ? `${pct(b.totals.orders, t.totals.checkout)} of checkouts` : "") : "Connect Polar"),
-    tile("Revenue", money(b?.totals.revenue, cur), b ? `${money(b.totals.averageOrder, cur)} per order` : "Connect Polar"),
+    tile("Stamps started", num(t?.totals.stamp_start), t ? `${pct(t.totals.stamp_start, t.totals.homeVisitors)} of homepage visitors` : "Connect Redis"),
     tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Connect Polar"),
     tile("Median turnaround", hours(b?.turnaround.medianHours), b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}% within 24 h` : "No stamps yet"),
     tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Connect Redis"),
@@ -174,14 +172,13 @@ export function renderAnalytics(root, data) {
   out.push(tiles);
 
   // Funnel
-  const f = section("Funnel", "Visitors are counted once per day. Paid and stamped come from Polar and your published stamps.");
+  const f = section("Funnel", "Visitors are counted once per day. Stamped comes from desk orders and your published stamps.");
   f.append(
     funnel([
       { label: "Homepage visitors", value: t?.totals.homeVisitors },
       { label: "Clicked into the form", value: t?.totals.form_start },
       { label: "Pressed “Judge my page”", value: t?.totals.submit_try },
-      { label: "Sent to checkout", value: t?.totals.checkout },
-      { label: "Paid", value: b?.totals.orders, missing: "Connect Polar" },
+      { label: "Stamps started", value: t?.totals.stamp_start },
       { label: "Stamped", value: b?.totals.stamped, missing: "Connect Polar" },
       { label: "Result page views", value: t?.totals["view:result"] },
       { label: "Shares (link, X, LinkedIn, card)", value: t?.totals.share_copy },
@@ -205,8 +202,8 @@ export function renderAnalytics(root, data) {
     charts.append(r);
   }
   if (t) {
-    const c = section("Sent to checkout per day");
-    c.append(barChart(t.daily, "checkouts", "Sent to checkout"));
+    const c = section("Stamps started per day");
+    c.append(barChart(t.daily, "checkouts", "Stamps started"));
     charts.append(c);
   }
   if (charts.childElementCount) out.push(charts);
@@ -281,8 +278,6 @@ export function renderAnalytics(root, data) {
         [
           ["“Judge my page” buttons outside the form", num(t.totals.cta_click)],
           ["Saw “Paused for a moment”", num(t.totals.queue_closed)],
-          ["Payment confirmed page views", num(t.totals["view:paid"])],
-          ["Pricing page views", num(t.totals["view:pricing"])],
           ["Privacy page views", num(t.totals["view:privacy"])],
           ["Terms page views", num(t.totals["view:terms"])],
         ],

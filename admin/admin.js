@@ -23,8 +23,8 @@ import { snapshotRows } from "../src/snapshot.js";
   let current = null;
 
   $("queue").textContent = DESK.queueOpen
-    ? "Queue is open. To close it, set queueOpen to false in src/config.js and deploy."
-    : "Queue is closed. To open it, set queueOpen to true in src/config.js and deploy.";
+    ? "Free stamping is on. To pause it, set queueOpen to false in src/config.js and deploy."
+    : "Free stamping is paused. To turn it on, set queueOpen to true in src/config.js and deploy.";
 
   // Unlock
 
@@ -112,13 +112,8 @@ import { snapshotRows } from "../src/snapshot.js";
   function renderSetup() {
     const items = [
       ["Admin key", true, "Set. You're in."],
-      ["Polar", setup.polar, setup.polar ? "Orders and revenue load from Polar." : "Add POLAR_ACCESS_TOKEN (Polar → Settings → Developers, scope orders:read)."],
-      ["Checkout link", !!(DESK.polarVerdictUrl || "").trim(), (DESK.polarVerdictUrl || "").trim() ? "The homepage form sends people to Polar." : "Paste the Polar checkout link into polarVerdictUrl in src/config.js."],
-      ["AI drafts", setup.ai, setup.ai ? "Paid orders get an AI draft: screenshot, stamp, sentence, and circles." : "Add ANTHROPIC_API_KEY (console.anthropic.com → API keys). Until then, stamp by hand."],
-      ["Order webhook", setup.webhook, setup.webhook ? "Polar tells the desk when an order is paid, so the draft is ready when you open it." : "In Polar → Settings → Webhooks, add https://stampmypage.com/api/polar-webhook for order.paid, then set POLAR_WEBHOOK_SECRET. Until then, press Ask AI on each order."],
-      ["Stamping mode", true, setup.autoMode
-        ? "Automatic. Confident drafts with nothing flagged go straight to the customer. The rest wait here for you. Set STAMP_MODE=review to check every one."
-        : "Review. Every AI draft waits here for you to check and publish. Set STAMP_MODE=auto to send confident drafts automatically."],
+      ["AI stamps", setup.ai, setup.ai ? "Free stamps from the homepage run automatically: screenshot, stamp, sentence, and circles." : "Add ANTHROPIC_API_KEY (console.anthropic.com → API keys). Until then the homepage form says the stamp is resting."],
+      ["Daily limits", true, "Each visitor gets STAMP_IP_LIMIT stamps a day (default 5) and the whole site STAMP_DAILY_LIMIT (default 300). Connect Redis so the counts are shared."],
       ["Screenshots", true, setup.screenshots ? "Using your Microlink plan." : "Using Microlink's free tier (about 50 a day). Add MICROLINK_API_KEY for more."],
       ["Stamp storage", setup.blob, setup.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
       ["Email", setup.email, setup.email ? "Customers get their link by email." : "Add RESEND_API_KEY and MAIL_FROM. Until then, use Draft email."],

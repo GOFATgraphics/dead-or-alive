@@ -5,8 +5,8 @@ import { fetchPolarOrders, isVerdictOrder, isWaiting, polarReady, publishedStamp
 import { pipeline, redisReady } from "./_redis.js";
 
 const COUNTERS = [
-  "view", "view:home", "view:result", "view:paid", "view:pricing", "view:privacy", "view:terms",
-  "form_start", "submit_try", "submit_error", "checkout", "queue_closed", "cta_click",
+  "view", "view:home", "view:result", "view:privacy", "view:terms",
+  "form_start", "submit_try", "submit_error", "stamp_start", "queue_closed", "cta_click",
   "share_copy", "result_cta",
   "view:v:DEAD", "view:v:COPE", "view:v:ALIVE",
   "share_copy:v:DEAD", "share_copy:v:COPE", "share_copy:v:ALIVE",
@@ -47,7 +47,7 @@ async function traffic(days) {
   const totals = { visitors: sum(daily, "visitors"), homeVisitors: sum(daily, "homeVisitors") };
   for (const c of COUNTERS) totals[c] = sum(daily, c);
   return {
-    daily: daily.map((r) => ({ day: r.day, visitors: r.visitors, views: r.view, formStarts: r.form_start, checkouts: r.checkout })),
+    daily: daily.map((r) => ({ day: r.day, visitors: r.visitors, views: r.view, formStarts: r.form_start, checkouts: r.stamp_start })),
     totals,
     verdictViews: { DEAD: totals["view:v:DEAD"], COPE: totals["view:v:COPE"], ALIVE: totals["view:v:ALIVE"] },
     verdictShares: { DEAD: totals["share_copy:v:DEAD"], COPE: totals["share_copy:v:COPE"], ALIVE: totals["share_copy:v:ALIVE"] },

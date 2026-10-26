@@ -1,7 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { DESK } from "./config.js";
 import { BoxCat, INK, InkButton, Logo, VERDICT_COLOR, reducedMotion } from "./ui.jsx";
 import BlurText from "./bits/BlurText.jsx";
 import DecryptedText from "./bits/DecryptedText.jsx";
@@ -14,15 +13,9 @@ import { snapshotRows } from "./snapshot.js";
 const still = reducedMotion();
 
 const NEXT = {
-  DEAD: {
-    line: "It can come back.",
-    offers: [
-      { key: "killSheet", label: "Get the Kill Sheet" },
-      { key: "resurrection", label: "Book a Resurrection" },
-    ],
-  },
-  COPE: { line: "Close. Not clear yet.", offers: [{ key: "killSheet", label: "Get the Kill Sheet" }] },
-  ALIVE: { line: "Keep it that way.", offers: [{ key: "stayAlive", label: "Stay Alive" }] },
+  DEAD: "It can come back. Fix the first screen and stamp it again.",
+  COPE: "Close. Make it clear, then stamp it again.",
+  ALIVE: "Keep it that way. Stamp the next one.",
 };
 
 function resultId() {
@@ -47,8 +40,8 @@ function Missing() {
       <div className="stack">
         <BoxCat state="closed" />
         <h1>No stamp here.</h1>
-        <p>This link is wrong or the stamp was taken down. Check the link in your email.</p>
-        <a className="link" href="/">Judge yours — $1</a>
+        <p>This link is wrong or the stamp was taken down.</p>
+        <a className="link" href="/">Stamp yours free</a>
       </div>
     </main>
   );
@@ -105,15 +98,14 @@ function ShareCard({ r }) {
   const shared = () => track("share_copy", { v });
   const x = `https://x.com/intent/post?text=${encodeURIComponent(SHARE_TEXT[v])}&url=${encodeURIComponent(url)}`;
   const li = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-  const fix = (DESK.offers.killSheet || DESK.offers.resurrection || "").trim();
   return (
     <section className="section share-card">
       <h2 className="kicker brand">Post it</h2>
       {v === "DEAD" && (
         <div className="resurrect">
           <p><strong>Not ready to post a DEAD?</strong> Fix the first screen, then post the comeback.</p>
-          <InkButton as="a" href={fix || "/"} color={VERDICT_COLOR.DEAD} onClick={() => track("result_cta", { v })}>
-            {fix ? "Resurrect it" : "Fix it, then re-stamp — $1"}
+          <InkButton as="a" href="/" color={VERDICT_COLOR.DEAD} onClick={() => track("result_cta", { v })}>
+            Fix it, then stamp it again
           </InkButton>
         </div>
       )}
@@ -134,8 +126,6 @@ function ShareCard({ r }) {
 
 function Result({ r }) {
   const v = r.verdict;
-  const next = NEXT[v];
-  const offers = next.offers.filter((o) => (DESK.offers[o.key] || "").trim());
   const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
 
   const shot = (
@@ -178,19 +168,14 @@ function Result({ r }) {
 
       <section className="section next">
         <h2 className="kicker brand">Next</h2>
-        <p className="lede">{next.line}</p>
-        {offers.length > 0 && (
-          <div className="offer-list">
-            {offers.map((o, i) => (
-              <InkButton key={o.key} as="a" href={DESK.offers[o.key]} color={i ? INK : VERDICT_COLOR[v]} className={i ? "ghost" : ""}>
-                {o.label}
-              </InkButton>
-            ))}
-          </div>
-        )}
+        <p className="lede">{NEXT[v]}</p>
+        <div className="offer-list">
+          <InkButton as="a" href="/" color={VERDICT_COLOR[v]} onClick={() => track("result_cta", { v })}>
+            Stamp another page free
+          </InkButton>
+        </div>
         <div className="share">
           <CopyLink verdict={v} />
-          <a className="link" href="/" onClick={() => track("result_cta", { v })}>Judge another page — $1</a>
         </div>
       </section>
     </main>

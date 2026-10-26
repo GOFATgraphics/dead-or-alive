@@ -1,14 +1,13 @@
 // The automated half of a stamp: screenshot the first screen (desktop and phone), take the stack and speed
 // snapshot, have Claude read the screenshots, and save a draft.
-// In auto mode (STAMP_MODE=auto) a confident, problem-free draft is published straight away. If it isn't,
-// the whole run is tried once more, and if that still fails the order is refunded and the customer told.
-// In review mode (STAMP_MODE unset) every draft waits in the desk instead.
-// Env: ANTHROPIC_API_KEY, BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY (paid screenshot plan), STAMP_MODE.
+// Stamps are free: a confident, problem-free draft is published straight away. If it isn't, the whole run
+// is tried once more, and if that still fails a note says why.
+// Env: ANTHROPIC_API_KEY, BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY (paid screenshot plan).
 import Anthropic from "@anthropic-ai/sdk";
 import { head, list, put } from "@vercel/blob";
-import { VERDICTS, orderPageUrl, refundPolarOrder, resultId } from "./_lib.js";
+import { VERDICTS, resultId } from "./_lib.js";
 import { inspect } from "./_inspect.js";
-import { publishStamp, publicOrigin, sendRefundEmail } from "./_publish.js";
+import { publishStamp, publicOrigin } from "./_publish.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
 
 export const VIEWPORT = { width: 1440, height: 900 };
@@ -16,7 +15,6 @@ const PHONE = { width: 390, height: 844, scale: 2 };
 const MODEL = "claude-opus-5-5";
 
 export const aiReady = () => Boolean(process.env.ANTHROPIC_API_KEY);
-export const autoMode = () => String(process.env.STAMP_MODE || "").toLowerCase() === "auto";
 
 export const draftPaths = (id) => ({ json: `drafts/${id}.json`, image: `drafts/${id}.jpg` });
 
@@ -48,7 +46,7 @@ export async function screenshot(pageUrl, phone = false) {
   return Buffer.from(await img.arrayBuffer());
 }
 
-const SYSTEM = `You run the first read for Stamp My Page. A customer paid $1 to learn whether a stranger understands their offer from the first screen of their page, in five seconds, before scrolling. The page can be a website, web app, SaaS homepage, or an app store listing.
+const SYSTEM = `You run the first read for Stamp My Page. Someone wants to know whether a stranger understands their offer from the first screen of their page, in five seconds, before scrolling. The page can be a website, web app, SaaS homepage, or an app store listing.
 
 You see the first screen on a desktop (${VIEWPORT.width}x${VIEWPORT.height}), and, when available, on a phone. Stamp the desktop screenshot; judge only what is visible in it. Read it the way a busy stranger would: headline first, then subhead, then the main button and anything large.
 
@@ -62,7 +60,7 @@ Then stamp it:
 - COPE: it looks credible, but a stranger cannot name at least one of product, buyer, or reason without decoding.
 - ALIVE: a stranger can name all three.
 
-Write one sentence for the customer in the stranger's own voice, first person, the way they'd say it out loud after five seconds. Plain and specific to this page, under 20 words. No jargon, no advice. For example:
+Write one sentence for the page owner in the stranger's own voice, first person, the way they'd say it out loud after five seconds. Plain and specific to this page, under 20 words. No jargon, no advice. For example:
 - DEAD: "Five seconds in, I still don't know what this does or who it's for."
 - COPE: "Clear headline, but five buttons fight over what I should click first."
 - ALIVE: "In five seconds I know what it does, who it's for, and what to click."
@@ -71,7 +69,7 @@ Mark one to three regions on the desktop screenshot that justify the stamp (usua
 
 If there is a phone screenshot, say whether the first screen works on a phone: nothing cut off or overflowing sideways, text readable, the main button visible. Note what breaks, in a few words.
 
-If the desktop screenshot shows an error page, a cookie wall covering the page, a login screen, or a blank page, set problem to describe it. If the page can't be judged, the customer is refunded, so say how sure you are.`;
+If the desktop screenshot shows an error page, a cookie wall covering the page, a login screen, or a blank page, set problem to describe it. If the page can't be judged, nothing is published, so say how sure you are.`;
 
 const SCHEMA = {
   type: "object",
@@ -290,34 +288,22 @@ async function saveFailure(orderId, pageUrl, err, extra = {}) {
   return note;
 }
 
-// Auto mode gave up on this order: refund it through Polar and tell the customer.
-// If Polar won't refund, the note says so and the order stays in the desk.
-async function giveUp(order, pageUrl, reason) {
-  const refund = await refundPolarOrder(order, reason).then(() => ({ ok: true }), (err) => ({ ok: false, error: err.message }));
-  const email = order.customer?.email || order.user?.email || "";
-  const mail = refund.ok && email ? await sendRefundEmail(email, { pageUrl }) : { emailed: false };
-  return saveFailure(order.id, pageUrl, reason, { refunded: { at: new Date().toISOString(), ...refund, emailed: mail.emailed } });
-}
-
-// A paid order arrived (webhook). Review mode: draft it for the desk.
-// Auto mode: draft it, publish it when confident, otherwise run the whole thing once more, then refund.
-export async function processPaidOrder(order) {
-  const pageUrl = orderPageUrl(order);
-  const tries = autoMode() ? 2 : 1;
+// A free stamp from the homepage. Draft it, publish it when the AI is confident, otherwise run the whole
+// thing once more. If that still fails, a note with the reason is saved and the homepage says so.
+export async function processStamp(jobId, pageUrl) {
   let built = null, reason = "";
-  for (let attempt = 1; attempt <= tries; attempt++) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      built = await buildDraft(order.id, pageUrl);
-      if (!autoMode() || autoPublishable(built.draft)) break;
+      built = await buildDraft(jobId, pageUrl);
+      if (autoPublishable(built.draft)) break;
       reason = built.draft.problem || `The AI wasn't sure (${built.draft.confidence} confidence).`;
     } catch (err) {
-      console.error("Draft failed:", order.id, `attempt ${attempt}`, err);
+      console.error("Draft failed:", jobId, `attempt ${attempt}`, err);
       built = null;
       reason = err.message || String(err);
     }
   }
-  if (!autoMode()) return built ? built.draft : saveFailure(order.id, pageUrl, reason);
-  if (!built || !autoPublishable(built.draft)) return giveUp(order, pageUrl, reason);
+  if (!built || !autoPublishable(built.draft)) return saveFailure(jobId, pageUrl, reason);
 
   const { draft, jpg } = built;
   try {
@@ -325,8 +311,7 @@ export async function processPaidOrder(order) {
     const { renderStamp } = await import("./_render.js");
     const { image, shot } = await renderStamp({ jpg, boxes: draft.marks, verdict: draft.verdict, sentence: draft.sentence });
     const out = await publishStamp({
-      orderId: order.id,
-      email: order.customer?.email || order.user?.email || "",
+      orderId: jobId,
       pageUrl: draft.pageUrl,
       verdict: draft.verdict,
       sentence: draft.sentence,
@@ -335,15 +320,16 @@ export async function processPaidOrder(order) {
       focus: draft.marks.length
         ? { top: Math.min(...draft.marks.map((m) => m.y)) / 1000, bottom: Math.max(...draft.marks.map((m) => m.y + m.h)) / 1000 }
         : null,
+      sendMail: false,
       origin: publicOrigin(),
       extra: { snapshot: draft.snapshot },
     });
-    const done = { ...draft, autoPublished: { at: new Date().toISOString(), url: out.url, emailed: out.emailed, emailError: out.emailError || "" } };
-    await saveNote(order.id, done);
+    const done = { ...draft, autoPublished: { at: new Date().toISOString(), url: out.url } };
+    await saveNote(jobId, done);
     return done;
   } catch (err) {
-    console.error("Publish failed:", order.id, err);
-    return giveUp(order, pageUrl, `Publishing failed: ${err.message || err}`);
+    console.error("Publish failed:", jobId, err);
+    return saveFailure(jobId, pageUrl, `Publishing failed: ${err.message || err}`);
   }
 }
 

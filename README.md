@@ -2,51 +2,46 @@
 
 Is your page dead or alive? Website, web app, SaaS, or app store page: we stamp its first screen DEAD, COPE, or ALIVE.
 
-First screen. Five seconds. One stamp. $1.
+First screen. Five seconds. One stamp. Free.
 
-Static desk. Polar hosted checkout. No other price on this page.
+## How a stamp runs
 
-## Turn the button on
+No checkout and no account. The homepage form posts the URL to `/api/stamp`, which answers with a random job id and, in the background, screenshots the page, has Claude judge it, and publishes the stamp at `/v/<id>`. The homepage polls `/api/status?job=` and opens the stamp when it's ready (about a minute). If the page can't be stamped after one retry, the homepage says so and nothing is published.
 
-1. In Polar, create the $1 **Verdict** product. Required custom field slug: `page_url`. No benefits. Discount codes off. Do not put other products on this checkout link.
-2. Paste that checkout link into `polarVerdictUrl` in [src/config.js](src/config.js).
-3. Set the link’s success URL to `https://<your-domain>/paid?checkout_id={CHECKOUT_ID}`.
+Needed in Vercel: `ANTHROPIC_API_KEY` and a **Blob** store (`BLOB_READ_WRITE_TOKEN`). Without them the form says the stamp is resting.
 
-Later links, not linked from this page:
+Free stamps cost us screenshots and AI calls, so they're limited:
 
-| Product | Success URL |
-|---|---|
-| Kill Sheet | `/paid/sheet` |
-| Resurrection | `/paid/resurrection` |
-| Stay Alive | `/paid/alive` |
+- `STAMP_IP_LIMIT`: stamps per visitor per day (default 5).
+- `STAMP_DAILY_LIMIT`: stamps for the whole site per day (default 300).
+- Connect Upstash Redis (below) so these counts are shared across function instances. Without it they're per instance, which slows abuse but doesn't stop it.
 
-The homepage closes the form by itself when `QUEUE_LIMIT` paid pages are waiting for a stamp (it asks `/api/queue` on load and again before checkout). To close it by hand, set `queueOpen` to `false` in `src/config.js`. The button is replaced with: “Paused for a moment. Try again shortly.”
+To pause stamping by hand, set `queueOpen` to `false` in [src/config.js](src/config.js).
 
-Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `dist/`. Locally: `npm install`, then `npm run dev`. Do not use the Polar organization storefront as the homepage. It lists every product.
+Deploy on Vercel from this repo. Vercel runs `npm run build` (Vite) and serves `dist/`. Locally: `npm install`, then `npm run dev`.
 
 ## Admin desk and result pages
 
-`/admin` lists paid Polar orders. Stamp one, press **Publish verdict**, and the customer gets an email with their own result page at `/v/<id>`: the verdict, Box holding it up, the circled screenshot, and the next offer. Shared links show the stamp as their preview image.
+`/admin` is the back room: visitor analytics, setup status, and (if Polar is still connected) any old paid orders to stamp by hand. Free stamps don't appear in its order list; they publish straight to `/v/<id>`: the verdict, Box holding it up, and the circled screenshot. Shared links show the stamp as their preview image.
 
 1. In Vercel, add **Blob** storage to the project (Storage tab). It sets `BLOB_READ_WRITE_TOKEN`.
-2. In Polar, create an organization access token with `orders:read`.
-3. In [Resend](https://resend.com), verify your sending domain and create an API key.
+2. Optional, only for old paid orders: a Polar organization access token with `orders:read`.
+3. Optional, for desk emails: in [Resend](https://resend.com), verify your sending domain and create an API key.
 4. In Vercel project env vars, set:
    - `ADMIN_KEY`: the password for `/admin`. At least 32 characters, random. Make one with `openssl rand -base64 36`. Without it (or if it's shorter), the admin API answers 503.
    - `POLAR_ACCESS_TOKEN`: the token from step 2.
    - `RESEND_API_KEY` and `MAIL_FROM` (for example `Stamp My Page <stamps@stampmypage.com>`).
    - `SITE_URL`: your domain, for example `https://stampmypage.com`. Emails, canonical links, share tags, robots.txt, and the sitemap use it. Without it, the build falls back to Vercel's production domain.
    - `CONTACT_EMAIL`: the address shown on the privacy and terms pages for deletion requests and questions.
-   - `QUEUE_LIMIT`: how many paid pages may wait for a stamp before the homepage closes the form (default 10).
    - `POLAR_VERDICT_PRODUCT_ID`: the Verdict product's ID, so only its orders show in the desk, queue, and analytics (other products in the same Polar organization are ignored); `POLAR_ORGANIZATION_ID`; `POLAR_API_BASE=https://sandbox-api.polar.sh` for sandbox; `RESULT_SECRET` so result links do not change if you rotate `ADMIN_KEY`.
-   - Optional: Upstash Redis from the Vercel Marketplace (Storage → Upstash) for visitor analytics. It adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+   - Optional: Upstash Redis from the Vercel Marketplace (Storage → Upstash) for visitor analytics and shared daily stamp limits. It adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 5. Redeploy. Open `/admin` and enter the key.
 
 Only `ADMIN_KEY` is needed to open the desk. Everything else lights up as it's connected; the **Setup** tab shows what's in and what's missing.
 
-### What the $1 checks
+### What a stamp checks
 
-$1 checks the first screen only. The Kill Sheet (not built yet) is where the whole page and flow get scouted.
+The first screen only.
 
 The form reads the link as the visitor types (`pageKind` in `src/url.js`) and says what will be stamped:
 - `apps.apple.com` / `play.google.com/store/apps`: the App Store or Google Play listing (icon, title, subtitle, first screenshots). The AI is told to judge it as a store listing, and the stack snapshot is skipped.
