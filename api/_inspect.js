@@ -106,6 +106,22 @@ function hostOf(h) {
   return server ? server.split("/")[0] : "";
 }
 
+// AI app builders first: they're what a vibe-coded page is "built with", whatever framework sits underneath.
+const BUILDERS = [
+  ["Lovable", /\.lovable\.app$|\.lovableproject\.com$/i, /gpteng\.co|gptengineer|lovable-tagger|lovable\.dev\/|<meta[^>]+content=["']Lovable/i],
+  ["Bolt", /\.bolt\.host$|\.bolt\.new$/i, /made (with|in) bolt|bolt\.new\/|<meta[^>]+content=["']Bolt/i],
+  ["v0", /\.vusercontent\.net$|\.v0\.app$/i, /v0\.dev\/|v0\.app\/|<meta[^>]+content=["']v0/i],
+  ["Replit", /\.replit\.app$|\.repl\.co$|\.replit\.dev$/i, /replit\.com\/public\/js|replit-badge/i],
+  ["Base44", /\.base44\.app$/i, /base44\.com\/|base44-sdk/i],
+];
+function builtBy(finalUrl, html) {
+  let host = "";
+  try {
+    host = new URL(finalUrl).hostname;
+  } catch (_) {}
+  return BUILDERS.filter(([, hostRe, htmlRe]) => hostRe.test(host) || htmlRe.test(html.slice(0, 200000))).map(([name]) => name).slice(0, 1);
+}
+
 const FRAMEWORKS = [
   ["Framer", /framerusercontent\.com|data-framer-/i],
   ["Webflow", /data-wf-page|webflow\.(js|css)|assets\.website-files\.com/i],
@@ -212,7 +228,7 @@ export async function inspect(pageUrl) {
     htmlKB: Math.round(f.bytes / 102.4) / 10,
     scripts: (html.match(/<script\b/gi) || []).length,
     host: hostOf(f.res.headers),
-    built: FRAMEWORKS.filter(([, re]) => re.test(html)).map(([name]) => name).slice(0, 3),
+    built: [...builtBy(f.finalUrl, html), ...FRAMEWORKS.filter(([, re]) => re.test(html)).map(([name]) => name)].slice(0, 3),
     title: tags.title.slice(0, 160),
     missing: Object.entries(tags).filter(([, v]) => !v).map(([k]) => k),
     content: content(html, tags),

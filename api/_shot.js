@@ -29,7 +29,16 @@ const CTA_SELECTOR = 'button, [role="button"], a[class*="btn"], a[class*="button
 // If a site's security policy blocks injected scripts, there are simply no circles.
 const MEASURE = `(function(){var S=${JSON.stringify(CTA_SELECTOR)};function box(b,W,H){if(!b||!b.width||!b.height||b.bottom<0||b.top>H||b.right<0||b.left>W)return null;return[Math.round(b.left),Math.round(b.top),Math.round(b.width),Math.round(b.height)]}function go(){try{var W=innerWidth,H=innerHeight,h=document.querySelector("h1"),hb=null;if(h){var r=document.createRange();r.selectNodeContents(h);hb=box(r.getBoundingClientRect(),W,H)||box(h.getBoundingClientRect(),W,H)}var bs=[].slice.call(document.querySelectorAll(S)).map(function(e){var t=(e.innerText||e.value||"").trim();var b=box(e.getBoundingClientRect(),W,H);return b&&t&&t.length<=60?b.concat([t]):null}).filter(Boolean).slice(0,16);document.documentElement.setAttribute("data-smp",JSON.stringify({w:W,h:H,head:hb,buttons:bs}))}catch(e){}}go();setTimeout(go,500);setTimeout(go,1200)})();`;
 
-async function microlink(pageUrl, { phone = false, read = false } = {}) {
+// How much to ask for. "full": banner hiding, the measuring script, and the data rules. "safe": the same
+// without the script. "bare": just the screenshot and the headline and buttons. capture() steps down
+// when a richer request is refused, so an option the screenshot plan doesn't allow costs circles, not the stamp.
+const TIERS = ["full", "safe", "bare"];
+
+// A refusal that stepping down won't fix: the plan's rate limit or daily quota. (A feature the plan
+// doesn't include is fixed by stepping down, so that isn't "busy".)
+export const isBusy = (msg) => /\b(429|ERATE|rate.?limit|too many requests|quota)\b/i.test(String(msg || ""));
+
+async function microlink(pageUrl, { phone = false, read = false, tier = "full" } = {}) {
   const key = process.env.MICROLINK_API_KEY;
   const api = new URL(key ? "https://pro.microlink.io/" : "https://api.microlink.io/");
   const q = {
@@ -43,9 +52,8 @@ async function microlink(pageUrl, { phone = false, read = false } = {}) {
     "viewport.hasTouch": String(phone),
     "screenshot.type": "jpeg",
     waitForTimeout: "1500",
-    adblock: "true",
-    styles: CONSENT_CSS,
-    ...(read ? { scripts: MEASURE } : {}),
+    ...(tier !== "bare" ? { adblock: "true", styles: CONSENT_CSS } : {}),
+    ...(read && tier === "full" ? { scripts: MEASURE } : {}),
     ...(read
       ? {
           "data.h1.selector": "h1",
@@ -54,6 +62,10 @@ async function microlink(pageUrl, { phone = false, read = false } = {}) {
           "data.ctas.selectorAll": CTA_SELECTOR,
           "data.ctas.attr": "text",
           "data.ctas.type": "string",
+        }
+      : {}),
+    ...(read && tier !== "bare"
+      ? {
           // What the page says about itself, for when our own request is blocked.
           "data.pageTitle.selector": "title",
           "data.pageTitle.attr": "text",
@@ -69,17 +81,16 @@ async function microlink(pageUrl, { phone = false, read = false } = {}) {
           "data.viewport.attr": "content",
           "data.iconHref.selector": "link[rel~='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']",
           "data.iconHref.attr": "href",
-          "data.layout.selector": "html",
-          "data.layout.attr": "data-smp",
         }
       : {}),
+    ...(read && tier === "full" ? { "data.layout.selector": "html", "data.layout.attr": "data-smp" } : {}),
   };
   for (const [k, v] of Object.entries(q)) api.searchParams.set(k, v);
   const r = await fetch(api, { headers: key ? { "x-api-key": key } : {} });
   const data = await r.json().catch(() => ({}));
   const shot = data?.data?.screenshot?.url;
   if (!r.ok || data.status !== "success" || !shot) {
-    throw new Error(`Screenshot failed: ${data.message || data.code || `status ${r.status}`}.`);
+    throw new Error(`Screenshot failed (${tier}): ${data.code ? `${data.code} ` : ""}${data.message || `status ${r.status}`}.`.replace(/\s+\./, "."));
   }
   const img = await fetch(shot);
   if (!img.ok) throw new Error(`Screenshot download failed: status ${img.status}.`);
@@ -107,7 +118,19 @@ function parseLayout(raw) {
 // The desktop first screen plus what it says: { jpg, rendered: { h1, ctas, title, description, tags } }.
 // rendered is null when the browser couldn't read the page; the rules then fall back to the raw HTML.
 export async function capture(pageUrl) {
-  const { jpg, data } = await microlink(pageUrl, { read: true });
+  let jpg, data, last;
+  for (const tier of TIERS) {
+    try {
+      ({ jpg, data } = await microlink(pageUrl, { read: true, tier }));
+      if (tier !== "full") console.warn(`Capture fell back to "${tier}" after: ${last?.message}`);
+      break;
+    } catch (err) {
+      last = err;
+      console.error(err.message);
+      if (isBusy(err.message)) throw err;
+    }
+  }
+  if (!jpg) throw last;
   const ctas = (Array.isArray(data?.ctas) ? data.ctas : []).map(clean).filter((t) => t && t.length <= 60);
   const h1 = clean(data?.h1).slice(0, 300);
   const title = clean(data?.pageTitle).slice(0, 160);

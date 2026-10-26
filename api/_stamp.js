@@ -5,7 +5,7 @@
 import { head, put } from "@vercel/blob";
 import { resultId } from "./_lib.js";
 import { inspect } from "./_inspect.js";
-import { capture } from "./_shot.js";
+import { capture, isBusy } from "./_shot.js";
 import { scorePage } from "./_rules.js";
 import { publishStamp, publicOrigin } from "./_publish.js";
 import { saveIcon } from "./_icon.js";
@@ -88,9 +88,18 @@ async function captureTwice(pageUrl) {
   try {
     return await capture(pageUrl);
   } catch (err) {
+    if (isBusy(err.message)) throw err;
     console.error("Capture failed, retrying:", pageUrl, err.message);
     return capture(pageUrl);
   }
+}
+
+// Why a stamp failed, in a word the homepage turns into a sentence.
+export function failReason(msg) {
+  const m = String(msg || "");
+  if (isBusy(m)) return "busy";
+  if (/timeout|took longer|ETIMEDOUT|EUNREACHABLE|ENOTFOUND|getaddrinfo|answered [45]\d\d|status [45]\d\d|Could not load/i.test(m)) return "unreachable";
+  return "other";
 }
 
 export async function processStamp(jobId, pageUrl) {

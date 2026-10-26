@@ -112,6 +112,12 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+const FAIL_TEXT = {
+  busy: "Our screenshot service is at its limit right now. Give it a minute and try again; this one didn't count.",
+  unreachable: "We couldn't reach this page: it timed out or answered with an error. Check it loads for a logged-out visitor, then try again.",
+  other: "We couldn't stamp this one. It didn't load for us, showed a login wall, or came up blank. Try again in a moment, or try a page a logged-out stranger can see.",
+};
+
 // The run: steps tick over on a timer (the real work isn't reported step by step), and the stamp opens when ready.
 
 const run = $("#run");
@@ -183,7 +189,7 @@ function watch(job, pageUrl) {
         return;
       }
       if (body.state === "failed") {
-        return failed("We couldn't stamp this one. It didn't load for us, showed a login or cookie wall, or came up blank. Try a page a logged-out stranger can see.");
+        return failed(FAIL_TEXT[body.reason] || FAIL_TEXT.other);
       }
     } catch (_) {}
     if (Date.now() - t0 > GIVE_UP_MS) return failed("This one is stuck. Try again, or try another page.");

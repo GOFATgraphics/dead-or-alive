@@ -2,7 +2,7 @@
 // The job id is random and only known to the browser that started it.
 // ?recent=1 answers the homepage's "Latest stamps" card instead (see _recent.js).
 import { readResult, resultId } from "./_lib.js";
-import { stampNote } from "./_stamp.js";
+import { failReason, stampNote } from "./_stamp.js";
 import { recentStamps } from "./_recent.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -15,6 +15,6 @@ export default async function handler(req, res) {
   const id = resultId(job);
   if (await readResult(id)) return res.status(200).json({ state: "ready", url: `/v/${id}` });
   const note = await stampNote(id);
-  if (note?.failed) return res.status(200).json({ state: "failed" });
+  if (note?.failed) return res.status(200).json({ state: "failed", reason: failReason(note.failed) });
   res.status(200).json({ state: "working" });
 }

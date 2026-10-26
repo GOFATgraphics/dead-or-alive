@@ -192,6 +192,7 @@ ol, ul { padding: 0; list-style: none; }
 .logo-row li { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--body); filter: grayscale(1); opacity: 0.75; transition: filter 0.2s, opacity 0.2s; }
 .logo-row li:hover { filter: none; opacity: 1; }
 .logo-row img { width: 1.375rem; height: 1.375rem; }
+.logo-row .name-only span { font-weight: 800; letter-spacing: -0.02em; }
 
 /* Sections */
 .sect { padding-top: clamp(4rem, 8vw, 6.5rem); padding-bottom: clamp(4rem, 8vw, 6.5rem); }
