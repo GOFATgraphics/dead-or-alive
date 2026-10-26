@@ -252,3 +252,38 @@ $$("[data-focus-form]").forEach((a) =>
 );
 // Arriving from another page at /#top lands in the form too.
 if (location.hash === "#top" && !location.search) requestAnimationFrame(() => focusForm({ smooth: false }));
+
+// The hero's "Latest stamps" card: real ALIVE and COPE stamps when there are any (never DEAD), else the sample.
+(async () => {
+  try {
+    const r = await fetch("/api/recent", { headers: { Accept: "application/json" } });
+    const { stamps } = r.ok ? await r.json() : {};
+    if (!Array.isArray(stamps) || !stamps.length) return;
+    const ul = $("#recent-rows");
+    ul.replaceChildren(
+      ...stamps.map((s) => {
+        const v = String(s.verdict).toLowerCase();
+        const li = document.createElement("li");
+        const tile = document.createElement("span");
+        tile.className = `dot-tile ${v === "alive" ? "green" : "amber"}`;
+        tile.textContent = (s.host || "?").charAt(0).toUpperCase();
+        const name = document.createElement("span");
+        name.className = "row-name";
+        name.textContent = s.host;
+        const bar = document.createElement("span");
+        bar.className = "row-bar";
+        const fill = document.createElement("i");
+        fill.className = v;
+        fill.style.width = `${Math.max(4, Math.min(100, Number(s.score) || (v === "alive" ? 85 : 65)))}%`;
+        bar.append(fill);
+        const tag = document.createElement("b");
+        tag.className = `v-${v}`;
+        tag.textContent = s.verdict;
+        li.append(tile, name, bar, tag);
+        return li;
+      })
+    );
+    $("#recent-tag").textContent = "live";
+    $("#recent-dot").hidden = false;
+  } catch (_) {}
+})();

@@ -71,6 +71,14 @@ const sendEmail = (to, data) =>
     ].filter(Boolean).join("\n\n"),
   });
 
+// The homepage's "Latest stamps" card reads this list. Only ALIVE and COPE go on it, never DEAD,
+// and only the domain, verdict, and score: never the private link. Without Redis, /api/recent lists blobs instead.
+async function noteRecent(r) {
+  if (!redisReady() || !["ALIVE", "COPE"].includes(r.verdict)) return;
+  const item = JSON.stringify({ id: r.id, host: r.host, verdict: r.verdict, score: r.score ?? null, at: r.createdAt });
+  await pipeline([["LREM", "recent", 0, item], ["LPUSH", "recent", item], ["LTRIM", "recent", 0, 49]]).catch(() => {});
+}
+
 // Stamp numbers make cards feel collectible (#0042). Republishing keeps the number.
 // Redis counts when it's connected; otherwise the count of published stamps stands in.
 async function stampNumber(id) {
@@ -127,6 +135,7 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
     }
   }
   await put(p.json, JSON.stringify(record), { ...opts, contentType: "application/json" });
+  await noteRecent(record);
   const link = `${origin}/v/${id}`;
   const mail = sendMail && email ? await sendEmail(email, { ...record, link }) : { emailed: false };
   return { url: link, ...mail };

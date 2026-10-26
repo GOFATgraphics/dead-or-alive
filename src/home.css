@@ -165,6 +165,12 @@ ol, ul { padding: 0; list-style: none; }
 .row-bar .w31 { width: 31%; background: var(--red); }
 .row-bar .w64 { width: 64%; background: var(--amber); }
 .row-bar .w92 { width: 92%; background: var(--green); }
+.row-bar .w86 { width: 86%; background: var(--green); }
+.row-bar i.alive { background: var(--green); }
+.row-bar i.cope { background: var(--amber); }
+.folder-tab .tab-title { font: inherit; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.live-dot { width: 0.5rem; height: 0.5rem; align-self: center; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(29, 122, 69, 0.5); animation: live 1.8s infinite; }
+@keyframes live { 70% { box-shadow: 0 0 0 0.45rem rgba(29, 122, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(29, 122, 69, 0); } }
 .rows b { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; }
 .v-dead { color: var(--red); }
 .v-cope { color: var(--amber); }
@@ -362,5 +368,5 @@ ol, ul { padding: 0; list-style: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .btn, .form-box.flash .field-row, .run-steps li.now::before { transition: none; animation: none; }
+  .btn, .form-box.flash .field-row, .run-steps li.now::before, .live-dot { transition: none; animation: none; }
 }

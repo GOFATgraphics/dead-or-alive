@@ -46,6 +46,42 @@ function fromBrowser(pageUrl, r) {
   };
 }
 
+// Which parts of the first screen get a marker circle, as boxes in thousandths of the screenshot.
+// ALIVE: the headline and the main button, in green. DEAD and COPE: what failed, in red or amber —
+// the headline when it's missing the point, the buttons when they compete or none says what to do.
+const HEAD_CHECKS = ["plain", "short", "who"];
+export function circlesFor(layout, verdict, checks) {
+  if (!layout) return [];
+  const failed = new Set(checks.filter((k) => !k.pass && !k.skip).map((k) => k.id));
+  const { w: W, h: H, head } = layout;
+  // Buttons in the hero, near the headline; header buttons (top strip) don't count.
+  const hero = layout.buttons.filter((b) => b[1] > H * 0.1 && (!head || (b[1] >= head[1] - 40 && b[1] <= head[1] + head[3] + H * 0.42)));
+  const union = (bs) => {
+    const x1 = Math.min(...bs.map((b) => b[0])), y1 = Math.min(...bs.map((b) => b[1]));
+    const x2 = Math.max(...bs.map((b) => b[0] + b[2])), y2 = Math.max(...bs.map((b) => b[1] + b[3]));
+    return [x1, y1, x2 - x1, y2 - y1];
+  };
+  const boxes = [];
+  if (verdict === "ALIVE") {
+    if (head) boxes.push(head);
+    if (hero.length) boxes.push(hero[0]);
+  } else {
+    if (head && HEAD_CHECKS.some((id) => failed.has(id))) boxes.push(head);
+    if (hero.length && (failed.has("focus") || failed.has("next"))) boxes.push(union(hero));
+    if (!boxes.length && head) boxes.push(head);
+  }
+  const clamp = (n, max) => Math.max(0, Math.min(max, n));
+  return boxes.slice(0, 3).map((b) => {
+    const x = clamp(b[0], W), y = clamp(b[1], H);
+    return {
+      x: Math.round((x / W) * 1000),
+      y: Math.round((y / H) * 1000),
+      w: Math.round((clamp(b[0] + b[2], W) - x) / W * 1000),
+      h: Math.round((clamp(b[1] + b[3], H) - y) / H * 1000),
+    };
+  }).filter((b) => b.w > 4 && b.h > 4);
+}
+
 // The screenshot is retried once; a page that never renders can't be stamped.
 async function captureTwice(pageUrl) {
   try {
@@ -76,8 +112,9 @@ export async function processStamp(jobId, pageUrl) {
   try {
     // Loaded only here, so routes that just read stamps don't carry the canvas library.
     const { renderStamp } = await import("./_render.js");
-    // The result page frames the first screen itself, so the clean screenshot is the stamp's image.
-    const { shot: clean } = await renderStamp({ jpg: shot.jpg, boxes: [], verdict, sentence });
+    // The result page frames the first screen itself, so the circled screenshot (no stamp, no strip) is the image.
+    const boxes = circlesFor(shot.rendered?.layout, verdict, checks);
+    const { shot: clean } = await renderStamp({ jpg: shot.jpg, boxes, verdict, sentence });
     return await publishStamp({
       orderId: jobId,
       pageUrl,
@@ -85,7 +122,7 @@ export async function processStamp(jobId, pageUrl) {
       sentence,
       image: clean,
       shot: clean,
-      focus: null,
+      focus: boxes.length ? { top: Math.min(...boxes.map((b) => b.y)) / 1000, bottom: Math.max(...boxes.map((b) => b.y + b.h)) / 1000 } : null,
       sendMail: false,
       origin: publicOrigin(),
       extra: { snapshot, score, checks },

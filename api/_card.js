@@ -1,8 +1,8 @@
 // Share cards: the stamp as an image people post. Wide (1200x630, the link-preview shape on X and
 // LinkedIn) and square (1080x1080 for Instagram and LinkedIn posts), drawn at 2x so they stay sharp.
-// Made to stop a scroll: a near-black ground lit by a glow in the verdict colour, faint dots and grain,
-// the first screen in a tilted browser frame with an engraved seal stuck on its corner, the verdict in a
-// metallic gradient, a score ring, and for ALIVE the tier pill and verified tick.
+// Clean and dark: a flat near-black ground with faint dots, the circled first screen in a tilted browser
+// frame with an engraved seal on its corner, the verdict in solid colour, a score ring, and for ALIVE the
+// tier pill and verified tick. No gradients, no glow, no grain.
 import path from "node:path";
 import { GlobalFonts, Path2D, createCanvas, loadImage } from "@napi-rs/canvas";
 import { SCALLOP, tierFor } from "../src/badge.js";
@@ -12,11 +12,11 @@ const NIGHT = "#0b0b10";
 const WHITE = "#f5f4f8";
 const SOFT = "#a3a1b3";
 const DIM = "#6e6c80";
-// Verdict colours, lifted for a dark ground. `deep` is the bottom of the metallic gradient.
+// Verdict colours, lifted for a dark ground; `light` is the seal's centre word.
 const V = {
-  DEAD: { main: "#ff5a52", light: "#ffb3ab", deep: "#c2271f", glow: "255, 76, 66" },
-  COPE: { main: "#ffb547", light: "#ffe0a8", deep: "#c97a0a", glow: "255, 170, 50" },
-  ALIVE: { main: "#35d985", light: "#b9f5d4", deep: "#13914f", glow: "40, 210, 120" },
+  DEAD: { main: "#ff5a52", light: "#ffb3ab" },
+  COPE: { main: "#ffb547", light: "#ffe0a8" },
+  ALIVE: { main: "#35d985", light: "#b9f5d4" },
 };
 const SANS = '"Plus Jakarta Sans"';
 const BOLD = '"Plus Jakarta Sans Bold"';
@@ -47,34 +47,12 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// Seeded, so the same stamp always draws the same grain.
-function rng(seed) {
-  let s = seed >>> 0 || 1;
-  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-}
-const seedOf = (str) => [...String(str)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
-
-// Night ground, a verdict-coloured glow behind the shot and a fainter one opposite, dots, and grain.
-function ground(ctx, W, H, verdict, glowAt, seed) {
-  const c = V[verdict];
+// Flat night ground with a faint dot grid.
+function ground(ctx, W, H) {
   ctx.fillStyle = NIGHT;
   ctx.fillRect(0, 0, W, H);
-  const glow = (x, y, r, a) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(${c.glow}, ${a})`);
-    g.addColorStop(1, `rgba(${c.glow}, 0)`);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-  };
-  glow(glowAt.x, glowAt.y, Math.max(W, H) * 0.62, 0.34);
-  glow(W * 0.05, H * 1.05, Math.max(W, H) * 0.45, 0.12);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.055)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
   for (let y = 9; y < H; y += 18) for (let x = 9; x < W; x += 18) ctx.fillRect(x - 0.7, y - 0.7, 1.4, 1.4);
-  const rand = rng(seed);
-  for (let i = 0; i < (W * H) / 90; i++) {
-    ctx.fillStyle = rand() > 0.5 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.12)";
-    ctx.fillRect(rand() * W, rand() * H, 1, 1);
-  }
 }
 
 let MARK = null;
@@ -143,12 +121,6 @@ function frame(ctx, shot, host, cx, cy, w, h, angle) {
   ctx.fillStyle = "#fff";
   ctx.fillRect(x, y + BAR, w, h - BAR);
   ctx.drawImage(shot, 0, 0, shot.width, srcH, x, y + BAR, w, srcH * scale);
-  // A sheen across the glass.
-  const sheen = ctx.createLinearGradient(x, y, x + w, y + h);
-  sheen.addColorStop(0, "rgba(255, 255, 255, 0.10)");
-  sheen.addColorStop(0.35, "rgba(255, 255, 255, 0)");
-  ctx.fillStyle = sheen;
-  ctx.fillRect(x, y, w, h);
   ctx.restore();
   roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
   ctx.lineWidth = 1;
@@ -167,12 +139,9 @@ function seal(ctx, verdict, score, number, cx, cy, R, angle) {
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
   ctx.shadowBlur = 30;
   ctx.shadowOffsetY = 14;
-  const g = ctx.createLinearGradient(-R, -R, R, R);
-  g.addColorStop(0, "#1d1d28");
-  g.addColorStop(1, "#0d0d13");
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, Math.PI * 2);
-  ctx.fillStyle = g;
+  ctx.fillStyle = "#15151d";
   ctx.fill();
   ctx.restore();
   const ring = (r, wdt, dash) => {
@@ -261,7 +230,7 @@ function hostChip(ctx, host, tier, x, y, size) {
   return w;
 }
 
-// A metal pill with the tier name, in the tier card's colours.
+// A flat pill with the tier name in the tier's colour.
 function tierChip(ctx, tier, x, y, size) {
   const name = tier.name.toUpperCase();
   ctx.font = `${size}px ${HEAVY}`;
@@ -269,12 +238,8 @@ function tierChip(ctx, tier, x, y, size) {
   const tw = ctx.measureText(name).width;
   const h = size * 2.3, w = tw + size * 2;
   const c = tier.card;
-  const g = ctx.createLinearGradient(x, y, x + w, y + h);
-  g.addColorStop(0, c.from);
-  g.addColorStop(0.5, c.mid);
-  g.addColorStop(1, c.to);
   roundRect(ctx, x, y, w, h, h / 2);
-  ctx.fillStyle = g;
+  ctx.fillStyle = tier.key === "obsidian" ? "#0e0f12" : c.mid;
   ctx.fill();
   if (tier.key === "obsidian") {
     ctx.lineWidth = 1;
@@ -288,23 +253,15 @@ function tierChip(ctx, tier, x, y, size) {
   return w;
 }
 
-// The verdict in a metallic gradient with a soft glow. Returns its width.
+// The verdict in solid colour. Returns its width.
 function verdictWord(ctx, verdict, x, baseline, size) {
   const c = V[verdict];
   ctx.font = `${size}px ${HEAVY}`;
   ctx.letterSpacing = `${-size * 0.05}px`;
   ctx.textBaseline = "alphabetic";
   const w = ctx.measureText(verdict).width;
-  const g = ctx.createLinearGradient(0, baseline - size * 0.8, 0, baseline);
-  g.addColorStop(0, c.light);
-  g.addColorStop(0.55, c.main);
-  g.addColorStop(1, c.deep);
-  ctx.save();
-  ctx.shadowColor = `rgba(${c.glow}, 0.45)`;
-  ctx.shadowBlur = size * 0.35;
-  ctx.fillStyle = g;
+  ctx.fillStyle = c.main;
   ctx.fillText(verdict, x - size * 0.03, baseline);
-  ctx.restore();
   ctx.letterSpacing = "0px";
   return w;
 }
@@ -355,14 +312,11 @@ function ring(ctx, verdict, score, cx, cy, R) {
   ctx.strokeStyle = "rgba(255, 255, 255, 0.09)";
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * Math.min(100, score)) / 100);
+  // Just short of a full turn: a closed arc can draw as nothing.
+  ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * Math.min(99.9, score)) / 100);
   ctx.lineCap = "round";
-  ctx.save();
-  ctx.shadowColor = `rgba(${c.glow}, 0.6)`;
-  ctx.shadowBlur = R * 0.4;
   ctx.strokeStyle = c.main;
   ctx.stroke();
-  ctx.restore();
   ctx.lineCap = "butt";
   ctx.font = `${R * 0.72}px ${HEAVY}`;
   ctx.letterSpacing = `${-R * 0.03}px`;
@@ -401,7 +355,7 @@ function wide(shot, r) {
   const ctx = c.getContext("2d");
   ctx.scale(SCALE, SCALE);
   const tier = tierFor(r.verdict, r.score);
-  ground(ctx, W, H, r.verdict, { x: W * 0.78, y: H * 0.35 }, seedOf(r.id || r.host));
+  ground(ctx, W, H);
 
   // Right: the first screen, tilted, with the seal on its corner.
   const fw = 500, fh = frameHeight(shot, fw, 420);
@@ -427,7 +381,7 @@ function square(shot, r) {
   const ctx = c.getContext("2d");
   ctx.scale(SCALE, SCALE);
   const tier = tierFor(r.verdict, r.score);
-  ground(ctx, W, H, r.verdict, { x: W * 0.62, y: H * 0.3 }, seedOf(r.id || r.host));
+  ground(ctx, W, H);
 
   brand(ctx, M, 80, 34);
   label(ctx, "FIRST-SCREEN VERDICT", W - M, 86, 13, SOFT, "right");
