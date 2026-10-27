@@ -313,7 +313,7 @@ export default async function handler(req, res) {
       const page = String(b.url || "").trim() ? checkPageUrl(b.url) : { url: "" };
       const u = await updateUser(email, (x) => (x ? { ...x, pendingUrl: page.url || x.pendingUrl || "" } : undefined));
       if (plan === "stayAlive" && hasStayAlive(u)) return res.status(409).json({ error: "Stay Alive is already on for this account." });
-      return res.status(200).json({ url: checkoutUrl(plan, u, page.url || u.pendingUrl || "") });
+      return res.status(200).json({ url: checkoutUrl(plan, u, page.url || u.pendingUrl || "", plan === "stayAlive" && b.billing === "yearly") });
     }
     if (op === "confirm") {
       const ok = await confirmCheckout(email, String(b.checkoutId || "")).catch(() => false);

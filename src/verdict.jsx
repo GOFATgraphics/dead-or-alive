@@ -341,8 +341,8 @@ function Offers({ r }) {
       {/* Same cards as /pricing, from src/plans.js; clicks on a plan are counted here. */}
       <div
         onClick={(e) => {
-          const plan = e.target.closest?.("[data-plan]")?.dataset.plan;
-          if (plan) track("offer_click", { v, plan });
+          const el = e.target.closest?.("[data-plan]");
+          if (el) track("offer_click", { v, plan: el.dataset.plan, billing: el.dataset.billing || "" });
         }}
         dangerouslySetInnerHTML={{ __html: plansHtml({ order, pageUrl: r.pageUrl }) + reviewHtml() }}
       />

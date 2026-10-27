@@ -11,8 +11,8 @@ function show() {
   plans.innerHTML = plansHtml({ free: true }) + reviewHtml();
   plans.hidden = false;
   plans.addEventListener("click", (e) => {
-    const plan = e.target.closest?.("[data-plan]")?.dataset.plan;
-    if (plan) track("offer_click", { plan, from: "pricing" });
+    const el = e.target.closest?.("[data-plan]");
+    if (el) track("offer_click", { plan: el.dataset.plan, billing: el.dataset.billing || "", from: "pricing" });
   });
   document.getElementById("plans-gate").hidden = true;
   document.getElementById("plans-when").hidden = false;

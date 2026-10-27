@@ -10,7 +10,7 @@ export const point = (p) => {
   return m ? { instant: true, text: m[1] } : { instant: false, text: p };
 };
 
-export const planHref = (key, pageUrl = "") => `/dashboard?plan=${key}${pageUrl ? `&url=${encodeURIComponent(pageUrl)}` : ""}`;
+export const planHref = (key, pageUrl = "", billing = "") => `/dashboard?plan=${key}${billing === "yearly" ? "&billing=yearly" : ""}${pageUrl ? `&url=${encodeURIComponent(pageUrl)}` : ""}`;
 
 // Plain feature text: the "Instant:" marker becomes a note under the button instead of a tag on every line.
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -19,34 +19,53 @@ const NOTE = {
   killSheet: "In your dashboard the moment you pay.",
   stayAlive: "Starts the moment you subscribe. Cancel anytime.",
 };
-const FREE_POINTS = [
-  "Your stamp, score, and the top problem with its fix",
-  "A shareable card, and a footer badge for ALIVE",
-  "With a free account: all 13 checks, the full stack, speed, and SEO",
-  "Every stamp saved, and a free re-stamp after you fix it",
-];
+const FREE = {
+  name: "Free",
+  price: "$0",
+  per: "forever",
+  sub: "No card, no account needed",
+  audience: "Solo founders and hobbyists",
+  points: [
+    "Your stamp in about a minute: DEAD, COPE or ALIVE",
+    "13 first-screen checks and a score out of 100",
+    "A shareable stamp card, and a footer badge for ALIVE",
+    "With a free account: every check, the stack, speed, and SEO, saved",
+  ],
+  limits: ["No full-page scout", "No copy rewrites", "No monitoring", "Re-stamp by hand"],
+  cta: "Stamp my page",
+};
 
-function card({ key, name, pitch, price, per, points, cta, href, featured }) {
+// One card: who it's for, the price (and the yearly price where there is one), what's in, what's not, then the button.
+function card({ key, name, audience, price, per, sub, yearly, points, limits, cta, href, yearlyHref, featured }) {
   const list = points.map((t) => `<li>${CHECK}<span>${esc(t)}</span></li>`).join("");
+  const nots = (limits || []).map((t) => `<li>${esc(t)}</li>`).join("");
+  const under = yearly
+    ? `<p class="pc-sub">or <a href="${yearlyHref}" data-plan="${key}" data-billing="yearly">${esc(yearly.price)} ${esc(yearly.per)}</a> <b>${esc(yearly.save)}</b></p>`
+    : `<p class="pc-sub">${esc(sub)}</p>`;
   return `<article class="pc${featured ? " pc-main" : ""}">
-  <div class="pc-top"><h3>${esc(name)}</h3>${featured ? '<span class="pc-flag">Recommended</span>' : ""}</div>
-  <p class="pc-pitch">${esc(pitch)}</p>
+  ${featured ? '<span class="pc-flag">Recommended</span>' : ""}
+  <h3>${esc(name)}</h3>
   <p class="pc-amount"><b>${esc(price)}</b><span>${esc(per)}</span></p>
-  <a class="btn ${featured ? "btn-red" : "btn-line"}" href="${href}"${key !== "free" ? ` data-plan="${key}"` : ""}>${esc(cta)}</a>
-  <p class="pc-note">${esc(NOTE[key])}</p>
+  ${under}
+  <p class="pc-for">${esc(audience)}</p>
   <ul class="pc-list">${list}</ul>
+  ${nots ? `<ul class="pc-nots" aria-label="Not included">${nots}</ul>` : ""}
+  <div class="pc-foot">
+    <a class="btn ${featured ? "btn-dark" : "btn-line"}" href="${href}"${key !== "free" ? ` data-plan="${key}"` : ""}>${esc(cta)}</a>
+    <p class="pc-note">${esc(NOTE[key])}</p>
+  </div>
 </article>`;
 }
 
 const paid = (key, pageUrl, featured) => {
   const p = PLANS[key];
-  return card({ key, name: p.name, pitch: p.pitch, price: p.price, per: p.per, points: p.points.map((x) => cap(point(x).text)), cta: p.cta, href: planHref(key, pageUrl), featured });
+  return card({ key, ...p, points: p.points.map((x) => cap(point(x).text)), href: planHref(key, pageUrl), yearlyHref: planHref(key, pageUrl, "yearly"), featured });
 };
 
 // order: which paid plan comes first (and is recommended). pageUrl: carried to checkout from a result page.
 export function plansHtml({ free = false, order = ["killSheet", "stayAlive"], pageUrl = "" } = {}) {
   const cards = [
-    free ? card({ key: "free", name: "Free stamp", pitch: "Paste a URL, get DEAD, COPE or ALIVE in about a minute.", price: "$0", per: "forever", points: FREE_POINTS, cta: "Stamp my page", href: "/#top" }) : "",
+    free ? card({ key: "free", ...FREE, href: "/#top" }) : "",
     paid(order[0], pageUrl, true),
     paid(order[1], pageUrl, false),
   ].join("");

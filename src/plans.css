@@ -3,20 +3,29 @@
    and a small flag, not an inverted card. */
 .pc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; max-width: 52rem; margin: 0 auto; text-align: left; }
 .pc-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 72rem; }
-.pc { display: flex; flex-direction: column; padding: 1.6rem 1.5rem 1.75rem; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
-.pc-main { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
-.pc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.pc h3 { font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.01em; }
-.pc-flag { padding: 0.2rem 0.55rem; border-radius: 999px; background: var(--canvas); font-size: 0.75rem; font-weight: 600; color: var(--body); }
-.pc-pitch { margin-top: 0.35rem; min-height: 2.6em; font-size: 0.9rem; line-height: 1.45; color: var(--body); }
-.pc-amount { display: flex; align-items: baseline; gap: 0.4rem; margin-top: 1.25rem; }
-.pc-amount b { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
-.pc-amount span { font-size: 0.875rem; color: var(--soft); }
-.pc .btn { width: 100%; margin-top: 1.25rem; }
+.pc { position: relative; display: flex; flex-direction: column; padding: 1.75rem 1.6rem 1.6rem; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow-1); }
+.pc-main { border: 2px solid var(--ink); box-shadow: var(--shadow-2); padding: calc(1.75rem - 1px) calc(1.6rem - 1px) calc(1.6rem - 1px); }
+.pc-flag { position: absolute; top: -2px; right: -2px; padding: 0.4rem 0.9rem; border-radius: 0 16px 0 12px; background: var(--ink); color: var(--page); font: 700 0.6875rem var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
+.pc h3 { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+.pc-amount { display: flex; align-items: baseline; gap: 0.45rem; margin-top: 0.9rem; }
+.pc-amount b { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.045em; line-height: 1; }
+.pc-amount span { font-size: 0.9375rem; color: var(--soft); }
+.pc-sub { min-height: 1.5em; margin-top: 0.4rem; font-size: 0.875rem; color: var(--body); }
+.pc-sub a { color: var(--ink); font-weight: 700; }
+.pc-sub b { margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 6px; background: rgba(29, 122, 69, 0.1); color: var(--green); font-size: 0.8125rem; font-weight: 700; }
+.pc-for { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: 0.9rem; font-weight: 600; color: var(--body); }
+.pc-list { display: grid; gap: 0.6rem; margin: 1rem 0 0; padding: 0; list-style: none; font-size: 0.9rem; line-height: 1.45; color: var(--ink); }
+.pc-list li { display: flex; gap: 0.6rem; }
+.pc-list .ic { flex: none; width: 16px; height: 16px; margin-top: 0.15em; color: var(--green); }
+.pc-nots { display: grid; gap: 0.35rem; margin: 1.1rem 0 0; padding: 1rem 0 0; border-top: 1px dashed var(--line); list-style: none; font-size: 0.8125rem; color: var(--soft); }
+.pc-nots li { display: flex; gap: 0.5rem; }
+.pc-nots li::before { content: "\2013"; flex: none; color: var(--soft); }
+.pc-foot { margin-top: auto; padding-top: 1.5rem; }
+.pc .btn { width: 100%; }
+.pc .btn-dark { background: var(--ink); color: #fff; box-shadow: var(--shadow-2); }
+.pc .btn-dark:hover { opacity: 0.92; }
 .pc-note { margin-top: 0.6rem; font-size: 0.8125rem; color: var(--soft); text-align: center; }
-.pc-list { display: grid; gap: 0.55rem; margin: 1.4rem 0 0; padding: 1.25rem 0 0; border-top: 1px solid var(--line); list-style: none; font-size: 0.875rem; line-height: 1.45; color: var(--ink); }
-.pc-list li { display: flex; gap: 0.55rem; }
-.pc-list .ic { flex: none; width: 15px; height: 15px; margin-top: 0.15em; color: var(--soft); }
+[data-theme="dark"] .pc-sub b { background: rgba(60, 207, 134, 0.14); }
 .pc-how { max-width: 52rem; margin: 1.25rem auto 0; font-size: 0.875rem; line-height: 1.55; color: var(--soft); text-align: center; }
 .pc-grid.three + .pc-how { max-width: 72rem; }
 .pc-review { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 2rem; max-width: 52rem; margin: 2.5rem auto 0; padding-top: 2rem; border-top: 1px solid var(--line); text-align: left; }

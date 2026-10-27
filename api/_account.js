@@ -106,13 +106,24 @@ export const hasKillSheet = (u) => !!(u?.killSheet && !u.killSheet.refunded);
 export const hasStayAlive = (u) => !!(u?.stayAlive && ["active", "trialing"].includes(u.stayAlive.status));
 export const isMember = (u) => hasKillSheet(u) || hasStayAlive(u);
 
-// App reviews included: the Kill Sheet includes one; Stay Alive includes one per billing period.
+// The start of the current month of a membership, counted from its billing day (a yearly plan still gets a
+// fresh month every month). Without a billing day, the last 30 days.
+function monthStart(anchor, now = new Date()) {
+  if (!anchor) return new Date(now - 30 * 86400000);
+  const a = new Date(anchor);
+  const at = (n) => new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth() + n, a.getUTCDate(), a.getUTCHours(), a.getUTCMinutes()));
+  let n = (now.getUTCFullYear() - a.getUTCFullYear()) * 12 + now.getUTCMonth() - a.getUTCMonth();
+  while (n > 0 && at(n) > now) n--;
+  return at(Math.max(0, n));
+}
+
+// App reviews included: the Kill Sheet includes one; Stay Alive includes one a month, billed monthly or yearly.
 export function reviewAllowance(u) {
   const reviews = u?.reviews || [];
   const ks = hasKillSheet(u) ? Math.max(0, 1 - reviews.filter((r) => r.plan === "killSheet").length) : 0;
   let sa = 0;
   if (hasStayAlive(u)) {
-    const from = u.stayAlive.periodStart ? new Date(u.stayAlive.periodStart) : new Date(Date.now() - 30 * 86400000);
+    const from = monthStart(u.stayAlive.periodStart);
     sa = reviews.some((r) => r.plan === "stayAlive" && new Date(r.createdAt) >= from) ? 0 : 1;
   }
   return { killSheet: ks, stayAlive: sa, total: ks + sa };

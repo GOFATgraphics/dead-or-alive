@@ -8,6 +8,11 @@ export const CHECKOUT = {
   stayAlive: {
     productId: "5519c850-61ad-464c-ba1a-67014d4c4d2e",
     url: "https://buy.polar.sh/polar_cl_ofuXwNOkMIagb4X5MK8d5E7E7gEGRvwkFyhmT0gM9lS",
+    // The same plan billed once a year ($200). A separate product, because a product has one billing interval.
+    yearly: {
+      productId: "4b215eba-4694-4919-b66b-8f99b2a52bd9",
+      url: "https://buy.polar.sh/polar_cl_hos0tdCJCEJdKQAx8KACyEOC9noE2jy5z35Sy0tjnI0",
+    },
   },
 };
 

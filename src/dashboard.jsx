@@ -16,6 +16,10 @@ import { hasChecked, markChecked } from "./checked.js";
 
 const params = new URLSearchParams(location.search);
 const PLAN = PLANS[params.get("plan")] ? params.get("plan") : "";
+// Stay Alive can be billed yearly: ?plan=stayAlive&billing=yearly.
+const YEARLY = PLAN === "stayAlive" && params.get("billing") === "yearly";
+const PLAN_NAME = PLAN ? `${PLANS[PLAN].name}${YEARLY ? ", billed yearly" : ""}` : "";
+const planPrice = (k, yearly) => (yearly && PLANS[k].yearly ? `${PLANS[k].yearly.price} ${PLANS[k].yearly.per}` : `${PLANS[k].price} ${PLANS[k].per}`);
 const PAID = { kill_sheet: "killSheet", stay_alive: "stayAlive" }[params.get("paid")] || "";
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString([], { dateStyle: "medium" }) : "");
@@ -152,7 +156,7 @@ function Auth({ setup, onIn }) {
             <h1>Create your free account, then check out.</h1>
             <p className="sect-sub">Your {plan.name} lands in this dashboard the moment your payment is confirmed. Use the email you'll pay with, so the payment finds your account.</p>
             <div className="auth-plan">
-              <p><b>{plan.name}</b>{hasChecked() && ` · ${plan.price} ${plan.per}`}</p>
+              <p><b>{PLAN_NAME}</b>{hasChecked() && ` · ${planPrice(PLAN, YEARLY)}`}</p>
               <ul>{plan.points.map(point).map((x) => <li key={x.text}><Icon name="check" size={15} />{x.text.charAt(0).toUpperCase() + x.text.slice(1)}</li>)}</ul>
             </div>
           </>
@@ -250,7 +254,7 @@ function Billing({ user, setup, onChange }) {
           <div>
             <dt>Stay Alive</dt>
             <dd>
-              Since {fmtDate(sa.since)} · {PLANS.stayAlive.price} {PLANS.stayAlive.per}
+              Since {fmtDate(sa.since)} · {planPrice("stayAlive", sa.interval === "year")}
               <br />
               {sa.cancelAtPeriodEnd ? <>Cancelled. On until <b>{fmtDate(sa.renews || sa.endsAt)}</b>, then stops. No more charges.</> : <>Next billing date <b>{fmtDate(sa.renews)}</b></>}
             </dd>
@@ -555,7 +559,7 @@ function Reviews({ user, onChange }) {
     <section className="panel" aria-labelledby="rv-h">
       <div className="panel-head">
         <h2 id="rv-h"><Icon name="search" /> App review</h2>
-        <p>{user.member ? (left ? "Included with your membership. A person tests it end to end, and the result comes back here." : "Your included review is in. Stay Alive members get a new one every billing month.") : "Included with the Kill Sheet and Stay Alive."}</p>
+        <p>{user.member ? (left ? "Included with your membership. A person tests it end to end, and the result comes back here." : "Your included review is in. Stay Alive members get a new one every month.") : "Included with the Kill Sheet and Stay Alive."}</p>
       </div>
       <ol className="how">{REVIEW_STEPS.map((x) => <li key={x}>{x}</li>)}</ol>
 
@@ -759,9 +763,9 @@ function Dashboard({ data, setData, onOut }) {
       setBanner("");
       return;
     }
-    api("checkout", { plan: PLAN, url: params.get("url") || "" })
+    api("checkout", { plan: PLAN, url: params.get("url") || "", billing: YEARLY ? "yearly" : "" })
       .then((out) => {
-        track("checkout_start", { plan: PLAN });
+        track("checkout_start", { plan: PLAN, billing: YEARLY ? "yearly" : "monthly" });
         location.assign(out.url);
       })
       .catch((e) => {
@@ -845,7 +849,7 @@ function Dashboard({ data, setData, onOut }) {
       </aside>
 
       <main className="main">
-        {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for the ${PLANS[PLAN].name}, with ${user.email} filled in…`} /></div>}
+        {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for ${PLAN_NAME}, with ${user.email} filled in…`} /></div>}
         {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
         {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
         {banner === "active" && <Toast text={PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running." : "You're a Stay Alive member. Monitoring is on."} />}

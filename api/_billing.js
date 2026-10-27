@@ -25,11 +25,12 @@ async function polar(path, { method = "GET", body } = {}) {
   return data;
 }
 
-const planOf = (productId) => Object.keys(CHECKOUT).find((k) => CHECKOUT[k].productId === productId) || "";
+// Which plan a product is. Stay Alive has a monthly and a yearly product.
+const planOf = (productId) => Object.keys(CHECKOUT).find((k) => CHECKOUT[k].productId === productId || CHECKOUT[k].yearly?.productId === productId) || "";
 
 // The Polar checkout for a plan, with the account's email filled in and its id attached.
-export function checkoutUrl(plan, user, pageUrl) {
-  const u = new URL(CHECKOUT[plan].url);
+export function checkoutUrl(plan, user, pageUrl, yearly = false) {
+  const u = new URL(((yearly && CHECKOUT[plan].yearly) || CHECKOUT[plan]).url);
   u.searchParams.set("customer_email", user.email);
   u.searchParams.set("reference_id", user.id);
   if (pageUrl) u.searchParams.set("custom_field_data.page_url", pageUrl);
@@ -99,6 +100,7 @@ export async function syncStayAlive(email, sub, pageUrl = "") {
       since: was?.since || sub.started_at || new Date().toISOString(),
       periodStart: sub.current_period_start || was?.periodStart || null,
       renews: sub.current_period_end || null,
+      interval: sub.recurring_interval || was?.interval || "month",
       cancelAtPeriodEnd: !!sub.cancel_at_period_end,
       endsAt: sub.ends_at || null,
       endedAt: sub.ended_at || null,
