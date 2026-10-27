@@ -226,7 +226,7 @@ function Checks({ r }) {
         <div className="sect-head">
           <p className="eyebrow">What we checked</p>
           <h2 id="checks-h">{failed.length ? `${failed.length} thing${failed.length === 1 ? "" : "s"} holding it back` : "Every check passed"}</h2>
-          <p className="sect-sub">Checks a stranger runs in their first five seconds. {passed.length} passed{skipped.length ? `, ${skipped.length} couldn't be measured because the site blocks automated requests` : ""}.</p>
+          <p className="sect-sub">Checks a stranger runs in their first five seconds, scored by rules, not AI. {passed.length} passed{skipped.length ? `, ${skipped.length} couldn't be measured because the site blocks automated requests` : ""}.</p>
         </div>
         {failed.length > 0 && (
           <ol className="fails">
@@ -576,7 +576,7 @@ function LockedChecks({ r }) {
         <div className="sect-head">
           <p className="eyebrow">What we checked</p>
           <h2 id="checks-h">{c.failed ? (c.failed === 1 ? "1 thing holding it back" : `${c.failed} things holding it back`) : "Every check passed"}</h2>
-          <p className="sect-sub">{c.passed} of {c.measured} checks passed. {top ? "Here's the one that matters most." : ""}</p>
+          <p className="sect-sub">{c.passed} of {c.measured} checks passed, scored by rules, not AI. {top ? "Here's the one that matters most." : ""}</p>
         </div>
         {top && (
           <ol className="fails single">
