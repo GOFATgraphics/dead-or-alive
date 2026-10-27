@@ -865,6 +865,63 @@ function Settings({ user, onOut }) {
   );
 }
 
+// Right after paying: what's on, what's already running, and where to go next. Shown once, when the plan switches on.
+function Welcome({ plan, user, go, onClose }) {
+  const ks = plan === "killSheet";
+  const page = ks ? user.killSheet?.url : user.stayAlive?.url;
+  const host = page ? page.replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.focus();
+    const esc = (e) => e.key === "Escape" && onClose();
+    addEventListener("keydown", esc);
+    return () => removeEventListener("keydown", esc);
+  }, [onClose]);
+  const steps = ks
+    ? [
+        ["done", "Kill Sheet is on", "Payment confirmed. It's yours to keep, nothing renews."],
+        page ? ["run", `Scouting ${host}`, "The whole page, your headline, subhead and button rewritten, and 3 to 5 ranked fixes. Ready in about a minute."] : ["todo", "Add your page", "Tell us which page to scout and the Kill Sheet starts right away."],
+        ["todo", "One app review, included", "Send your site or app whenever you're ready. A person tests it end to end."],
+        ["todo", "One free re-stamp", "Ship the fixes, then re-stamp to see the new score."],
+      ]
+    : [
+        ["done", "Stay Alive is on", "Payment confirmed. Cancel anytime from your dashboard."],
+        page ? ["run", `Watching ${host}`, "The first uptime check and re-stamp are running now. After that: daily checks and a fresh stamp every week."] : ["todo", "Add the page to watch", "Monitoring starts the moment you add it."],
+        ["todo", "Alerts by email", "When the page goes down, or its stack, speed, or tracking pixels change."],
+        ["todo", "One app review a month", "For the site you pick. More sites can be added from Monitoring."],
+      ];
+  const open = (id) => {
+    onClose();
+    go(id);
+  };
+  return (
+    <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-h">
+      <div className="welcome-scrim" onClick={onClose}></div>
+      <div className="welcome-card" ref={ref} tabIndex={-1}>
+        <span className="welcome-badge"><Icon name="check" size={26} /></span>
+        <p className="eyebrow">Payment confirmed</p>
+        <h2 id="welcome-h">Welcome to {ks ? "the Kill Sheet" : "Stay Alive"}</h2>
+        <p className="welcome-sub">Everything is in this dashboard. Your receipt comes by email from our payment provider.</p>
+        <ol className="welcome-steps">
+          {steps.map(([state, title, text]) => (
+            <li key={title} className={state}>
+              <span className="welcome-dot" aria-hidden="true">{state === "done" ? <Icon name="check" size={14} /> : state === "run" ? <span className="spin"></span> : null}</span>
+              <div>
+                <b>{title}</b>
+                <p>{text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="welcome-actions">
+          <button type="button" className="btn btn-dark" onClick={() => open(ks ? "kill-sheet" : "monitoring")}>{ks ? (page ? "See my Kill Sheet" : "Add my page") : page ? "Open Monitoring" : "Add my page"} <Icon name="arrow-right" /></button>
+          <button type="button" className="btn btn-line" onClick={() => open("reviews")}>Send an app review</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ data, setData, onOut }) {
   const { user, report, monitor, monitors, setup } = data;
   const [banner, setBanner] = useState(PAID ? "confirming" : PLAN ? "checkout" : "");
@@ -914,9 +971,9 @@ function Dashboard({ data, setData, onOut }) {
     if (!running) return;
     const t = setTimeout(() => {
       tries.current++;
-      if (banner === "confirming" && tries.current > 60) setBanner("slow");
+      if (banner === "confirming" && tries.current > 90) setBanner("slow");
       refresh();
-    }, 3000);
+    }, banner === "confirming" ? 1500 : 3000);
     return () => clearTimeout(t);
   }, [running, data, banner, refresh]);
 
@@ -972,7 +1029,7 @@ function Dashboard({ data, setData, onOut }) {
         {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for ${PLAN_NAME}, with ${user.email} filled in…`} /></div>}
         {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
         {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
-        {banner === "active" && <Toast text={PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running." : "You're a Stay Alive member. Monitoring is on."} />}
+        {banner === "active" && <Welcome plan={PAID} user={user} go={go} onClose={() => setBanner("")} />}
         {params.get("confirmed") && !banner && <Toast text="Email confirmed. You're signed in." />}
         {err && <p className="alert" role="alert">{err}</p>}
 

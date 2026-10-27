@@ -3,6 +3,7 @@
 // Env: POLAR_WEBHOOK_SECRET (required for the webhook). Optional: POLAR_ACCESS_TOKEN (confirms a checkout the
 // moment the buyer lands back, and cancels from the dashboard), POLAR_API_BASE (sandbox).
 import crypto from "node:crypto";
+import { waitUntil } from "@vercel/functions";
 import { CHECKOUT } from "./_plans.js";
 import { emailForId, ensureUser, getUser, hasStayAlive, updateUser } from "./_account.js";
 import { addTo } from "./_store.js";
@@ -81,7 +82,8 @@ export async function activateKillSheet(email, { orderId = "", checkoutId = "", 
     start = !!url;
     return u;
   });
-  if (start) await runScout(email, url);
+  // The scout takes about a minute: it runs after the answer, so the buyer sees the plan on right away.
+  if (start) waitUntil(runScout(email, url).catch((e) => console.error("Scout failed:", e)));
 }
 
 // Stay Alive changed: keep the status and dates, and on the first activation switch monitoring on with a re-stamp.
@@ -116,7 +118,8 @@ export async function syncStayAlive(email, sub, pageUrl = "") {
   });
   if (next?.stayAlive && ["active", "trialing"].includes(next.stayAlive.status)) {
     await addTo("idx:members", email);
-    if (first && next.stayAlive.url) await runMonitor(email, { restamp: true, url: next.stayAlive.url });
+    // The first check and re-stamp run after the answer, so the member sees monitoring on right away.
+    if (first && next.stayAlive.url) waitUntil(runMonitor(email, { restamp: true, url: next.stayAlive.url }).catch((e) => console.error("Monitor failed:", e)));
   }
 }
 
