@@ -38,18 +38,22 @@ export function checkoutUrl(plan, user, pageUrl, yearly = false) {
   return u.toString();
 }
 
-// Standard Webhooks: HMAC-SHA256 over "id.timestamp.body", keyed with the secret's UTF-8 bytes (as Polar's SDK does).
+// HMAC-SHA256 over "id.timestamp.body". Polar has two keys, by when the endpoint's secret was made: since
+// 8 Sep 2026 it's Standard Webhooks (the base64 after "whsec_", decoded); before, the secret's own UTF-8 bytes.
+// Both are tried, as Polar's SDKs do.
 export function verifyWebhook(headers, body, secret) {
   const h = (k) => headers[k] || headers.get?.(k) || "";
   const id = h("webhook-id"), ts = h("webhook-timestamp"), sigs = h("webhook-signature");
+  secret = String(secret || "").trim();
   if (!id || !ts || !sigs || !secret) return false;
   if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
-  const expected = crypto.createHmac("sha256", Buffer.from(secret, "utf8")).update(`${id}.${ts}.${body}`).digest();
+  const keys = [Buffer.from(secret.replace(/^whsec_/, ""), "base64"), Buffer.from(secret, "utf8")].filter((k) => k.length);
+  const expected = keys.map((k) => crypto.createHmac("sha256", k).update(`${id}.${ts}.${body}`).digest());
   return String(sigs).split(" ").some((entry) => {
     const [version, sig] = entry.split(",");
     if (version !== "v1" || !sig) return false;
     const got = Buffer.from(sig, "base64");
-    return got.length === expected.length && crypto.timingSafeEqual(got, expected);
+    return expected.some((e) => got.length === e.length && crypto.timingSafeEqual(got, e));
   });
 }
 
@@ -153,7 +157,16 @@ export async function confirmCheckout(email, checkoutId) {
   const plan = planOf(c.product_id);
   const pageUrl = pageFrom(c, await getUser(email));
   if (plan === "killSheet") await activateKillSheet(email, { checkoutId: c.id, pageUrl });
-  if (plan === "stayAlive" && c.subscription_id) await syncStayAlive(email, await polar(`/v1/subscriptions/${c.subscription_id}`), pageUrl);
+  if (plan === "stayAlive") {
+    // A subscription checkout doesn't always carry the subscription's id: find the one this checkout started.
+    let sub = c.subscription_id ? await polar(`/v1/subscriptions/${c.subscription_id}`) : null;
+    if (!sub && c.customer_id) {
+      const list = await polar(`/v1/subscriptions/?customer_id=${c.customer_id}&limit=20`);
+      sub = (list.items || []).find((s) => s.checkout_id === c.id) || null;
+    }
+    if (!sub) return false;
+    await syncStayAlive(email, sub, pageUrl);
+  }
   return true;
 }
 
