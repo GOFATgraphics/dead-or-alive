@@ -24,10 +24,10 @@ const el = (tag, cls, text) => {
   return n;
 };
 const nf = new Intl.NumberFormat();
-const num = (v) => (v == null ? "—" : nf.format(v));
-const pct = (a, b) => (!b || a == null ? "—" : `${Math.round((a / b) * 100)}%`);
-const money = (cents, cur) => (cents == null ? "—" : new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD" }).format(cents / 100));
-const hours = (h) => (h == null ? "—" : h < 1 ? `${Math.round(h * 60)} min` : `${h < 10 ? h.toFixed(1) : Math.round(h)} h`);
+const num = (v) => (v == null ? "n/a" : nf.format(v));
+const pct = (a, b) => (!b || a == null ? "n/a" : `${Math.round((a / b) * 100)}%`);
+const money = (cents, cur) => (cents == null ? "n/a" : new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD" }).format(cents / 100));
+const hours = (h) => (h == null ? "n/a" : h < 1 ? `${Math.round(h * 60)} min` : `${h < 10 ? h.toFixed(1) : Math.round(h)} h`);
 const shortDay = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 function section(title, hint) {
@@ -167,12 +167,14 @@ export function renderAnalytics(root, data) {
     tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Not connected"),
     tile("Median turnaround", hours(b?.turnaround.medianHours), b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}% within 24 h` : "No stamps yet"),
     tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Not connected"),
-    tile("Offer clicks", num(t?.totals.offer_click), t ? `${pct(t.totals.offer_click, t.totals["view:result"])} of result views · Kill Sheet or Stay Alive` : "Not connected")
+    tile("Offer clicks", num(t?.totals.offer_click), t ? `${pct(t.totals.offer_click, t.totals["view:result"])} of result views · Kill Sheet or Stay Alive` : "Not connected"),
+    tile("New accounts", num(t?.totals.signup), t ? `${num(t.totals.login)} sign-ins · ${num(t.totals.save_click)} unlock or save clicks` : "Not connected"),
+    tile("Sent to checkout", num(t?.totals.checkout_start), t ? `${num(t.totals.review_submit)} app reviews sent · ${num(t.totals["view:pricing"])} pricing views` : "Not connected")
   );
   out.push(tiles);
 
   // Funnel
-  const f = section("Funnel", "Visitors are counted once per day. Stamped comes from desk orders and your published stamps.");
+  const f = section("Funnel", "Visitors are counted once per day. Stamped counts published stamps.");
   f.append(
     funnel([
       { label: "Homepage visitors", value: t?.totals.homeVisitors },
@@ -181,7 +183,10 @@ export function renderAnalytics(root, data) {
       { label: "Stamps started", value: t?.totals.stamp_start },
       { label: "Stamped", value: b?.totals.stamped, missing: "Not connected" },
       { label: "Result page views", value: t?.totals["view:result"] },
+      { label: "Clicked unlock or save", value: t?.totals.save_click },
+      { label: "Created an account", value: t?.totals.signup },
       { label: "Clicked an offer", value: t?.totals.offer_click },
+      { label: "Went to checkout", value: t?.totals.checkout_start },
       { label: "Shares (link, X, LinkedIn, card)", value: t?.totals.share_copy },
     ])
   );
@@ -213,7 +218,7 @@ export function renderAnalytics(root, data) {
   const v = section("Verdicts", "Stamped counts orders in this range. Views and copied links count result pages opened in this range.");
   const vrows = VERDICTS.map((name) => {
     const stamped = b?.verdicts[name];
-    return [name, num(stamped), b ? pct(stamped, b.totals.stamped) : "—", num(t?.verdictViews[name]), num(t?.verdictShares[name])];
+    return [name, num(stamped), b ? pct(stamped, b.totals.stamped) : "n/a", num(t?.verdictViews[name]), num(t?.verdictShares[name])];
   });
   const vt = table(["Verdict", "Stamped", "Share", "Result views", "Links copied"], vrows, "");
   vt.querySelectorAll("tbody tr td:first-child").forEach((td) => {
@@ -231,8 +236,8 @@ export function renderAnalytics(root, data) {
       ["Measure", "Value"],
       [
         ["Median", hours(b?.turnaround.medianHours)],
-        ["Slowest 10% take", b?.turnaround.p90Hours != null ? `${hours(b.turnaround.p90Hours)} or more` : "—"],
-        ["Within 24 hours", b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}%` : "—"],
+        ["Slowest 10% take", b?.turnaround.p90Hours != null ? `${hours(b.turnaround.p90Hours)} or more` : "n/a"],
+        ["Within 24 hours", b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}%` : "n/a"],
         ["Stamps measured", num(b?.turnaround.count)],
       ],
       ""
@@ -246,7 +251,7 @@ export function renderAnalytics(root, data) {
         ["Revenue, after refunds", money(b?.totals.revenue, cur)],
         ["Paid orders", num(b?.totals.orders)],
         ["Average order", money(b?.totals.averageOrder, cur)],
-        ["Refunds", b ? `${num(b.totals.refunds)} (${money(b.totals.refunded, cur)})` : "—"],
+        ["Refunds", b ? `${num(b.totals.refunds)} (${money(b.totals.refunded, cur)})` : "n/a"],
       ],
       ""
     )

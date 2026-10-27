@@ -41,6 +41,14 @@ export async function runMonitor(email, { restamp = false } = {}) {
     m.restampRunning = false;
     m.lastRestampAt = new Date().toISOString();
     m.restamps = [...m.restamps, r.failed ? { at: m.lastRestampAt, failed: String(r.failed).slice(0, 200) } : { at: m.lastRestampAt, id: r.id, verdict: r.verdict, score: r.score, lcp: r.snapshot?.browser?.lcp || null }].slice(-30);
+    if (!r.failed) {
+      const change = diff(m.lastSeen, seen(r));
+      m.lastSeen = seen(r);
+      if (change) {
+        m.changes = [{ at: m.lastRestampAt, stampId: r.id, ...change }, ...(m.changes || [])].slice(0, 30);
+        await alertChange(email, pageUrl, change);
+      }
+    }
   }
   await set(monitorKey(email), m);
   if (wasUp && !check.ok) {
@@ -51,6 +59,39 @@ export async function runMonitor(email, { restamp = false } = {}) {
     }).catch(() => {});
   }
   return m;
+}
+
+// What a re-stamp saw that's worth watching: every tool by category, main-content time, score, verdict.
+function seen(r) {
+  const stack = (r.snapshot?.stack || []).map((t) => `${t.category}: ${t.name}`);
+  return { stack, lcp: r.snapshot?.browser?.lcp || null, score: r.score ?? null, verdict: r.verdict };
+}
+
+// What changed since the last re-stamp: tools added or removed (pixels and analytics included), speed that moved
+// by more than a third, or a different verdict. Null when nothing did, or on the first re-stamp.
+function diff(before, now) {
+  if (!before) return null;
+  const added = now.stack.filter((t) => !before.stack.includes(t));
+  const removed = before.stack.filter((t) => !now.stack.includes(t));
+  const lcp = before.lcp && now.lcp && Math.abs(now.lcp - before.lcp) / before.lcp > 0.33 ? { from: before.lcp, to: now.lcp } : null;
+  const verdict = before.verdict !== now.verdict ? { from: before.verdict, to: now.verdict } : null;
+  if (!added.length && !removed.length && !lcp && !verdict) return null;
+  return { added, removed, lcp, verdict, pixels: [...added, ...removed].some((t) => /^(Ads & pixels|Analytics):/.test(t)) };
+}
+
+async function alertChange(email, pageUrl, c) {
+  const host = new URL(pageUrl).hostname;
+  const lines = [
+    ...c.added.map((t) => `Added: ${t}`),
+    ...c.removed.map((t) => `Removed: ${t}`),
+    c.lcp ? `Main content now shows in ${(c.lcp.to / 1000).toFixed(1)}s (was ${(c.lcp.from / 1000).toFixed(1)}s)` : "",
+    c.verdict ? `Stamp went from ${c.verdict.from} to ${c.verdict.to}` : "",
+  ].filter(Boolean);
+  await mail(email, {
+    subject: `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`,
+    text: `Stay Alive re-stamped ${pageUrl} and noticed:\n\n${lines.join("\n")}\n\nDetails in your dashboard: https://stampmypage.com/dashboard`,
+    html: `<p>Stay Alive re-stamped <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard">Details in your dashboard</a></p>`,
+  }).catch(() => {});
 }
 
 // The daily run for every Stay Alive member. A few at a time, so the run fits in one function call.

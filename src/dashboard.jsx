@@ -403,8 +403,8 @@ function StayAlive({ user, monitor, onChange }) {
         <>
           <dl className="scout">
             <div><dt>Right now</dt><dd className={last?.ok ? "ok" : "bad"}>{last ? (last.ok ? `Up · ${last.status}` : `Down · ${last.status || last.error}`) : "Checking…"}</dd></div>
-            <div><dt>Uptime</dt><dd>{up != null ? `${up}%` : "—"} <small>last {checks.length} checks</small></dd></div>
-            <div><dt>Server answers in</dt><dd>{avg != null ? `${avg} ms` : "—"} <small>average</small></dd></div>
+            <div><dt>Uptime</dt><dd>{up != null ? `${up}%` : "Not yet"} <small>last {checks.length} checks</small></dd></div>
+            <div><dt>Server answers in</dt><dd>{avg != null ? `${avg} ms` : "Not yet"} <small>average</small></dd></div>
             <div><dt>Last check</dt><dd>{fmtTime(monitor.lastCheckAt)}</dd></div>
             <div><dt>Next re-stamp</dt><dd>{monitor.restampRunning ? "Running now" : next ? fmtDate(next) : "Soon"}</dd></div>
           </dl>
@@ -414,12 +414,31 @@ function StayAlive({ user, monitor, onChange }) {
             </div>
           )}
           {monitor.restampRunning && <Working text="Re-stamping your page now." />}
+          <h3>Changes spotted</h3>
+          {monitor.changes?.length ? (
+            <ul className="changes">
+              {monitor.changes.map((c) => (
+                <li key={c.at}>
+                  <time>{fmtDate(c.at)}</time>
+                  <div>
+                    {c.verdict && <p><b>Stamp:</b> {c.verdict.from} to {c.verdict.to}</p>}
+                    {c.lcp && <p><b>Speed:</b> main content in {(c.lcp.to / 1000).toFixed(1)}s, was {(c.lcp.from / 1000).toFixed(1)}s</p>}
+                    {c.added.map((t) => <p key={"a" + t} className="add">+ {t}</p>)}
+                    {c.removed.map((t) => <p key={"r" + t} className="rem">− {t}</p>)}
+                    {c.stampId && <a href={`/v/${c.stampId}`}>See that stamp</a>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="fine">Nothing changed yet. Each weekly re-stamp is compared with the last one: tools and tracking pixels added or removed, speed, and the verdict. You get an email when something changes.</p>
+          )}
           <h3>Weekly re-stamps</h3>
           {restamps.length ? (
             <ul className="history">
               {restamps.map((r) =>
                 r.failed ? (
-                  <li key={r.at}><span className="v-chip">—</span><span>Couldn't stamp: {r.failed}</span><time>{fmtDate(r.at)}</time></li>
+                  <li key={r.at}><span className="v-chip">FAIL</span><span>Couldn't stamp: {r.failed}</span><time>{fmtDate(r.at)}</time></li>
                 ) : (
                   <li key={r.at}><span className={"v-chip v-" + r.verdict.toLowerCase()}>{r.verdict}</span><a href={`/v/${r.id}`}>{r.score}/100{r.lcp ? ` · main content in ${(r.lcp / 1000).toFixed(1)}s` : ""}</a><time>{fmtDate(r.at)}</time></li>
                 )
@@ -656,10 +675,13 @@ function Dashboard({ data, setData, onOut }) {
     return () => clearTimeout(t);
   }, [running, data, banner, refresh]);
 
-  // Free stamps from this browser: saved as soon as you're in.
+  // Free stamps from this browser: saved as soon as you're in. Came from a locked result page? Back to it, unlocked.
   useEffect(() => {
     const j = jobs();
-    if (j.length) api("claim", { jobs: j }).then((out) => out.saved && out.user && setData((d) => ({ ...d, ...out }))).catch(() => {});
+    const back = params.get("back") || "";
+    const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(back);
+    if (j.length) api("claim", { jobs: j }).then((out) => out.saved && out.user && setData((d) => ({ ...d, ...out }))).catch(() => {}).finally(done);
+    else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onChange = (out) => out?.user !== undefined && setData((d) => ({ ...d, ...out }));

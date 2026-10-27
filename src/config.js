@@ -31,7 +31,8 @@ export const PLANS = {
     points: [
       "Instant: monitoring on, first re-stamp runs right away",
       "A fresh stamp every week, with the score over time",
-      "Daily uptime and speed checks, and an email if it goes down",
+      "Daily uptime checks, and an alert when it goes down",
+      "Alerts when your stack, speed, or a tracking pixel changes",
       "One app review a month in your dashboard",
       "Cancel anytime from your dashboard",
     ],

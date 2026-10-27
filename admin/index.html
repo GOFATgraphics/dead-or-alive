@@ -3,8 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="/theme.js"></script>
+    <link rel="stylesheet" href="/src/theme.css" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>Admin — Stamp My Page</title>
+    <title>Admin | Stamp My Page</title>
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -31,7 +33,9 @@
 
       <nav class="desk-nav" id="desk-nav" aria-label="Desk" hidden>
         <div class="tabs desk-tabs">
-          <button type="button" data-pane="reviews" aria-pressed="true">Reviews</button>
+          <button type="button" data-pane="stamps" aria-pressed="true">Stamps</button>
+          <button type="button" data-pane="users" aria-pressed="false">Accounts</button>
+          <button type="button" data-pane="reviews" aria-pressed="false">Reviews</button>
           <button type="button" data-pane="members" aria-pressed="false">Members</button>
           <button type="button" data-pane="analytics" aria-pressed="false">Analytics</button>
           <button type="button" data-pane="setup" aria-pressed="false">Setup</button>
@@ -61,6 +65,29 @@
           <button type="button" class="submit ghost" id="recards">Redraw all share cards</button>
           <span class="usp" id="recards-note" aria-live="polite">Redraws every published stamp's share card in the current design. Links shared before keep their old preview where the app cached it.</span>
         </div>
+      </section>
+
+      <section id="pane-stamps" class="section pane" hidden>
+        <div class="bar">
+          <h2 class="kicker">Stamps <span id="st-total"></span></h2>
+          <div class="tabs st-pages" role="group" aria-label="Page">
+            <button type="button" id="st-prev">Newer</button>
+            <button type="button" id="st-next">Older</button>
+          </div>
+          <button type="button" class="link" id="st-refresh">Refresh</button>
+        </div>
+        <p class="usp">Every published stamp, newest first. Open one for its full checks, stack, speed, SEO, and security.</p>
+        <p class="alert" id="st-alert" role="alert" hidden></p>
+        <ul class="orders" id="stamps"></ul>
+      </section>
+
+      <section id="pane-users" class="section pane" hidden>
+        <div class="bar">
+          <h2 class="kicker">Accounts <span id="us-total"></span></h2>
+          <button type="button" class="link" id="us-refresh">Refresh</button>
+        </div>
+        <p class="alert" id="us-alert" role="alert" hidden></p>
+        <ul class="orders" id="users"></ul>
       </section>
 
       <section id="pane-reviews" class="section pane" hidden>

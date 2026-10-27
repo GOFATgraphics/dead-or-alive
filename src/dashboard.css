@@ -156,3 +156,10 @@ label.check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color:
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .quiet-link { display: inline-flex; align-items: center; gap: 0.4rem; justify-self: center; font-size: 0.875rem; text-decoration: none; color: var(--body); }
 .quiet-link:hover { color: var(--ink); }
+.changes { display: grid; gap: 0.5rem; }
+.changes li { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.75rem; padding: 0.75rem 0.9rem; border-radius: 12px; background: var(--canvas); font-size: 0.9rem; }
+.changes time { font: 500 0.75rem var(--mono); color: var(--soft); }
+.changes p { overflow-wrap: anywhere; }
+.changes .add { color: var(--green); }
+.changes .rem { color: var(--red); }
+.changes a { font-weight: 700; font-size: 0.8125rem; }

@@ -2,13 +2,16 @@
 //   GET  session                   checks the key, reports setup
 //   GET  members                   every account with a plan
 //   GET  reviews                   every app review, newest first (no test logins)
+//   GET  stamps&page=N             every published stamp, newest first, 40 a page, with the account it's saved to
+//   GET  stamp&id=ID               one stamp in full: checks, stack, speed, SEO, security
+//   GET  users                     every account, free or paid
 //   POST login { email, id }       shows a review's test login, only while it's In review
 //   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
 //   POST rescout { email }         runs a member's Kill Sheet again
 //   POST recards { cursor }        redraws published stamps' share cards in the current design, about 10 per call
 // Env: ADMIN_KEY.
 import { waitUntil } from "@vercel/functions";
-import { polarReady, requireAdmin } from "./_lib.js";
+import { polarReady, readResult, requireAdmin } from "./_lib.js";
 import { redisReady } from "./_redis.js";
 import { get, members, remove, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
@@ -75,6 +78,53 @@ export default async function handler(req, res) {
     const reviews = users.flatMap((u) => (u.reviews || []).map((r) => ({ ...r, email: u.email, member: { killSheet: hasKillSheet(u), stayAlive: hasStayAlive(u) } })));
     reviews.sort((a, z) => String(z.createdAt).localeCompare(String(a.createdAt)));
     return res.status(200).json({ reviews });
+  }
+
+  if (op === "stamps") {
+    const blobs = [];
+    let cursor;
+    do {
+      const page = await listBlobs({ prefix: "verdicts/", cursor, limit: 1000 });
+      blobs.push(...page.blobs.filter((x) => /^verdicts\/[A-Za-z0-9_-]+\.json$/.test(x.pathname)));
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+    blobs.sort((a, z) => new Date(z.uploadedAt) - new Date(a.uploadedAt));
+    const per = 40, pageNo = Math.max(0, parseInt(req.query.page || "0", 10) || 0);
+    const slice = blobs.slice(pageNo * per, (pageNo + 1) * per);
+    // Which account saved each stamp.
+    const owners = new Map();
+    for (const u of (await Promise.all((await members("idx:users")).map((e) => getUser(e)))).filter(Boolean)) for (const st of u.stamps || []) owners.set(st.id, u.email);
+    const rows = await Promise.all(
+      slice.map(async (x) => {
+        const id = x.pathname.slice(9, -5);
+        const r = await fetch(`${x.url}?t=${Date.parse(x.uploadedAt) || 0}`).then((y) => (y.ok ? y.json() : null)).catch(() => null);
+        if (!r) return null;
+        const checks = Array.isArray(r.checks) ? r.checks.filter((k) => !k.skip) : [];
+        return {
+          id, number: r.number, host: r.host, pageUrl: r.pageUrl, verdict: r.verdict, score: r.score ?? null, createdAt: r.createdAt, icon: r.icon || "",
+          failed: checks.filter((k) => !k.pass).map((k) => k.label), stack: (r.snapshot?.stack || []).length, lcp: r.snapshot?.browser?.lcp || null,
+          owner: owners.get(id) || "",
+        };
+      })
+    );
+    return res.status(200).json({ stamps: rows.filter(Boolean), total: blobs.length, page: pageNo, pages: Math.ceil(blobs.length / per) });
+  }
+
+  if (op === "stamp") {
+    const r = await readResult(String(req.query.id || ""));
+    return r ? res.status(200).json({ stamp: r }) : res.status(404).json({ error: "No such stamp." });
+  }
+
+  if (op === "users") {
+    const users = (await Promise.all((await members("idx:users")).map((e) => getUser(e)))).filter(Boolean);
+    users.sort((a, z) => String(z.createdAt).localeCompare(String(a.createdAt)));
+    return res.status(200).json({
+      users: users.map((u) => ({
+        email: u.email, createdAt: u.createdAt, password: !!u.pass, x: u.x?.username || "", stamps: (u.stamps || []).length,
+        killSheet: hasKillSheet(u), stayAlive: hasStayAlive(u), stayAliveStatus: u.stayAlive?.status || "", reviews: (u.reviews || []).length,
+        lastStamp: (u.stamps || [])[0]?.host || "",
+      })),
+    });
   }
 
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });

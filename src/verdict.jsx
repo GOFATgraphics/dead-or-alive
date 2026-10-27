@@ -93,8 +93,8 @@ function Hero({ r }) {
   const tier = tierFor(v, r.score);
   const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
   const checks = Array.isArray(r.checks) ? r.checks : [];
-  const measured = checks.filter((k) => !k.skip);
-  const passed = measured.filter((k) => k.pass).length;
+  const measured = r.locked ? { length: r.counts.measured } : checks.filter((k) => !k.skip);
+  const passed = r.locked ? r.counts.passed : measured.filter((k) => k.pass).length;
   return (
     <section className={"hero v-" + v.toLowerCase()} aria-labelledby="verdict-h">
       <div className="hero-grid">
@@ -116,7 +116,7 @@ function Hero({ r }) {
               <p className="score-n"><strong>{r.score}</strong>/100</p>
               <div className="score-meta">
                 <div className="score-bar" aria-hidden="true"><span style={{ width: `${r.score}%` }}></span></div>
-                <p>{checks.length ? `${passed} of ${measured.length} checks passed` : "First-screen score"}</p>
+                <p>{measured.length ? `${passed} of ${measured.length} checks passed` : "First-screen score"}</p>
               </div>
             </div>
           )}
@@ -285,7 +285,7 @@ function SavePrompt({ r }) {
     };
   }, [r.id]);
   if (state.status === "loading" || state.status === "off") return null;
-  const next = `/dashboard?save=${encodeURIComponent(r.id)}`;
+  const next = `/dashboard?save=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}`;
   return (
     <section className="wrap save-wrap" aria-labelledby="save-h">
       <div className="save">
@@ -557,6 +557,81 @@ function Snapshot({ s }) {
   );
 }
 
+// Signed out: the one problem that matters most, then what a free account unlocks, as counts over a blurred
+// placeholder. The placeholder is made-up rows, never this page's data, so nothing is hidden only by CSS.
+const unlockHref = (r) => `/dashboard?save=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}`;
+
+function Unlock({ r, title, lines }) {
+  return (
+    <div className="unlock">
+      <div className="unlock-blur" aria-hidden="true">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="ghost-row"><span></span><i></i><b></b></div>
+        ))}
+      </div>
+      <div className="unlock-card">
+        <span className="ic-tile sm"><Icon name="lock" size={16} /></span>
+        <h3>{title}</h3>
+        <ul>{lines.filter(Boolean).map((l) => <li key={l}><Icon name="check" size={14} />{l}</li>)}</ul>
+        <a className="btn btn-dark" href={unlockHref(r)} onClick={() => track("save_click", { v: r.verdict, from: "unlock" })}>Create a free account to see it all</a>
+        <p className="fine">Free. No card. Your stamp is saved too.</p>
+      </div>
+    </div>
+  );
+}
+
+function LockedChecks({ r }) {
+  const c = r.counts;
+  const top = r.checks[0];
+  return (
+    <section className="sect band" id="checks" aria-labelledby="checks-h">
+      <div className="wrap">
+        <div className="sect-head">
+          <p className="eyebrow">What we checked</p>
+          <h2 id="checks-h">{c.failed ? (c.failed === 1 ? "1 thing holding it back" : `${c.failed} things holding it back`) : "Every check passed"}</h2>
+          <p className="sect-sub">{c.passed} of {c.measured} checks passed. {top ? "Here's the one that matters most." : ""}</p>
+        </div>
+        {top && (
+          <ol className="fails single">
+            <li>
+              <span className="ic-tile red"><Icon name="x" size={20} /></span>
+              <h3>{top.label}</h3>
+              <p className="fail-detail">{top.detail}</p>
+              <p className="fail-fix"><b>Fix</b>{top.fix}</p>
+            </li>
+          </ol>
+        )}
+        <Unlock
+          r={r}
+          title={`All ${c.checks} checks, with the fix for each`}
+          lines={[`${c.passed} passed and ${c.failed} failed, each with what we found`, c.failed > 1 ? `${c.failed - 1} more problem${c.failed - 1 === 1 ? "" : "s"} with fixes` : "", "Saved to your dashboard, with a free re-stamp after you fix it"]}
+        />
+      </div>
+    </section>
+  );
+}
+
+function LockedHood({ r }) {
+  const c = r.counts;
+  if (!c.stack && !c.speed && !c.seo) return null;
+  return (
+    <section className="sect wrap" id="stack" aria-labelledby="stack-h">
+      <div className="sect-head">
+        <p className="eyebrow">Stack and speed</p>
+        <h2 id="stack-h">Under the hood</h2>
+        <p className="sect-sub">Measured in a real browser and from the page's HTML and headers. Every tool comes with the evidence it was found by.</p>
+      </div>
+      <div className="hood-counts">
+        {c.stack > 0 && <div><b>{c.stack}</b><span>tech item{c.stack === 1 ? "" : "s"} found</span></div>}
+        {c.speed > 0 && <div><b>{c.speed}</b><span>real speed numbers</span></div>}
+        {c.thirdParty > 0 && <div><b>{c.thirdParty}</b><span>other domains loaded</span></div>}
+        {c.seo + c.security > 0 && <div><b>{c.seo + c.security}</b><span>SEO and security facts</span></div>}
+      </div>
+      <Unlock r={r} title="See the full stack, speed, and SEO details" lines={[c.stack ? `All ${c.stack} tech items, each with its evidence` : "", "Load time, largest paint, layout shift, page weight", "Search, security headers, and delivery"]} />
+    </section>
+  );
+}
+
 function Result({ r }) {
   const v = r.verdict;
   return (
@@ -565,11 +640,11 @@ function Result({ r }) {
       <main>
         <Hero r={r} />
         <Status r={r} />
-        <Checks r={r} />
+        {r.locked ? <LockedChecks r={r} /> : <Checks r={r} />}
         <SavePrompt r={r} />
         <Offers r={r} />
         <Share r={r} />
-        <Snapshot s={r.snapshot} />
+        {r.locked ? <LockedHood r={r} /> : <Snapshot s={r.snapshot} />}
         <section className="final" aria-labelledby="final-h">
           <div className="final-in">
             <span className="app-tile"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>
@@ -592,7 +667,7 @@ function App() {
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
       .then((r) => {
         if (!NEXT[r.verdict]) throw new Error("bad verdict");
-        document.title = `${r.verdict} — ${r.host} — Stamp My Page`;
+        document.title = `${r.verdict}: ${r.host} | Stamp My Page`;
         trackView("result", { v: r.verdict });
         setState({ status: "ready", r });
       })

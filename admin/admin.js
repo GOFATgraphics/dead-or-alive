@@ -64,16 +64,114 @@ import { renderAnalytics } from "./analytics.js";
     showPane(pane);
   }
 
-  let pane = "reviews";
+  let pane = "stamps";
   function showPane(name) {
     pane = name;
     document.querySelectorAll(".desk-tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pane === name)));
-    for (const p of ["reviews", "members", "analytics", "setup"]) $(`pane-${p}`).hidden = p !== name;
+    for (const p of ["stamps", "users", "reviews", "members", "analytics", "setup"]) $(`pane-${p}`).hidden = p !== name;
+    if (name === "stamps") loadStamps();
+    if (name === "users") loadUsers();
     if (name === "reviews") loadReviews();
     if (name === "members") loadMembers();
     if (name === "analytics") loadAnalytics();
   }
   document.querySelectorAll(".desk-tabs button").forEach((b) => b.addEventListener("click", () => showPane(b.dataset.pane)));
+
+  // Stamps
+
+  let stPage = 0, stPages = 1;
+  $("st-refresh").addEventListener("click", () => loadStamps());
+  $("st-prev").addEventListener("click", () => stPage > 0 && (stPage--, loadStamps()));
+  $("st-next").addEventListener("click", () => stPage < stPages - 1 && (stPage++, loadStamps()));
+  async function loadStamps() {
+    $("st-alert").hidden = true;
+    let data;
+    try {
+      data = await call(`stamps&page=${stPage}`);
+    } catch (err) {
+      $("st-alert").hidden = false;
+      $("st-alert").textContent = err.message;
+      return;
+    }
+    stPages = data.pages || 1;
+    $("st-total").textContent = `· ${data.total} total · page ${data.page + 1} of ${stPages}`;
+    const list = $("stamps");
+    if (!data.stamps.length) return list.replaceChildren(el("li", { className: "empty", textContent: "No stamps yet." }));
+    list.replaceChildren(...data.stamps.map(stampItem));
+  }
+  const VCOL = { DEAD: "#b42228", COPE: "#a85d06", ALIVE: "#1d7a45" };
+  function stampItem(st) {
+    const li = el("li", { className: "order" });
+    const verdict = el("strong", { textContent: `${st.verdict}${st.score != null ? ` ${st.score}` : ""}` });
+    verdict.style.color = VCOL[st.verdict] || "";
+    const head = el("div", { className: "who" }, verdict, el("strong", { textContent: st.host }), el("span", { textContent: `#${String(st.number || 0).padStart(4, "0")} · ${fmt(st.createdAt)}` }));
+    const meta = el(
+      "div",
+      { className: "meta" },
+      el("span", { textContent: st.owner ? `Saved by ${st.owner}` : "Not saved to an account" }),
+      el("span", { textContent: `${st.stack} tech items` }),
+      st.lcp ? el("span", { textContent: `Main content ${(st.lcp / 1000).toFixed(1)}s` }) : null,
+      el("span", { textContent: st.failed.length ? `Failed: ${st.failed.join(", ")}` : "All checks passed" })
+    );
+    const detail = el("div", { className: "st-detail", hidden: true });
+    const open = el("button", { type: "button", className: "link", textContent: "Full details" });
+    open.onclick = async () => {
+      if (!detail.hidden) return (detail.hidden = true);
+      detail.hidden = false;
+      detail.replaceChildren(el("p", { textContent: "Loading…" }));
+      try {
+        const { stamp } = await call(`stamp&id=${encodeURIComponent(st.id)}`);
+        detail.replaceChildren(...stampDetail(stamp));
+      } catch (err) {
+        detail.replaceChildren(el("p", { className: "alert", textContent: err.message }));
+      }
+    };
+    const links = el("div", { className: "actions" }, open, el("a", { className: "link", href: `/v/${st.id}`, target: "_blank", rel: "noopener", textContent: "Open stamp" }), el("a", { className: "link", href: st.pageUrl, target: "_blank", rel: "noopener noreferrer", textContent: "Open page" }));
+    li.append(head, meta, links, detail);
+    return li;
+  }
+  function stampDetail(r) {
+    const out = [];
+    out.push(el("p", { className: "st-sentence", textContent: `“${r.sentence}”` }));
+    const checks = el("ul", { className: "st-checks" }, ...(r.checks || []).map((k) => el("li", { className: k.skip ? "skip" : k.pass ? "pass" : "fail", textContent: `${k.skip ? "Not measured" : k.pass ? "Pass" : "Fail"} · ${k.label}: ${k.detail}` })));
+    out.push(el("h3", { className: "kicker", textContent: "Checks" }), checks);
+    const s = r.snapshot || {};
+    if (s.stack?.length) out.push(el("h3", { className: "kicker", textContent: `Stack (${s.stack.length})` }), el("ul", { className: "st-checks" }, ...s.stack.map((t) => el("li", { textContent: `${t.category} · ${t.name}: ${t.evidence}` }))));
+    const b = s.browser;
+    if (b) out.push(el("h3", { className: "kicker", textContent: "Speed" }), el("p", { textContent: [b.lcp && `Main content ${(b.lcp / 1000).toFixed(2)}s`, b.ttfb && `Server ${(b.ttfb / 1000).toFixed(2)}s`, b.cls != null && `Layout shift ${b.cls}`, b.requests && `${b.requests} requests`, b.thirdParty?.length && `${b.thirdParty.length} other domains`].filter(Boolean).join(" · ") }));
+    if (s.seo) out.push(el("h3", { className: "kicker", textContent: "SEO" }), el("p", { textContent: `Index: ${s.seo.noindex ? "blocked" : "allowed"} · h1: ${s.seo.h1Count} · Title ${s.seo.titleLength} chars · Description ${s.seo.descriptionLength} chars · Canonical ${s.seo.canonical ? "set" : "missing"} · Images without alt ${s.seo.imagesWithoutAlt}/${s.seo.images}` }));
+    if (s.security) out.push(el("h3", { className: "kicker", textContent: "Security headers" }), el("p", { textContent: Object.entries(s.security).map(([k, v]) => `${k}: ${v ? "yes" : "no"}`).join(" · ") }));
+    return out;
+  }
+
+  // Accounts
+
+  $("us-refresh").addEventListener("click", () => loadUsers());
+  async function loadUsers() {
+    $("us-alert").hidden = true;
+    let data;
+    try {
+      data = await call("users");
+    } catch (err) {
+      $("us-alert").hidden = false;
+      $("us-alert").textContent = err.message;
+      return;
+    }
+    const us = data.users || [];
+    $("us-total").textContent = `· ${us.length}`;
+    const list = $("users");
+    if (!us.length) return list.replaceChildren(el("li", { className: "empty", textContent: "No accounts yet." }));
+    list.replaceChildren(
+      ...us.map((u) =>
+        el(
+          "li",
+          { className: "order" },
+          el("div", { className: "who" }, el("strong", { textContent: u.email }), el("span", { textContent: [u.killSheet && "Kill Sheet", u.stayAlive && "Stay Alive", !u.killSheet && !u.stayAlive && "Free"].filter(Boolean).join(" + ") })),
+          el("div", { className: "meta" }, el("span", { textContent: `Joined ${fmt(u.createdAt)}` }), el("span", { textContent: u.x ? `X @${u.x}` : u.password ? "Password" : "Email link" }), el("span", { textContent: `${u.stamps} stamps${u.lastStamp ? `, last ${u.lastStamp}` : ""}` }), el("span", { textContent: `${u.reviews} reviews` }))
+        )
+      )
+    );
+  }
 
   // Reviews
 

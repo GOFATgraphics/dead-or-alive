@@ -591,3 +591,10 @@ input[aria-invalid="true"] { border-color: var(--dead); }
 .rv-login { margin: 0.5rem 0; padding: 0.6rem 0.8rem; border-radius: 10px; background: var(--chip); font-family: var(--mono); font-size: 0.8125rem; }
 .rv-form { display: grid; gap: 0.5rem; margin: 0.75rem 0; }
 .rv-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.75rem; font: inherit; font-size: 0.875rem; }
+.st-detail { margin-top: 0.75rem; padding: 0.9rem 1rem; border-radius: 12px; background: var(--chip); font-size: 0.875rem; line-height: 1.5; }
+.st-detail h3 { margin: 0.9rem 0 0.3rem; }
+.st-sentence { font-weight: 600; }
+.st-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.st-checks .fail { color: #b42228; }
+.st-checks .pass { color: #1d7a45; }
+.st-checks .skip { color: var(--muted); }

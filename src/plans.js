@@ -34,7 +34,7 @@ const FREE = `<article class="pc pc-free">
   <h3>Free stamp</h3>
   <p class="pc-amount">$0 <span>no signup</span></p>
   <p class="pc-pitch">Paste a URL, get DEAD, COPE or ALIVE in about a minute.</p>
-  <ul class="pc-ticks"><li>${CHECK}<span>13 first-screen checks with the fix for every fail</span></li><li>${CHECK}<span>Real tech stack and browser-measured speed</span></li><li>${CHECK}<span>A shareable card and, for ALIVE, a footer badge</span></li><li>${CHECK}<span>Optional free account to save every stamp</span></li></ul>
+  <ul class="pc-ticks"><li>${CHECK}<span>Your stamp, score, and the one problem that matters most, with its fix</span></li><li>${CHECK}<span>A shareable card and, for ALIVE, a footer badge</span></li><li>${CHECK}<span>With a free account: all 13 checks, the full tech stack, speed, and SEO details</span></li><li>${CHECK}<span>Every stamp saved in one place, and a free re-stamp after you fix it</span></li></ul>
   <a class="btn btn-line" href="/#top">Stamp my page free ${ARROW}</a>
 </article>`;
 

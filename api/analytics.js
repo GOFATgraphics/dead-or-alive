@@ -8,6 +8,7 @@ const COUNTERS = [
   "view", "view:home", "view:result", "view:privacy", "view:terms",
   "form_start", "submit_try", "submit_error", "stamp_start", "queue_closed", "cta_click", "offer_click",
   "share_copy", "result_cta",
+  "view:pricing", "view:dashboard", "save_click", "signup", "login", "checkout_start", "review_submit",
   "view:v:DEAD", "view:v:COPE", "view:v:ALIVE",
   "share_copy:v:DEAD", "share_copy:v:COPE", "share_copy:v:ALIVE",
 ];
