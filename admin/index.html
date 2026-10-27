@@ -11,109 +11,161 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="preload" href="/fonts/plus-jakarta-sans-latin-v12.woff2" as="font" type="font/woff2" crossorigin />
   </head>
-  <body>
-    <main class="desk admin">
-      <a class="logo" href="/" aria-label="Stamp My Page home">
-        <img src="/brand/smp-icon.svg" alt="" width="40" height="40" />
+  <body class="ad">
+    <header class="bar ad-bar">
+      <a class="mark" href="/" aria-label="Stamp My Page home">
+        <img src="/brand/smp-mark.svg" alt="" width="26" height="26" />
         <span>Stamp My Page</span>
       </a>
-      <p class="kicker brand back-room">Back room</p>
-      <h1 class="name">The desk</h1>
-      <p class="usp" id="queue"></p>
+      <span class="ad-tag">Admin</span>
+      <div class="who">
+        <span class="ad-pill" id="queue" hidden></span>
+        <button type="button" class="btn btn-line btn-sm" id="lock" hidden>Lock</button>
+      </div>
+    </header>
 
-      <form id="unlock" class="unlock">
-        <label class="label">Admin key
+    <main class="wrap">
+      <form id="unlock" class="ad-unlock">
+        <h1>Admin</h1>
+        <p>Stamps, accounts, members, reviews, and analytics. Enter the admin key to open it.</p>
+        <label>Admin key
           <input name="key" type="password" autocomplete="current-password" required />
         </label>
-        <button class="submit" type="submit">Open the desk</button>
+        <button class="btn btn-dark" type="submit">Open</button>
         <p class="alert" role="alert" hidden></p>
       </form>
 
-      <nav class="desk-nav" id="desk-nav" aria-label="Desk" hidden>
-        <div class="tabs desk-tabs">
-          <button type="button" data-pane="stamps" aria-pressed="true">Stamps</button>
-          <button type="button" data-pane="users" aria-pressed="false">Accounts</button>
-          <button type="button" data-pane="reviews" aria-pressed="false">Reviews</button>
-          <button type="button" data-pane="members" aria-pressed="false">Members</button>
-          <button type="button" data-pane="analytics" aria-pressed="false">Analytics</button>
-          <button type="button" data-pane="setup" aria-pressed="false">Setup</button>
-        </div>
-        <button type="button" class="link" id="lock">Lock</button>
-      </nav>
+      <div class="app" id="app" hidden>
+        <aside class="side">
+          <nav class="side-nav" id="side-nav" aria-label="Admin"></nav>
+        </aside>
 
-      <section id="pane-analytics" class="section pane" hidden>
-        <div class="bar">
-          <h2 class="kicker">Analytics</h2>
-          <div class="tabs range-tabs" role="group" aria-label="Date range">
-            <button type="button" data-days="7" aria-pressed="false">7 days</button>
-            <button type="button" data-days="30" aria-pressed="true">30 days</button>
-            <button type="button" data-days="90" aria-pressed="false">90 days</button>
-          </div>
-          <button type="button" class="link" id="an-refresh">Refresh</button>
-        </div>
-        <ul class="an-notes" id="an-notes"></ul>
-        <div class="an-body" id="an-body"><p class="an-empty">Loading…</p></div>
-      </section>
+        <div class="main">
+          <section class="pane" id="pane-overview" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Overview</h1><p>Everything at a glance. Numbers cover the last 30 days unless they say otherwise.</p></div>
+              <button type="button" class="btn btn-line btn-sm" data-refresh="overview">Refresh</button>
+            </header>
+            <div id="ov-body"><p class="ad-loading">Loading…</p></div>
+          </section>
 
-      <section id="pane-setup" class="section pane" hidden>
-        <h2 class="kicker">Setup</h2>
-        <p class="usp">What the desk is connected to. Add missing pieces in your hosting settings as environment variables, then redeploy.</p>
-        <ul class="setup-list" id="setup-list"></ul>
-        <div class="actions">
-          <button type="button" class="submit ghost" id="recards">Redraw all share cards</button>
-          <span class="usp" id="recards-note" aria-live="polite">Redraws every published stamp's share card in the current design. Links shared before keep their old preview where the app cached it.</span>
-        </div>
-      </section>
+          <section class="pane" id="pane-stamps" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Stamps</h1><p id="st-sub">Every published stamp, newest first.</p></div>
+              <button type="button" class="btn btn-line btn-sm" data-refresh="stamps">Refresh</button>
+            </header>
+            <div class="ad-tools">
+              <input type="search" id="st-q" placeholder="Search site or account" aria-label="Search stamps on this page" />
+              <div class="ad-seg" id="st-v" role="group" aria-label="Verdict">
+                <button type="button" data-v="" aria-pressed="true">All</button>
+                <button type="button" data-v="DEAD" aria-pressed="false">Dead</button>
+                <button type="button" data-v="COPE" aria-pressed="false">Cope</button>
+                <button type="button" data-v="ALIVE" aria-pressed="false">Alive</button>
+              </div>
+              <div class="ad-pager">
+                <span id="st-page"></span>
+                <button type="button" class="btn btn-line btn-sm" id="st-prev" aria-label="Newer"></button>
+                <button type="button" class="btn btn-line btn-sm" id="st-next" aria-label="Older"></button>
+              </div>
+            </div>
+            <p class="alert" id="st-alert" role="alert" hidden></p>
+            <div id="stamps"></div>
+          </section>
 
-      <section id="pane-stamps" class="section pane" hidden>
-        <div class="bar">
-          <h2 class="kicker">Stamps <span id="st-total"></span></h2>
-          <div class="tabs st-pages" role="group" aria-label="Page">
-            <button type="button" id="st-prev">Newer</button>
-            <button type="button" id="st-next">Older</button>
-          </div>
-          <button type="button" class="link" id="st-refresh">Refresh</button>
-        </div>
-        <p class="usp">Every published stamp, newest first. Open one for its full checks, stack, speed, SEO, and security.</p>
-        <p class="alert" id="st-alert" role="alert" hidden></p>
-        <ul class="orders" id="stamps"></ul>
-      </section>
+          <section class="pane" id="pane-users" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Accounts</h1><p id="us-sub">Everyone who made an account, newest first.</p></div>
+              <button type="button" class="btn btn-line btn-sm" data-refresh="users">Refresh</button>
+            </header>
+            <div class="ad-tools">
+              <input type="search" id="us-q" placeholder="Search email or X handle" aria-label="Search accounts" />
+              <div class="ad-seg" id="us-f" role="group" aria-label="Plan">
+                <button type="button" data-f="" aria-pressed="true">All</button>
+                <button type="button" data-f="free" aria-pressed="false">Free</button>
+                <button type="button" data-f="paid" aria-pressed="false">Paying</button>
+              </div>
+            </div>
+            <p class="alert" id="us-alert" role="alert" hidden></p>
+            <div id="users"></div>
+          </section>
 
-      <section id="pane-users" class="section pane" hidden>
-        <div class="bar">
-          <h2 class="kicker">Accounts <span id="us-total"></span></h2>
-          <button type="button" class="link" id="us-refresh">Refresh</button>
-        </div>
-        <p class="alert" id="us-alert" role="alert" hidden></p>
-        <ul class="orders" id="users"></ul>
-      </section>
+          <section class="pane" id="pane-members" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Members</h1><p id="mb-sub">Accounts with a Kill Sheet or Stay Alive.</p></div>
+              <button type="button" class="btn btn-line btn-sm" data-refresh="members">Refresh</button>
+            </header>
+            <p class="alert" id="mb-alert" role="alert" hidden></p>
+            <div id="members"></div>
+          </section>
 
-      <section id="pane-reviews" class="section pane" hidden>
-        <div class="bar">
-          <h2 class="kicker">App reviews</h2>
-          <div class="tabs rv-tabs" role="group" aria-label="Show">
-            <button type="button" data-view="open" aria-pressed="true">Open</button>
-            <button type="button" data-view="delivered" aria-pressed="false">Delivered</button>
-            <button type="button" data-view="all" aria-pressed="false">All</button>
-          </div>
-          <button type="button" class="link" id="rv-refresh">Refresh</button>
-        </div>
-        <p class="usp">Move a review to In review to see its test login. Delivering it puts the result in the member's dashboard and deletes the test login.</p>
-        <p class="alert" id="rv-alert" role="alert" hidden></p>
-        <ul class="orders" id="reviews"></ul>
-      </section>
+          <section class="pane" id="pane-reviews" hidden>
+            <header class="page-head ad-head">
+              <div><h1>App reviews</h1><p>Move a review to In review to see its test login. Delivering puts the result in the member's dashboard and deletes the test login.</p></div>
+              <button type="button" class="btn btn-line btn-sm" data-refresh="reviews">Refresh</button>
+            </header>
+            <div class="ad-tools">
+              <div class="ad-seg" id="rv-v" role="group" aria-label="Show">
+                <button type="button" data-view="open" aria-pressed="true">Open</button>
+                <button type="button" data-view="delivered" aria-pressed="false">Delivered</button>
+                <button type="button" data-view="all" aria-pressed="false">All</button>
+              </div>
+            </div>
+            <p class="alert" id="rv-alert" role="alert" hidden></p>
+            <div id="reviews"></div>
+          </section>
 
-      <section id="pane-members" class="section pane" hidden>
-        <div class="bar">
-          <h2 class="kicker">Members</h2>
-          <button type="button" class="link" id="mb-refresh">Refresh</button>
+          <section class="pane" id="pane-analytics" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Analytics</h1><p>Visits, the funnel from homepage to checkout, verdicts, and where people come from.</p></div>
+              <div class="ad-head-actions">
+                <div class="ad-seg" id="an-range" role="group" aria-label="Date range">
+                  <button type="button" data-days="7" aria-pressed="false">7d</button>
+                  <button type="button" data-days="30" aria-pressed="true">30d</button>
+                  <button type="button" data-days="90" aria-pressed="false">90d</button>
+                </div>
+                <button type="button" class="btn btn-line btn-sm" data-refresh="analytics">Refresh</button>
+              </div>
+            </header>
+            <ul class="an-notes" id="an-notes"></ul>
+            <div class="an-body" id="an-body"><p class="ad-loading">Loading…</p></div>
+          </section>
+
+          <section class="pane" id="pane-setup" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Setup</h1><p>What the site is connected to. Add missing pieces as environment variables in your hosting settings, then redeploy.</p></div>
+            </header>
+            <section class="panel">
+              <header class="panel-head"><div><h2>Connections</h2><p id="setup-sum"></p></div></header>
+              <ul class="ad-setup" id="setup-list"></ul>
+            </section>
+            <section class="panel">
+              <header class="panel-head">
+                <div><h2>Free stamping</h2><p id="queue-note"></p></div>
+              </header>
+            </section>
+            <section class="panel">
+              <header class="panel-head">
+                <div><h2>Share cards</h2><p id="recards-note" aria-live="polite">Redraws every published stamp's share card in the current design. Links shared before keep their old preview where the app cached it.</p></div>
+                <button type="button" class="btn btn-line btn-sm" id="recards">Redraw all</button>
+              </header>
+            </section>
+          </section>
         </div>
-        <p class="alert" id="mb-alert" role="alert" hidden></p>
-        <ul class="orders" id="members"></ul>
-      </section>
+      </div>
     </main>
+
+    <div class="ad-drawer" id="drawer" hidden>
+      <div class="ad-scrim" data-close></div>
+      <aside class="ad-sheet" role="dialog" aria-modal="true" aria-labelledby="drawer-h">
+        <header class="ad-sheet-head">
+          <h2 id="drawer-h"></h2>
+          <button type="button" class="btn btn-line btn-sm" data-close>Close</button>
+        </header>
+        <div class="ad-sheet-body" id="drawer-body"></div>
+      </aside>
+    </div>
     <script type="module" src="/admin/admin.js"></script>
   </body>
 </html>

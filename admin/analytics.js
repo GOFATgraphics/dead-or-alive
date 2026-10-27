@@ -69,7 +69,7 @@ function showTip(target, value, label) {
 const hideTip = () => tip && (tip.hidden = true);
 
 // Daily bars: one series, one axis. Bars round at the top only, 2px gaps, values on hover and focus.
-function barChart(rows, key, label, format = num) {
+export function barChart(rows, key, label, format = num) {
   const wrap = el("div", "an-chart");
   const max = Math.max(1, ...rows.map((r) => r[key] || 0));
   const W = 600, H = 160, pad = 2;

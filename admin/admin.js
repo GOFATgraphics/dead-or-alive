@@ -1,16 +1,45 @@
+import "../src/result.css";
+import "../src/dashboard.css";
+import "./admin.css";
 import { DESK } from "../src/config.js";
-import { renderAnalytics } from "./analytics.js";
+import { PATHS } from "../src/icon-paths.js";
+import { barChart, renderAnalytics } from "./analytics.js";
 
-// The desk: app reviews to work on, members, analytics, and what's connected. Everything goes through /api/admin
-// (and /api/analytics) with the admin key, which lives in this tab's session storage only.
+// The admin page: an overview, stamps, accounts, members, app reviews, analytics, and setup. Everything goes
+// through /api/admin (and /api/analytics) with the admin key, which lives in this tab's session storage only.
+// All text from the data goes in with textContent.
 (() => {
   const $ = (id) => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => {
-    const n = Object.assign(document.createElement(tag), props);
-    n.append(...kids.filter((k) => k != null && k !== false));
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) k === "role" || k.startsWith("aria-") ? n.setAttribute(k, v) : (n[k] = v);
+    n.append(...kids.flat().filter((k) => k != null && k !== false && k !== ""));
     return n;
   };
-  const fmt = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "");
+  const icon = (name) => {
+    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    for (const [k, v] of Object.entries({ class: "ic", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" })) s.setAttribute(k, v);
+    s.innerHTML = PATHS[name] || "";
+    return s;
+  };
+  const nf = new Intl.NumberFormat();
+  const num = (v) => (v == null ? "n/a" : nf.format(v));
+  const date = (iso) => (iso ? new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "");
+  const stamp = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "");
+  function ago(iso) {
+    if (!iso) return "";
+    const s = (Date.now() - Date.parse(iso)) / 1000;
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    if (s < 86400 * 14) return `${Math.floor(s / 86400)}d ago`;
+    return date(iso);
+  }
+  const chip = (text, tone = "") => el("span", { className: `ad-chip ${tone}`, textContent: text });
+  const vchip = (v) => el("span", { className: `ad-chip v-${String(v || "").toLowerCase()}`, textContent: v || "?" });
+  const muted = (text) => el("span", { className: "ad-muted", textContent: text });
+  const plural = (n, one, many = one + "s") => `${num(n)} ${n === 1 ? one : many}`;
+  const KILL_SHEET = 19, STAY_ALIVE = 20;
 
   const session = {
     get() { try { return sessionStorage.getItem("doa.key") || ""; } catch (_) { return ""; } },
@@ -24,10 +53,98 @@ import { renderAnalytics } from "./analytics.js";
     if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
     return data;
   }
+  async function analytics(days) {
+    const r = await fetch(`/api/analytics?days=${days}`, { headers: { "x-admin-key": key }, cache: "no-store" });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+    return data;
+  }
 
-  $("queue").textContent = DESK.queueOpen
-    ? "Free stamping is on. To pause it, set queueOpen to false in src/config.js and deploy."
-    : "Free stamping is paused. To turn it on, set queueOpen to true in src/config.js and deploy.";
+  // Data, fetched once per pane and again on Refresh.
+  const cache = {};
+  async function get(name, fn, fresh) {
+    if (fresh || !cache[name]) cache[name] = fn().catch((err) => { delete cache[name]; throw err; });
+    return cache[name];
+  }
+  const getStamps = (page, fresh) => get(`stamps:${page}`, () => call(`stamps&page=${page}`), fresh);
+  const getUsers = (fresh) => get("users", async () => (await call("users")).users || [], fresh);
+  const getMembers = (fresh) => get("members", () => call("members"), fresh);
+  const getReviews = (fresh) => get("reviews", async () => (await call("reviews")).reviews || [], fresh);
+  const getAnalytics = (days, fresh) => get(`an:${days}`, () => analytics(days), fresh);
+
+  const fail = (id, err) => {
+    const a = $(id);
+    a.hidden = !err;
+    if (err) a.textContent = err.message || String(err);
+  };
+
+  // A table. Rows with onRow open on click or Enter.
+  function table(cols, rows, { onRow, empty = "Nothing here yet." } = {}) {
+    if (!rows.length) return el("p", { className: "empty", textContent: empty });
+    const head = el("tr", {}, cols.map((c) => el("th", { scope: "col", className: c.cls || "", textContent: c.label })));
+    const body = rows.map((r) => {
+      const tr = el("tr", {}, cols.map((c) => {
+        const v = c.cell(r);
+        return el("td", { className: c.cls || "" }, v instanceof Node ? v : String(v ?? ""));
+      }));
+      if (onRow) {
+        tr.tabIndex = 0;
+        tr.className = "go";
+        tr.onclick = (e) => !e.target.closest("a, button") && onRow(r);
+        tr.onkeydown = (e) => e.key === "Enter" && e.target === tr && onRow(r);
+      }
+      return tr;
+    });
+    return el("div", { className: "ad-table-wrap" }, el("table", { className: "ad-table" }, el("thead", {}, head), el("tbody", {}, body)));
+  }
+
+  function panel(title, desc, action, ...kids) {
+    return el("section", { className: "panel" }, el("header", { className: "panel-head" }, el("div", {}, el("h2", { textContent: title }), desc ? el("p", { textContent: desc }) : null), action), ...kids);
+  }
+  const kpis = (items) => el("div", { className: "kpis ad-kpis" }, items.map(([label, value, sub, tone]) => el("div", {}, el("p", { textContent: label }), el("b", { className: tone || "", textContent: value }), sub ? el("small", { textContent: sub }) : null)));
+  const site = (host, iconUrl, sub) => {
+    const mark = iconUrl ? el("img", { src: iconUrl, alt: "", width: 18, height: 18, loading: "lazy" }) : el("i", { textContent: (host || "?")[0].toUpperCase() });
+    if (iconUrl) mark.onerror = () => mark.replaceWith(el("i", { textContent: (host || "?")[0].toUpperCase() }));
+    return el("span", { className: "ad-site" }, mark, el("span", {}, el("b", { textContent: host }), sub ? el("small", { textContent: sub }) : null));
+  };
+  const person = (email, sub) => el("span", { className: "ad-site" }, el("span", { className: "avatar", "aria-hidden": "true", textContent: (email || "?")[0].toUpperCase() }), el("span", {}, el("b", { textContent: email }), sub ? el("small", { textContent: sub }) : null));
+
+  // Navigation
+
+  const PANES = [
+    ["overview", "Overview", "layout-grid"],
+    ["stamps", "Stamps", "stamp"],
+    ["users", "Accounts", "users"],
+    ["members", "Members", "credit-card"],
+    ["reviews", "App reviews", "clipboard-list"],
+    ["analytics", "Analytics", "chart-column"],
+    ["setup", "Setup", "server"],
+  ];
+  const counts = {};
+  function renderNav() {
+    $("side-nav").replaceChildren(
+      ...PANES.map(([id, label, ic]) => {
+        const b = el("button", { type: "button", className: id === pane ? "on" : "" }, icon(ic), el("span", { textContent: label }), counts[id] != null ? el("em", { className: id === "reviews" && counts[id] ? "hot" : "", textContent: num(counts[id]) }) : null);
+        if (id === pane) b.setAttribute("aria-current", "page");
+        b.onclick = () => go(id);
+        return b;
+      })
+    );
+  }
+  const count = (id, n) => { counts[id] = n; renderNav(); };
+
+  let pane = "overview";
+  function go(name, fresh) {
+    if (!PANES.some(([id]) => id === name)) name = "overview";
+    pane = name;
+    if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);
+    for (const [id] of PANES) $(`pane-${id}`).hidden = id !== name;
+    renderNav();
+    ({ overview: loadOverview, stamps: loadStamps, users: loadUsers, members: loadMembers, reviews: loadReviews, analytics: loadAnalytics, setup: renderSetup })[name](fresh);
+    scrollTo({ top: 0 });
+  }
+  addEventListener("hashchange", () => key && !$("app").hidden && location.hash.slice(1) !== pane && go(location.hash.slice(1)));
+  document.querySelectorAll("[data-refresh]").forEach((b) => (b.onclick = () => go(b.dataset.refresh, true)));
 
   // Unlock
 
@@ -35,195 +152,385 @@ import { renderAnalytics } from "./analytics.js";
   unlock.addEventListener("submit", (e) => {
     e.preventDefault();
     key = String(new FormData(unlock).get("key") || "");
-    openDesk();
+    open();
   });
-  $("lock").addEventListener("click", () => {
+  $("lock").onclick = () => {
     key = "";
     session.set("");
-    $("desk-nav").hidden = true;
-    document.querySelectorAll(".pane").forEach((p) => (p.hidden = true));
+    for (const k of Object.keys(cache)) delete cache[k];
+    $("app").hidden = $("lock").hidden = $("queue").hidden = true;
     unlock.hidden = false;
-  });
+    unlock.reset();
+  };
 
   let setup = {};
-  async function openDesk() {
+  async function open() {
     const alert = unlock.querySelector("[role=alert]");
     alert.hidden = true;
     try {
       setup = (await call("session")).setup || {};
     } catch (err) {
       alert.hidden = false;
-      alert.textContent = err.message === "Not available." ? "The desk is off: the admin key isn't set up yet." : err.message || "Could not open the desk.";
+      alert.textContent = err.message === "Not available." ? "Admin is off: the admin key isn't set up yet." : err.message || "Could not open admin.";
       if (/key/i.test(String(err.message))) session.set("");
       return;
     }
     session.set(key);
     unlock.hidden = true;
-    $("desk-nav").hidden = false;
-    renderSetup();
-    showPane(pane);
+    $("app").hidden = $("lock").hidden = $("queue").hidden = false;
+    $("queue").textContent = DESK.queueOpen ? "Stamping on" : "Stamping paused";
+    $("queue").className = `ad-pill ${DESK.queueOpen ? "ok" : "warn"}`;
+    count("setup", (setup.items || []).filter(([, ok]) => !ok).length || null);
+    go(location.hash.slice(1) || "overview");
+    // Fill the sidebar counts in the background.
+    getStamps(0).then((d) => count("stamps", d.total)).catch(() => {});
+    getUsers().then((u) => count("users", u.length)).catch(() => {});
+    getMembers().then((m) => count("members", (m.members || []).length)).catch(() => {});
+    getReviews().then((r) => count("reviews", r.filter((x) => x.status !== "delivered").length)).catch(() => {});
   }
 
-  let pane = "stamps";
-  function showPane(name) {
-    pane = name;
-    document.querySelectorAll(".desk-tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pane === name)));
-    for (const p of ["stamps", "users", "reviews", "members", "analytics", "setup"]) $(`pane-${p}`).hidden = p !== name;
-    if (name === "stamps") loadStamps();
-    if (name === "users") loadUsers();
-    if (name === "reviews") loadReviews();
-    if (name === "members") loadMembers();
-    if (name === "analytics") loadAnalytics();
+  // Drawer
+
+  const drawer = $("drawer");
+  let lastFocus = null;
+  function openDrawer(title, kids) {
+    lastFocus = document.activeElement;
+    $("drawer-h").textContent = title;
+    $("drawer-body").replaceChildren(...kids);
+    drawer.hidden = false;
+    document.body.classList.add("ad-locked");
+    drawer.querySelector(".ad-sheet [data-close]").focus();
   }
-  document.querySelectorAll(".desk-tabs button").forEach((b) => b.addEventListener("click", () => showPane(b.dataset.pane)));
+  function closeDrawer() {
+    drawer.hidden = true;
+    document.body.classList.remove("ad-locked");
+    lastFocus?.focus?.();
+  }
+  drawer.addEventListener("click", (e) => e.target.closest("[data-close]") && closeDrawer());
+  addEventListener("keydown", (e) => e.key === "Escape" && !drawer.hidden && closeDrawer());
+
+  // Overview
+
+  async function loadOverview(fresh) {
+    const body = $("ov-body");
+    if (fresh || !body.dataset.ready) body.replaceChildren(el("p", { className: "ad-loading", textContent: "Loading…" }));
+    const [st, us, mb, rv, an] = await Promise.allSettled([getStamps(0, fresh), getUsers(fresh), getMembers(fresh), getReviews(fresh), getAnalytics(30, fresh)]);
+    const v = (p) => (p.status === "fulfilled" ? p.value : null);
+    const stamps = v(st), users = v(us), members = v(mb)?.members, reviews = v(rv), data = v(an);
+    const t = data?.traffic;
+    if (stamps) count("stamps", stamps.total);
+    if (users) count("users", users.length);
+    if (members) count("members", members.length);
+    const open = (reviews || []).filter((r) => r.status !== "delivered");
+    if (reviews) count("reviews", open.length);
+
+    const week = Date.now() - 7 * 86400e3;
+    const ks = (members || []).filter((m) => m.killSheet?.active).length;
+    const sa = (members || []).filter((m) => m.stayAlive?.active).length;
+    const mrr = sa * STAY_ALIVE;
+    const latest = stamps?.stamps?.[0];
+
+    const out = [
+      kpis([
+        ["Visitors", num(t?.totals.visitors), t ? `${num(t.totals.view)} page views` : "Analytics not connected"],
+        ["Stamps", num(stamps?.total), latest ? `Latest ${latest.host}, ${ago(latest.createdAt)}` : "None yet"],
+        ["Accounts", num(users?.length), users ? `${num(users.filter((u) => Date.parse(u.createdAt) > week).length)} new this week` : "Couldn't load"],
+        ["Monthly revenue", members ? `$${nf.format(mrr)}` : "n/a", members ? `${plural(sa, "Stay Alive")} · ${plural(ks, "Kill Sheet")}` : "Couldn't load"],
+      ]),
+    ];
+
+    const left = [];
+    if (t?.daily?.length) left.push(panel("Visitors per day", "Last 30 days.", go2("analytics", "Analytics"), barChart(t.daily, "visitors", "Visitors")));
+    left.push(
+      panel(
+        "Latest stamps",
+        stamps ? `${plural(stamps.total, "stamp")} in all.` : "Couldn't load stamps.",
+        go2("stamps", "All stamps"),
+        table(stampCols(true), (stamps?.stamps || []).slice(0, 8), { onRow: (r) => openStamp(r), empty: "No stamps yet." })
+      )
+    );
+
+    const right = [];
+    const sample = stamps?.stamps || [];
+    if (sample.length) right.push(panel("Verdict mix", `Across the latest ${plural(sample.length, "stamp")}.`, null, verdictMix(sample)));
+    right.push(
+      panel(
+        "Review queue",
+        open.length ? `${plural(open.length, "review")} waiting.` : "Nothing waiting.",
+        go2("reviews", "Open"),
+        open.length
+          ? el("ul", { className: "status-list" }, open.slice(0, 5).map((r) => el("li", {}, el("span", { className: `dot ${r.status === "in_review" ? "run" : ""}` }), el("div", {}, el("b", { textContent: r.siteUrl || r.appUrl }), el("p", { textContent: `${LABEL[r.status]} · ${r.email}` })), muted(ago(r.createdAt)))))
+          : el("p", { className: "ad-muted", textContent: "New requests from members show up here." })
+      )
+    );
+    const missing = (setup.items || []).filter(([, ok]) => !ok);
+    right.push(
+      panel(
+        "Setup",
+        missing.length ? `${plural(missing.length, "thing")} to connect.` : "Everything is connected.",
+        go2("setup", "Details"),
+        el("ul", { className: "status-list" }, (missing.length ? missing : (setup.items || []).slice(0, 4)).map(([name, ok]) => el("li", {}, el("span", { className: `dot ${ok ? "ok" : "bad"}` }), el("b", { textContent: name }), muted(ok ? "Connected" : "Missing"))))
+      )
+    );
+
+    out.push(el("div", { className: "grid2" }, el("div", { className: "ad-col" }, left), el("div", { className: "ad-col" }, right)));
+    body.replaceChildren(...out);
+    body.dataset.ready = "1";
+  }
+  const go2 = (id, label) => el("button", { type: "button", className: "btn btn-line btn-sm", textContent: label, onclick: () => go(id) });
+
+  function verdictMix(rows) {
+    const n = { DEAD: 0, COPE: 0, ALIVE: 0 };
+    for (const r of rows) if (r.verdict in n) n[r.verdict]++;
+    const total = rows.length || 1;
+    const bar = el("div", { className: "ad-mix", role: "img", "aria-label": Object.entries(n).map(([k, c]) => `${k} ${c}`).join(", ") }, Object.entries(n).filter(([, c]) => c).map(([k, c]) => {
+      const s = el("span", { className: `v-${k.toLowerCase()}` });
+      s.style.width = `${(c / total) * 100}%`;
+      return s;
+    }));
+    const legend = el("ul", { className: "ad-legend" }, Object.entries(n).map(([k, c]) => el("li", {}, el("i", { className: `v-${k.toLowerCase()}` }), el("span", { textContent: k[0] + k.slice(1).toLowerCase() }), el("b", { textContent: `${num(c)}` }), muted(`${Math.round((c / total) * 100)}%`))));
+    return el("div", {}, bar, legend);
+  }
 
   // Stamps
 
-  let stPage = 0, stPages = 1;
-  $("st-refresh").addEventListener("click", () => loadStamps());
-  $("st-prev").addEventListener("click", () => stPage > 0 && (stPage--, loadStamps()));
-  $("st-next").addEventListener("click", () => stPage < stPages - 1 && (stPage++, loadStamps()));
-  async function loadStamps() {
-    $("st-alert").hidden = true;
-    let data;
-    try {
-      data = await call(`stamps&page=${stPage}`);
-    } catch (err) {
-      $("st-alert").hidden = false;
-      $("st-alert").textContent = err.message;
-      return;
+  let stPage = 0, stV = "";
+  const lcp = (ms) => (ms ? el("span", { className: `ad-num ${ms > 2500 ? "bad" : ""}`, textContent: `${(ms / 1000).toFixed(1)}s` }) : muted("n/a"));
+  function stampCols(short) {
+    const cols = [
+      { label: "Site", cell: (r) => site(r.host, r.icon, `#${String(r.number || 0).padStart(4, "0")}`) },
+      { label: "Verdict", cell: (r) => vchip(r.verdict) },
+      { label: "Score", cls: "num", cell: (r) => el("span", { className: "ad-num", textContent: r.score ?? "n/a" }) },
+    ];
+    if (!short) {
+      cols.push(
+        { label: "Failed", cls: "num hide-sm", cell: (r) => el("span", { className: "ad-num", title: r.failed.join(", "), textContent: r.failed.length }) },
+        { label: "Main content", cls: "num hide-sm", cell: (r) => lcp(r.lcp) },
+        { label: "Saved by", cls: "hide-md", cell: (r) => (r.owner ? el("span", { className: "ad-ell", textContent: r.owner }) : muted("Not saved")) }
+      );
     }
-    stPages = data.pages || 1;
-    $("st-total").textContent = `· ${data.total} total · page ${data.page + 1} of ${stPages}`;
-    const list = $("stamps");
-    if (!data.stamps.length) return list.replaceChildren(el("li", { className: "empty", textContent: "No stamps yet." }));
-    list.replaceChildren(...data.stamps.map(stampItem));
+    cols.push({ label: "Stamped", cls: "num hide-sm", cell: (r) => muted(ago(r.createdAt)) });
+    return cols;
   }
-  const VCOL = { DEAD: "#b42228", COPE: "#a85d06", ALIVE: "#1d7a45" };
-  function stampItem(st) {
-    const li = el("li", { className: "order" });
-    const verdict = el("strong", { textContent: `${st.verdict}${st.score != null ? ` ${st.score}` : ""}` });
-    verdict.style.color = VCOL[st.verdict] || "";
-    const head = el("div", { className: "who" }, verdict, el("strong", { textContent: st.host }), el("span", { textContent: `#${String(st.number || 0).padStart(4, "0")} · ${fmt(st.createdAt)}` }));
-    const meta = el(
-      "div",
-      { className: "meta" },
-      el("span", { textContent: st.owner ? `Saved by ${st.owner}` : "Not saved to an account" }),
-      el("span", { textContent: `${st.stack} tech items` }),
-      st.lcp ? el("span", { textContent: `Main content ${(st.lcp / 1000).toFixed(1)}s` }) : null,
-      el("span", { textContent: st.failed.length ? `Failed: ${st.failed.join(", ")}` : "All checks passed" })
-    );
-    const detail = el("div", { className: "st-detail", hidden: true });
-    const open = el("button", { type: "button", className: "link", textContent: "Full details" });
-    open.onclick = async () => {
-      if (!detail.hidden) return (detail.hidden = true);
-      detail.hidden = false;
-      detail.replaceChildren(el("p", { textContent: "Loading…" }));
-      try {
-        const { stamp } = await call(`stamp&id=${encodeURIComponent(st.id)}`);
-        detail.replaceChildren(...stampDetail(stamp));
-      } catch (err) {
-        detail.replaceChildren(el("p", { className: "alert", textContent: err.message }));
-      }
-    };
-    const links = el("div", { className: "actions" }, open, el("a", { className: "link", href: `/v/${st.id}`, target: "_blank", rel: "noopener", textContent: "Open stamp" }), el("a", { className: "link", href: st.pageUrl, target: "_blank", rel: "noopener noreferrer", textContent: "Open page" }));
-    li.append(head, meta, links, detail);
-    return li;
+  $("st-prev").append(icon("chevron-left"));
+  $("st-next").append(icon("chevron-right"));
+  $("st-prev").onclick = () => stPage > 0 && (stPage--, loadStamps());
+  $("st-next").onclick = () => (stPage++, loadStamps());
+  $("st-q").oninput = () => renderStamps();
+  $("st-v").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    stV = b.dataset.v;
+    $("st-v").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderStamps();
+  }));
+  let stData = null;
+  async function loadStamps(fresh) {
+    fail("st-alert");
+    try {
+      stData = await getStamps(stPage, fresh);
+    } catch (err) {
+      return fail("st-alert", err);
+    }
+    stPage = stData.page;
+    count("stamps", stData.total);
+    $("st-sub").textContent = `${plural(stData.total, "published stamp")}, newest first. Open one for its checks, stack, speed, SEO, and security.`;
+    $("st-page").textContent = `Page ${stData.page + 1} of ${stData.pages || 1}`;
+    $("st-prev").disabled = stData.page <= 0;
+    $("st-next").disabled = stData.page >= (stData.pages || 1) - 1;
+    renderStamps();
   }
-  function stampDetail(r) {
+  function renderStamps() {
+    if (!stData) return;
+    const q = $("st-q").value.trim().toLowerCase();
+    const rows = stData.stamps.filter((r) => (!stV || r.verdict === stV) && (!q || `${r.host} ${r.owner} ${r.pageUrl}`.toLowerCase().includes(q)));
+    $("stamps").replaceChildren(table(stampCols(false), rows, { onRow: openStamp, empty: q || stV ? "No stamps on this page match." : "No stamps yet." }));
+  }
+
+  async function openStamp(row) {
+    openDrawer(row.host, [el("p", { className: "ad-loading", textContent: "Loading…" })]);
+    try {
+      const { stamp: r } = await call(`stamp&id=${encodeURIComponent(row.id)}`);
+      if (!drawer.hidden && $("drawer-h").textContent === row.host) $("drawer-body").replaceChildren(...stampDetail(r, row));
+    } catch (err) {
+      $("drawer-body").replaceChildren(el("p", { className: "alert", textContent: err.message }));
+    }
+  }
+  const tiles = (items) => el("dl", { className: "scout" }, items.filter(Boolean).map(([k, v, tone]) => el("div", {}, el("dt", { textContent: k }), el("dd", { className: tone || "", textContent: v }))));
+  const sec = (ms) => (ms == null ? "n/a" : `${(ms / 1000).toFixed(2)}s`);
+  function stampDetail(r, row) {
     const out = [];
-    out.push(el("p", { className: "st-sentence", textContent: `“${r.sentence}”` }));
-    const checks = el("ul", { className: "st-checks" }, ...(r.checks || []).map((k) => el("li", { className: k.skip ? "skip" : k.pass ? "pass" : "fail", textContent: `${k.skip ? "Not measured" : k.pass ? "Pass" : "Fail"} · ${k.label}: ${k.detail}` })));
-    out.push(el("h3", { className: "kicker", textContent: "Checks" }), checks);
+    const checks = (r.checks || []).filter((k) => !k.skip);
+    const passed = checks.filter((k) => k.pass).length;
+    out.push(
+      el("div", { className: "ad-verdict" }, vchip(r.verdict), el("b", { className: "ad-num", textContent: `${r.score ?? "n/a"}/100` }), muted(`#${String(r.number || 0).padStart(4, "0")} · ${stamp(r.createdAt)}`)),
+      r.sentence ? el("p", { className: "ad-quote", textContent: `“${r.sentence}”` }) : null,
+      r.image ? el("a", { className: "ad-shot", href: r.image, target: "_blank", rel: "noopener noreferrer" }, el("img", { src: r.image, alt: `First screen of ${r.host}` })) : null,
+      el("div", { className: "row-actions" },
+        el("a", { className: "btn btn-dark btn-sm", href: `/v/${r.id}`, target: "_blank", rel: "noopener", textContent: "Open stamp" }),
+        el("a", { className: "btn btn-line btn-sm", href: r.pageUrl, target: "_blank", rel: "noopener noreferrer", textContent: "Open page" }),
+        r.card ? el("a", { className: "btn btn-line btn-sm", href: `/api/card?id=${encodeURIComponent(r.id)}`, target: "_blank", rel: "noopener", textContent: "Share card" }) : null
+      ),
+      el("dl", { className: "kv" },
+        el("div", {}, el("dt", { textContent: "Page" }), el("dd", { className: "ad-break", textContent: r.pageUrl })),
+        el("div", {}, el("dt", { textContent: "Saved by" }), el("dd", { textContent: row.owner || "Not saved to an account" })),
+        el("div", {}, el("dt", { textContent: "Checks" }), el("dd", { textContent: `${passed} of ${checks.length} passed` }))
+      )
+    );
+    out.push(el("h3", { textContent: "Checks" }), el("ul", { className: "ad-checks" }, checks.map((k) => el("li", { className: k.pass ? "pass" : "fail" }, icon(k.pass ? "check" : "x"), el("div", {}, el("b", { textContent: k.label }), el("p", { textContent: k.detail }), !k.pass && k.fix ? el("p", { className: "ad-fix", textContent: `Fix: ${k.fix}` }) : null)))));
     const s = r.snapshot || {};
-    if (s.stack?.length) out.push(el("h3", { className: "kicker", textContent: `Stack (${s.stack.length})` }), el("ul", { className: "st-checks" }, ...s.stack.map((t) => el("li", { textContent: `${t.category} · ${t.name}: ${t.evidence}` }))));
+    if (s.stack?.length) out.push(el("h3", { textContent: `Stack · ${s.stack.length}` }), table([{ label: "Tool", cell: (t) => el("b", { textContent: t.name }) }, { label: "Kind", cell: (t) => muted(t.category) }, { label: "Found by", cell: (t) => el("span", { className: "ad-small", textContent: t.evidence }) }], s.stack));
     const b = s.browser;
-    if (b) out.push(el("h3", { className: "kicker", textContent: "Speed" }), el("p", { textContent: [b.lcp && `Main content ${(b.lcp / 1000).toFixed(2)}s`, b.ttfb && `Server ${(b.ttfb / 1000).toFixed(2)}s`, b.cls != null && `Layout shift ${b.cls}`, b.requests && `${b.requests} requests`, b.thirdParty?.length && `${b.thirdParty.length} other domains`].filter(Boolean).join(" · ") }));
-    if (s.seo) out.push(el("h3", { className: "kicker", textContent: "SEO" }), el("p", { textContent: `Index: ${s.seo.noindex ? "blocked" : "allowed"} · h1: ${s.seo.h1Count} · Title ${s.seo.titleLength} chars · Description ${s.seo.descriptionLength} chars · Canonical ${s.seo.canonical ? "set" : "missing"} · Images without alt ${s.seo.imagesWithoutAlt}/${s.seo.images}` }));
-    if (s.security) out.push(el("h3", { className: "kicker", textContent: "Security headers" }), el("p", { textContent: Object.entries(s.security).map(([k, v]) => `${k}: ${v ? "yes" : "no"}`).join(" · ") }));
+    if (b) {
+      const kb = b.kb ? Object.values(b.kb).reduce((a, x) => a + (x || 0), 0) : null;
+      out.push(el("h3", { textContent: "Speed" }), tiles([["Main content", sec(b.lcp), b.lcp > 2500 ? "bad" : "ok"], ["Server answered", sec(b.ttfb)], ["Layout shift", b.cls ?? "n/a", b.cls > 0.1 ? "bad" : ""], ["Fully loaded", sec(b.load)], ["Requests", num(b.requests)], kb != null && ["Page weight", kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`], b.thirdParty && ["Other domains", num(b.thirdParty.length)]]));
+    }
+    if (s.seo) out.push(el("h3", { textContent: "SEO" }), tiles([["Search engines", s.seo.noindex ? "Blocked" : "Allowed", s.seo.noindex ? "bad" : "ok"], ["Headlines (h1)", num(s.seo.h1Count), s.seo.h1Count === 1 ? "" : "bad"], ["Title", `${s.seo.titleLength} chars`], ["Description", `${s.seo.descriptionLength} chars`], ["Canonical", s.seo.canonical ? "Set" : "Missing", s.seo.canonical ? "" : "bad"], ["Images without alt", `${s.seo.imagesWithoutAlt} of ${s.seo.images}`, s.seo.imagesWithoutAlt ? "bad" : ""], s.seo.lang != null && ["Language", s.seo.lang || "Not set"]]));
+    if (s.security) {
+      const names = { hsts: "HSTS", csp: "Content policy", frameOptions: "Frame options", noSniff: "No sniff", referrerPolicy: "Referrer policy" };
+      out.push(el("h3", { textContent: "Security headers" }), tiles(Object.entries(s.security).map(([k, v]) => [names[k] || k, v ? "Yes" : "No", v ? "ok" : "bad"])));
+    }
     return out;
   }
 
   // Accounts
 
-  $("us-refresh").addEventListener("click", () => loadUsers());
-  async function loadUsers() {
-    $("us-alert").hidden = true;
-    let data;
+  let usF = "";
+  $("us-q").oninput = () => renderUsers();
+  $("us-f").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    usF = b.dataset.f;
+    $("us-f").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderUsers();
+  }));
+  let users = [];
+  async function loadUsers(fresh) {
+    fail("us-alert");
     try {
-      data = await call("users");
+      users = await getUsers(fresh);
     } catch (err) {
-      $("us-alert").hidden = false;
-      $("us-alert").textContent = err.message;
-      return;
+      return fail("us-alert", err);
     }
-    const us = data.users || [];
-    $("us-total").textContent = `· ${us.length}`;
-    const list = $("users");
-    if (!us.length) return list.replaceChildren(el("li", { className: "empty", textContent: "No accounts yet." }));
-    list.replaceChildren(
-      ...us.map((u) =>
-        el(
-          "li",
-          { className: "order" },
-          el("div", { className: "who" }, el("strong", { textContent: u.email }), el("span", { textContent: [u.killSheet && "Kill Sheet", u.stayAlive && "Stay Alive", !u.killSheet && !u.stayAlive && "Free"].filter(Boolean).join(" + ") })),
-          el("div", { className: "meta" }, el("span", { textContent: `Joined ${fmt(u.createdAt)}` }), el("span", { textContent: u.x ? `X @${u.x}` : u.password ? "Password" : "Email link" }), el("span", { textContent: `${u.stamps} stamps${u.lastStamp ? `, last ${u.lastStamp}` : ""}` }), el("span", { textContent: `${u.reviews} reviews` }))
-        )
+    count("users", users.length);
+    const paid = users.filter((u) => u.killSheet || u.stayAlive).length;
+    $("us-sub").textContent = `${plural(users.length, "account")}, ${num(paid)} paying. Newest first.`;
+    renderUsers();
+  }
+  const plans = (u) => [u.killSheet && chip("Kill Sheet", "ink"), u.stayAlive && chip("Stay Alive", "ok"), !u.killSheet && !u.stayAlive && chip("Free")];
+  function renderUsers() {
+    const q = $("us-q").value.trim().toLowerCase();
+    const rows = users.filter((u) => (!usF || (usF === "paid") === !!(u.killSheet || u.stayAlive)) && (!q || `${u.email} ${u.x}`.toLowerCase().includes(q)));
+    $("users").replaceChildren(
+      table(
+        [
+          { label: "Account", cell: (u) => person(u.email, u.x ? `@${u.x}` : "") },
+          { label: "Plan", cell: (u) => el("span", { className: "ad-chips" }, plans(u)) },
+          { label: "Sign-in", cls: "hide-sm", cell: (u) => muted(u.x ? "X" : u.password ? "Password" : "Email") },
+          { label: "Stamps", cls: "num", cell: (u) => el("span", { className: "ad-num", textContent: u.stamps }) },
+          { label: "Reviews", cls: "num hide-sm", cell: (u) => el("span", { className: "ad-num", textContent: u.reviews }) },
+          { label: "Last stamp", cls: "hide-md", cell: (u) => (u.lastStamp ? el("span", { className: "ad-ell", textContent: u.lastStamp }) : muted("None")) },
+          { label: "Joined", cls: "num", cell: (u) => muted(ago(u.createdAt)) },
+        ],
+        rows,
+        { empty: q || usF ? "No accounts match." : "No accounts yet." }
       )
     );
   }
 
+  // Members
+
+  async function loadMembers(fresh) {
+    fail("mb-alert");
+    let data;
+    try {
+      data = await getMembers(fresh);
+    } catch (err) {
+      return fail("mb-alert", err);
+    }
+    const ms = data.members || [];
+    count("members", ms.length);
+    const ks = ms.filter((m) => m.killSheet?.active).length;
+    const sa = ms.filter((m) => m.stayAlive?.active).length;
+    const leaving = ms.filter((m) => m.stayAlive?.cancelAtPeriodEnd).length;
+    $("mb-sub").textContent = `${plural(ms.length, "member")} of ${plural(data.accounts || 0, "account")}.`;
+    $("members").replaceChildren(
+      kpis([
+        ["Members", num(ms.length), `${pct(ms.length, data.accounts)} of accounts`],
+        ["Kill Sheets", num(ks), `$${nf.format(ks * KILL_SHEET)} one-time`],
+        ["Stay Alive", num(sa), `${num(leaving)} cancelling`],
+        ["Monthly revenue", `$${nf.format(sa * STAY_ALIVE)}`, "From Stay Alive"],
+      ]),
+      table(
+        [
+          { label: "Member", cell: (m) => person(m.email, `Joined ${date(m.createdAt)}`) },
+          { label: "Kill Sheet", cell: (m) => (m.killSheet ? el("span", { className: "ad-stack" }, chip(m.killSheet.active ? "Active" : "Refunded", m.killSheet.active ? "ink" : "bad"), muted(`since ${date(m.killSheet.since)}`)) : muted("None")) },
+          { label: "Stay Alive", cell: (m) => (m.stayAlive ? el("span", { className: "ad-stack" }, chip(m.stayAlive.cancelAtPeriodEnd ? "Cancelling" : m.stayAlive.status, m.stayAlive.active && !m.stayAlive.cancelAtPeriodEnd ? "ok" : "warn"), muted(`${m.stayAlive.cancelAtPeriodEnd ? "ends" : "renews"} ${date(m.stayAlive.renews)}`)) : muted("None")) },
+          { label: "Page", cls: "hide-md", cell: (m) => { const u = m.stayAlive?.url || m.killSheet?.url; return u ? el("a", { className: "ad-ell", href: u, target: "_blank", rel: "noopener noreferrer", textContent: u.replace(/^https?:\/\//, "") }) : muted("No page yet"); } },
+          { label: "Stamps", cls: "num hide-sm", cell: (m) => el("span", { className: "ad-num", textContent: m.stamps }) },
+          { label: "", cls: "num", cell: (m) => (m.killSheet?.url ? rescout(m) : "") },
+        ],
+        ms,
+        { empty: `No members yet. ${plural(data.accounts || 0, "free account")}.` }
+      )
+    );
+  }
+  const pct = (a, b) => (!b ? "n/a" : `${Math.round((a / b) * 100)}%`);
+  function rescout(m) {
+    const b = el("button", { type: "button", className: "btn btn-line btn-sm", title: "Run the Kill Sheet on their page again", textContent: "Rerun" });
+    b.prepend(icon("rotate-ccw"));
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await call("rescout", { email: m.email });
+        b.replaceChildren(icon("check"), "Started");
+      } catch (err) {
+        b.disabled = false;
+        b.title = err.message;
+        b.replaceChildren(icon("circle-alert"), "Failed");
+      }
+    };
+    return b;
+  }
+
   // Reviews
 
+  const LABEL = { received: "Received", in_review: "In review", delivered: "Delivered" };
+  const ORDER = ["received", "in_review", "delivered"];
   let reviews = [];
   let view = "open";
-  document.querySelectorAll(".rv-tabs button").forEach((b) =>
-    b.addEventListener("click", () => {
-      view = b.dataset.view;
-      document.querySelectorAll(".rv-tabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-      renderReviews();
-    })
-  );
-  $("rv-refresh").addEventListener("click", loadReviews);
-
-  async function loadReviews() {
-    $("rv-alert").hidden = true;
+  $("rv-v").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    view = b.dataset.view;
+    $("rv-v").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderReviews();
+  }));
+  async function loadReviews(fresh) {
+    fail("rv-alert");
     try {
-      reviews = (await call("reviews")).reviews || [];
+      reviews = await getReviews(fresh);
     } catch (err) {
-      $("rv-alert").hidden = false;
-      $("rv-alert").textContent = err.message;
-      return;
+      return fail("rv-alert", err);
     }
     renderReviews();
   }
-
-  const LABEL = { received: "Received", in_review: "In review", delivered: "Delivered" };
-  const lines = (v) => (Array.isArray(v) ? v.join("\n") : "");
-
+  const lines = (v) => (Array.isArray(v) ? v.filter(Boolean).join("\n") : "");
   function renderReviews() {
+    count("reviews", reviews.filter((r) => r.status !== "delivered").length);
     const shown = reviews.filter((r) => view === "all" || (view === "open" ? r.status !== "delivered" : r.status === "delivered"));
-    const list = $("reviews");
-    if (!shown.length) return list.replaceChildren(el("li", { className: "empty", textContent: view === "open" ? "No open reviews." : "Nothing here yet." }));
-    list.replaceChildren(...shown.map(reviewItem));
+    $("reviews").replaceChildren(shown.length ? el("div", { className: "ad-reviews" }, shown.map(reviewCard)) : el("p", { className: "empty", textContent: view === "open" ? "No open reviews. New requests from members show up here." : "Nothing here yet." }));
   }
-
-  function reviewItem(r) {
-    const li = el("li", { className: "order" });
-    const head = el("div", { className: "who" }, el("strong", { textContent: r.siteUrl || r.appUrl }), el("span", { textContent: `${LABEL[r.status]} · ${r.plan === "killSheet" ? "Kill Sheet" : "Stay Alive"} · ${r.email}` }));
-    const meta = el("div", { className: "meta" }, el("span", { textContent: `Sent ${fmt(r.createdAt)}` }), r.appUrl && r.siteUrl ? el("span", { textContent: `App: ${r.appUrl}` }) : null, el("span", { textContent: `Test login: ${r.login}` }));
-    const what = el("p", { className: "rv-what", textContent: r.what });
+  function reviewCard(r) {
     const out = el("p", { className: "alert", hidden: true });
-    const loginBox = el("p", { className: "rv-login", hidden: true });
-
-    const summary = el("textarea", { rows: 3, placeholder: "Summary: what a new user experiences, in two or three sentences.", value: r.result?.summary || "" });
-    const problems = el("textarea", { rows: 4, placeholder: "Problems found, one per line.", value: lines(r.result?.problems) });
-    const fixes = el("textarea", { rows: 4, placeholder: "Fixes, ranked, one per line.", value: lines(r.result?.fixes) });
-    const copy = el("textarea", { rows: 4, placeholder: "Rewritten copy (headline, subhead, buttons, onboarding text).", value: r.result?.copy || "" });
+    const loginBox = el("div", { className: "login-box", hidden: true });
+    const field = (label, rows, placeholder, value) => {
+      const t = el("textarea", { rows, placeholder, value });
+      return [el("label", {}, label, t), t];
+    };
+    const [fSum, summary] = field("Summary", 3, "What a new user experiences, in two or three sentences.", r.result?.summary || "");
+    const [fProb, problems] = field("Problems", 4, "One per line.", lines(r.result?.problems));
+    const [fFix, fixes] = field("Fixes, ranked", 4, "One per line.", lines(r.result?.fixes));
+    const [fCopy, copy] = field("Rewritten copy", 4, "Headline, subhead, buttons, onboarding text.", r.result?.copy || "");
     const result = () => ({ summary: summary.value, problems: problems.value.split("\n"), fixes: fixes.value.split("\n"), copy: copy.value });
 
-    async function move(status) {
+    async function move(status, btn) {
       out.hidden = true;
+      if (btn) btn.disabled = true;
       try {
         const { review } = await call("review", { email: r.email, id: r.id, status, result: result() });
         Object.assign(r, review);
@@ -231,6 +538,7 @@ import { renderAnalytics } from "./analytics.js";
       } catch (err) {
         out.hidden = false;
         out.textContent = err.message;
+        if (btn) btn.disabled = false;
       }
     }
     async function showLogin() {
@@ -238,83 +546,56 @@ import { renderAnalytics } from "./analytics.js";
       try {
         const { login } = await call("login", { email: r.email, id: r.id });
         loginBox.hidden = false;
-        loginBox.textContent = `Email: ${login.email}  ·  Password: ${login.password}`;
+        loginBox.replaceChildren(el("dl", { className: "kv" }, el("div", {}, el("dt", { textContent: "Email" }), el("dd", { className: "ad-num", textContent: login.email })), el("div", {}, el("dt", { textContent: "Password" }), el("dd", { className: "ad-num", textContent: login.password }))), el("p", { className: "warn-line", textContent: "A throwaway test account. Use it only for this review. It's deleted when you deliver." }));
       } catch (err) {
         out.hidden = false;
         out.textContent = err.message;
       }
     }
 
-    const actions = el("div", { className: "actions" });
-    if (r.status === "received") actions.append(el("button", { type: "button", className: "submit", textContent: "Start review (In review)", onclick: () => move("in_review") }));
+    const at = ORDER.indexOf(r.status);
+    const steps = el("ol", { className: "steps" }, ORDER.map((s, i) => el("li", { className: i < at ? "done" : i === at ? "now" : "", textContent: LABEL[s] })));
+    const actions = el("div", { className: "row-actions" });
+    if (r.status === "received") actions.append(el("button", { type: "button", className: "btn btn-dark btn-sm", textContent: "Start review", onclick: (e) => move("in_review", e.currentTarget) }));
     if (r.status === "in_review") {
-      if (r.login === "stored") actions.append(el("button", { type: "button", className: "submit ghost", textContent: "Show test login", onclick: showLogin }));
-      actions.append(el("button", { type: "button", className: "submit ghost", textContent: "Save draft", onclick: () => move("in_review") }));
-      actions.append(el("button", { type: "button", className: "submit", textContent: "Deliver to dashboard", onclick: () => move("delivered") }));
+      if (r.login === "stored") actions.append(el("button", { type: "button", className: "btn btn-line btn-sm", textContent: "Show test login", onclick: showLogin }));
+      actions.append(el("button", { type: "button", className: "btn btn-line btn-sm", textContent: "Save draft", onclick: (e) => move("in_review", e.currentTarget) }));
+      actions.append(el("button", { type: "button", className: "btn btn-dark btn-sm", textContent: "Deliver to dashboard", onclick: (e) => move("delivered", e.currentTarget) }));
     }
-    const form = r.status === "received" ? null : el("div", { className: "rv-form" }, summary, problems, fixes, copy);
-    li.append(head, meta, what, loginBox, form, actions, out);
-    return li;
-  }
-
-  // Members
-
-  $("mb-refresh").addEventListener("click", loadMembers);
-  async function loadMembers() {
-    $("mb-alert").hidden = true;
-    let data;
-    try {
-      data = await call("members");
-    } catch (err) {
-      $("mb-alert").hidden = false;
-      $("mb-alert").textContent = err.message;
-      return;
-    }
-    const list = $("members");
-    const ms = data.members || [];
-    if (!ms.length) return list.replaceChildren(el("li", { className: "empty", textContent: `No members yet. ${data.accounts || 0} free accounts.` }));
-    list.replaceChildren(
-      el("li", { className: "empty", textContent: `${ms.length} members of ${data.accounts} accounts.` }),
-      ...ms.map((m) => {
-        const plans = [
-          m.killSheet && `Kill Sheet${m.killSheet.active ? "" : " (refunded)"} since ${fmt(m.killSheet.since)}${m.killSheet.url ? ` · ${m.killSheet.url}` : " · no page yet"}`,
-          m.stayAlive && `Stay Alive ${m.stayAlive.status}${m.stayAlive.cancelAtPeriodEnd ? " (cancels at period end)" : ""} · renews ${fmt(m.stayAlive.renews)}${m.stayAlive.url ? ` · ${m.stayAlive.url}` : " · no page yet"}`,
-        ].filter(Boolean);
-        const li = el("li", { className: "order" }, el("div", { className: "who" }, el("strong", { textContent: m.email }), el("span", { textContent: `${m.stamps} stamps` })), ...plans.map((p) => el("div", { className: "meta", textContent: p })));
-        if (m.killSheet?.url) {
-          const msg = el("span", { className: "meta" });
-          li.append(el("div", { className: "actions" }, el("button", { type: "button", className: "submit ghost", textContent: "Run Kill Sheet again", onclick: async () => {
-            try {
-              await call("rescout", { email: m.email });
-              msg.textContent = "Started. It shows in their dashboard in about a minute.";
-            } catch (err) {
-              msg.textContent = err.message;
-            }
-          } }), msg));
-        }
-        return li;
-      })
+    const form = r.status === "received" ? null : el("div", { className: "review-form" }, fSum, el("div", { className: "row2" }, fProb, fFix), fCopy);
+    return el(
+      "article",
+      { className: "panel ad-review" },
+      el("header", { className: "panel-head" },
+        el("div", {}, el("h2", {}, el("span", { className: "ad-break", textContent: r.siteUrl || r.appUrl })), el("p", { textContent: `${r.plan === "killSheet" ? "Kill Sheet" : "Stay Alive"} · ${r.email} · sent ${ago(r.createdAt)}` })),
+        chip(LABEL[r.status], r.status === "delivered" ? "ok" : r.status === "in_review" ? "warn" : "")
+      ),
+      steps,
+      el("dl", { className: "kv ad-kv" },
+        r.appUrl && r.siteUrl ? el("div", {}, el("dt", { textContent: "App" }), el("dd", { className: "ad-break", textContent: r.appUrl })) : null,
+        el("div", {}, el("dt", { textContent: "Test login" }), el("dd", { textContent: { stored: "Stored, encrypted", revoked: "Revoked by the member", deleted: "Deleted" }[r.login] || r.login || "None" })),
+        r.what ? el("div", {}, el("dt", { textContent: "Look at" }), el("dd", { textContent: r.what })) : null
+      ),
+      loginBox,
+      form,
+      actions,
+      out
     );
   }
 
   // Analytics
 
   let days = 30;
-  document.querySelectorAll(".range-tabs button").forEach((b) =>
-    b.addEventListener("click", () => {
-      days = Number(b.dataset.days);
-      document.querySelectorAll(".range-tabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-      loadAnalytics();
-    })
-  );
-  $("an-refresh").addEventListener("click", () => loadAnalytics());
-  async function loadAnalytics() {
+  $("an-range").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    days = Number(b.dataset.days);
+    $("an-range").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    loadAnalytics();
+  }));
+  async function loadAnalytics(fresh) {
     const body = $("an-body");
     body.classList.add("loading");
     try {
-      const r = await fetch(`/api/analytics?days=${days}`, { headers: { "x-admin-key": key }, cache: "no-store" });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `Error ${r.status}.`);
+      const data = await getAnalytics(days, fresh);
       $("an-notes").replaceChildren(...(data.notes || []).map((n) => el("li", { textContent: n })));
       renderAnalytics(body, data);
     } catch (err) {
@@ -324,18 +605,19 @@ import { renderAnalytics } from "./analytics.js";
     }
   }
 
-  // Setup
+  // Setup. The checklist text comes from the server, so the public script names no services.
 
-  // The checklist text comes from the server, so the public script names no services.
   function renderSetup() {
-    $("setup-list").replaceChildren(
-      ...(setup.items || []).map(([name, ok, text]) =>
-        el("li", { className: ok ? "ok" : "todo" }, el("span", { className: "setup-badge", textContent: ok ? "Connected" : "Missing" }), el("strong", { textContent: name }), el("p", { textContent: text }))
-      )
-    );
+    const items = setup.items || [];
+    const ok = items.filter(([, x]) => x).length;
+    $("setup-sum").textContent = `${ok} of ${items.length} connected.`;
+    $("setup-list").replaceChildren(...items.map(([name, on, text]) => el("li", {}, el("span", { className: `dot ${on ? "ok" : "bad"}` }), el("div", {}, el("b", { textContent: name }), el("p", { textContent: text })), chip(on ? "Connected" : "Missing", on ? "ok" : "warn"))));
+    $("queue-note").textContent = DESK.queueOpen
+      ? "On. To pause it, set queueOpen to false in src/config.js and deploy."
+      : "Paused. To turn it on, set queueOpen to true in src/config.js and deploy.";
   }
 
-  $("recards").addEventListener("click", async () => {
+  $("recards").onclick = async () => {
     const btn = $("recards"), note = $("recards-note");
     btn.disabled = true;
     let cursor = "", total = 0;
@@ -352,7 +634,8 @@ import { renderAnalytics } from "./analytics.js";
     } finally {
       btn.disabled = false;
     }
-  });
+  };
 
-  if (key) openDesk();
+  renderNav();
+  if (key) open();
 })();
