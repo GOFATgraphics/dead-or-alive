@@ -19,7 +19,7 @@ import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
 } from "./_account.js";
-import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
+import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
 import { forgetSite, readMonitors, runMonitor, seatsOf, sitesOf } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
@@ -53,6 +53,20 @@ function sameSite(req) {
     return new URL(o).host === host;
   } catch (_) {
     return false;
+  }
+}
+
+// A plan that isn't on yet: ask the payment provider directly, at most every two minutes per account, so a
+// payment whose message never arrived still lands. Never blocks the dashboard on an error.
+async function heal(email) {
+  try {
+    const u = await getUser(email);
+    if (!u || (hasKillSheet(u) && hasStayAlive(u)) || !polarApiReady()) return;
+    if (await get(`heal:${email}`)) return;
+    await set(`heal:${email}`, 1, 120);
+    await reconcile(email);
+  } catch (err) {
+    console.error("Heal failed:", err);
   }
 }
 
@@ -184,6 +198,7 @@ export default async function handler(req, res) {
       return res.redirect(302, `/dashboard${v.next && /^\?[\w=&%.-]*$/.test(v.next) ? v.next : ""}`);
     }
     const email = await sessionEmail(req);
+    if (email) await heal(email);
     return res.status(200).json({ ...(email ? await me(email) : { user: null }), setup: setup() });
   }
 

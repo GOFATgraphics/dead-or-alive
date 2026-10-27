@@ -102,6 +102,19 @@
             <div id="members"></div>
           </section>
 
+          <section class="pane" id="pane-payments" hidden>
+            <header class="page-head ad-head">
+              <div><h1>Payments</h1><p>Every subscription and Kill Sheet order from the payment provider, the account it belongs to, and whether that account has the plan on. Sync asks the provider again and switches on anything missing.</p></div>
+              <button type="button" class="btn btn-line btn-sm" data-refresh="payments">Refresh</button>
+            </header>
+            <p class="alert" id="pay-alert" role="alert" hidden></p>
+            <div id="payments"></div>
+            <section class="panel">
+              <header class="panel-head"><div><h2>Payment messages</h2><p>The last 100 messages from the payment provider, and what happened to each.</p></div></header>
+              <div id="pay-log"></div>
+            </section>
+          </section>
+
           <section class="pane" id="pane-reviews" hidden>
             <header class="page-head ad-head">
               <div><h1>App reviews</h1><p>Move a review to In review to see its test login. Delivering puts the result in the member's dashboard and deletes the test login.</p></div>

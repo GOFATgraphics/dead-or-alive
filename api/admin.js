@@ -5,6 +5,8 @@
 //   GET  stamps&page=N             every published stamp, newest first, 40 a page, with the account it's saved to
 //   GET  stamp&id=ID               one stamp in full: checks, stack, speed, SEO, security
 //   GET  users                     every account, free or paid
+//   GET  payments                  every subscription and Kill Sheet order, the account it belongs to, and the payment log
+//   POST sync { email }            asks the payment provider what an account paid for and switches it on
 //   POST login { email, id }       shows a review's test login, only while it's In review
 //   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
 //   POST rescout { email }         runs a member's Kill Sheet again
@@ -15,7 +17,7 @@ import { polarReady, readResult, requireAdmin } from "./_lib.js";
 import { redisReady } from "./_redis.js";
 import { get, members, remove, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
-import { polarApiReady } from "./_billing.js";
+import { paymentsOverview, polarApiReady, reconcile } from "./_billing.js";
 import { runScout } from "./_scout.js";
 import { redrawCards } from "./_publish.js";
 import { list as listBlobs } from "@vercel/blob";
@@ -127,7 +129,15 @@ export default async function handler(req, res) {
     });
   }
 
+  if (op === "payments") return res.status(200).json(await paymentsOverview());
+
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
+
+  if (op === "sync") {
+    const email = String(b.email || "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Which account?" });
+    return res.status(200).json({ result: await reconcile(email) });
+  }
   const email = String(b.email || "").toLowerCase();
   const id = String(b.id || "");
 

@@ -122,6 +122,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
     ["stamps", "Stamps", "stamp"],
     ["users", "Accounts", "users"],
     ["members", "Members", "credit-card"],
+    ["payments", "Payments", "activity"],
     ["reviews", "App reviews", "clipboard-list"],
     ["analytics", "Analytics", "chart-column"],
     ["setup", "Setup", "server"],
@@ -146,7 +147,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
     if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);
     for (const [id] of PANES) $(`pane-${id}`).hidden = id !== name;
     renderNav();
-    ({ overview: loadOverview, stamps: loadStamps, users: loadUsers, members: loadMembers, reviews: loadReviews, analytics: loadAnalytics, setup: renderSetup })[name](fresh);
+    ({ overview: loadOverview, stamps: loadStamps, users: loadUsers, members: loadMembers, payments: loadPayments, reviews: loadReviews, analytics: loadAnalytics, setup: renderSetup })[name](fresh);
     scrollTo({ top: 0 });
   }
   addEventListener("hashchange", () => key && !$("app").hidden && location.hash.slice(1) !== pane && go(location.hash.slice(1)));
@@ -490,6 +491,68 @@ import { barChart, renderAnalytics } from "./analytics.js";
         b.disabled = false;
         b.title = err.message;
         b.replaceChildren(icon("circle-alert"), "Failed");
+      }
+    };
+    return b;
+  }
+
+  // Payments
+
+  const getPayments = (fresh) => get("payments", () => call("payments"), fresh);
+  async function loadPayments(fresh) {
+    fail("pay-alert");
+    let data;
+    try {
+      data = await getPayments(fresh);
+    } catch (err) {
+      return fail("pay-alert", err);
+    }
+    const rows = data.rows || [];
+    const off = rows.filter((r) => !r.on && ["active", "trialing", "paid"].includes(r.status));
+    count("payments", off.length || null);
+    $("payments").replaceChildren(
+      data.ready ? null : el("p", { className: "note", textContent: "The payment API token isn't set, so payments can't be listed. Payment messages still show below." }),
+      off.length ? el("p", { className: "alert", textContent: `${plural(off.length, "payment")} without the plan on. Press Sync on ${off.length === 1 ? "it" : "each"}.` }) : null,
+      table(
+        [
+          { label: "Account", cell: (r) => person(r.account || r.payer || "Unknown", r.account && r.payer && r.payer !== r.account ? `paid as ${r.payer}` : r.account ? "" : "no matching account") },
+          { label: "Plan", cell: (r) => el("span", { className: "ad-stack" }, chip(r.plan === "killSheet" ? "Kill Sheet" : "Stay Alive", "ink"), muted([r.yearly ? "yearly" : r.kind === "subscription" ? "monthly" : "one-time", r.seats > 1 ? `${r.seats} sites` : ""].filter(Boolean).join(", "))) },
+          { label: "Payment", cell: (r) => chip(r.status, ["active", "trialing", "paid"].includes(r.status) ? "ok" : r.status === "past_due" ? "warn" : "") },
+          { label: "On the account", cell: (r) => (r.on ? chip("Yes", "ok") : chip("No", ["active", "trialing", "paid"].includes(r.status) ? "bad" : "")) },
+          { label: "When", cls: "num hide-sm", cell: (r) => muted(ago(r.at)) },
+          { label: "", cls: "num", cell: (r) => (r.account ? syncButton(r.account) : "") },
+        ],
+        rows,
+        { empty: "No payments yet." }
+      )
+    );
+    const log = data.log || [];
+    $("pay-log").replaceChildren(
+      table(
+        [
+          { label: "When", cell: (e) => muted(stamp(e.at)) },
+          { label: "Message", cell: (e) => el("span", { className: "ad-num", textContent: e.type || "" }) },
+          { label: "Result", cell: (e) => chip(e.action || "", e.error || e.action === "Bad signature" || e.action === "no account" ? "bad" : e.action === "ignored" ? "" : "ok") },
+          { label: "Account", cell: (e) => (e.error ? el("span", { className: "ad-small", textContent: e.error }) : muted(e.email || "")) },
+        ],
+        log,
+        { empty: "No payment messages recorded yet. New ones show here as they arrive." }
+      )
+    );
+  }
+  function syncButton(email) {
+    const b = el("button", { type: "button", className: "btn btn-line btn-sm", textContent: "Sync" });
+    b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = "Syncing…";
+      try {
+        const { result } = await call("sync", { email });
+        b.textContent = result.checked ? (result.stayAlive || result.killSheet ? "Synced" : "Up to date") : result.reason;
+        setTimeout(() => go("payments", true), 900);
+      } catch (err) {
+        b.disabled = false;
+        b.textContent = "Failed";
+        b.title = err.message;
       }
     };
     return b;

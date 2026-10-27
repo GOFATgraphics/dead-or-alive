@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import { CHECKOUT } from "./_plans.js";
 import { emailForId, ensureUser, getUser, hasStayAlive, updateUser } from "./_account.js";
-import { addTo } from "./_store.js";
+import { addTo, get, set, update } from "./_store.js";
 import { runScout } from "./_scout.js";
 import { runMonitor } from "./_monitor.js";
 import { checkPageUrl } from "../src/url.js";
@@ -128,23 +128,96 @@ export async function syncStayAlive(email, sub, pageUrl = "") {
 }
 
 // One verified webhook event. Long work (the scout, the first re-stamp) runs inside; the caller keeps it alive.
+// Returns what it did, for the payment log.
 export async function handleEvent(event) {
   const type = event?.type || "";
   const d = event?.data || {};
+  const plan = planOf(d.product_id || d.product?.id);
   if (type === "order.paid") {
-    const plan = planOf(d.product_id || d.product?.id);
-    if (plan !== "killSheet") return;
+    if (plan !== "killSheet") return { action: "ignored", plan };
     const email = await ownerOf(d);
-    if (email) await activateKillSheet(email, { orderId: d.id, checkoutId: d.checkout_id || "", pageUrl: pageFrom(d, await getUser(email)) });
-  } else if (type === "order.refunded") {
-    if (planOf(d.product_id || d.product?.id) !== "killSheet") return;
+    if (!email) return { action: "no account", plan };
+    await activateKillSheet(email, { orderId: d.id, checkoutId: d.checkout_id || "", pageUrl: pageFrom(d, await getUser(email)) });
+    return { action: "Kill Sheet on", plan, email };
+  }
+  if (type === "order.refunded") {
+    if (plan !== "killSheet") return { action: "ignored", plan };
     const email = await ownerOf(d);
     if (email) await updateUser(email, (u) => (u?.killSheet?.orderId === d.id ? { ...u, killSheet: { ...u.killSheet, refunded: true } } : undefined));
-  } else if (type.startsWith("subscription.")) {
-    if (planOf(d.product_id || d.product?.id) !== "stayAlive") return;
-    const email = await ownerOf(d);
-    if (email) await syncStayAlive(email, d, pageFrom(d, await getUser(email)));
+    return { action: "Kill Sheet refunded", plan, email };
   }
+  if (type.startsWith("subscription.")) {
+    if (plan !== "stayAlive") return { action: "ignored", plan };
+    const email = await ownerOf(d);
+    if (!email) return { action: "no account", plan };
+    await syncStayAlive(email, d, pageFrom(d, await getUser(email)));
+    return { action: `Stay Alive ${d.status}`, plan, email };
+  }
+  return { action: "ignored" };
+}
+
+// The last 100 payment events and what happened to each, newest first, for the admin's Payments page.
+export async function logBilling(entry) {
+  await update("log:billing", (list) => [{ at: new Date().toISOString(), ...entry }, ...(Array.isArray(list) ? list : [])].slice(0, 100)).catch(() => {});
+}
+export const readBillingLog = async () => (await get("log:billing").catch(() => null)) || [];
+
+// For the admin's Payments page: every subscription and paid order from Polar, which account each belongs to, and
+// whether that account actually has the plan on.
+// Which existing account a Polar object belongs to, without creating one.
+async function accountFor(obj) {
+  const ref = obj?.metadata?.reference_id;
+  const byId = ref ? await emailForId(ref) : null;
+  if (byId) return byId;
+  const payer = obj?.customer?.email || "";
+  return payer && (await getUser(payer)) ? payer.trim().toLowerCase() : "";
+}
+
+export async function paymentsOverview() {
+  if (!polarApiReady()) return { ready: false, rows: [], log: await readBillingLog() };
+  const [subs, orders] = await Promise.all([polar("/v1/subscriptions/?limit=100"), polar("/v1/orders/?limit=100")]);
+  const rows = [];
+  for (const s of subs.items || []) {
+    const plan = planOf(s.product_id);
+    if (!plan) continue;
+    const email = await accountFor(s).catch(() => "");
+    const u = email ? await getUser(email) : null;
+    rows.push({ kind: "subscription", id: s.id, plan, yearly: s.recurring_interval === "year", seats: s.seats || 1, status: s.status, amount: s.amount ?? null, at: s.created_at, payer: s.customer?.email || "", account: email, on: !!u && hasStayAlive(u) && u.stayAlive?.subId === s.id });
+  }
+  for (const o of orders.items || []) {
+    const plan = planOf(o.product_id);
+    if (plan !== "killSheet") continue;
+    const email = await accountFor(o).catch(() => "");
+    const u = email ? await getUser(email) : null;
+    rows.push({ kind: "order", id: o.id, plan, status: o.status, amount: o.total_amount ?? null, at: o.created_at, payer: o.customer?.email || "", account: email, on: !!u?.killSheet && !u.killSheet.refunded });
+  }
+  rows.sort((a, z) => String(z.at).localeCompare(String(a.at)));
+  return { ready: true, rows, log: await readBillingLog() };
+}
+
+// Ask Polar directly what this account has paid for, and switch on anything that's missing. Used when a member
+// opens the dashboard and a plan isn't on, and by the admin's Sync button. Payments are found by our account id
+// (sent to checkout as reference_id), so it works even if the payment message never arrived.
+export async function reconcile(email) {
+  if (!polarApiReady()) return { checked: false, reason: "No payment API token." };
+  const u = await getUser(email);
+  if (!u) return { checked: false, reason: "No such account." };
+  const q = `metadata[reference_id]=${encodeURIComponent(u.id)}&limit=50`;
+  const [subs, orders] = await Promise.all([polar(`/v1/subscriptions/?${q}`), polar(`/v1/orders/?${q}`)]);
+  const out = { checked: true, stayAlive: "", killSheet: "" };
+  const sub = (subs.items || []).filter((s) => planOf(s.product_id) === "stayAlive").sort((a, z) => (["active", "trialing"].includes(z.status) ? 1 : 0) - (["active", "trialing"].includes(a.status) ? 1 : 0))[0];
+  if (sub && (sub.status !== u.stayAlive?.status || sub.id !== u.stayAlive?.subId || (sub.seats || 1) !== (u.stayAlive?.seats || 1))) {
+    await syncStayAlive(email, sub, u.pendingUrl || "");
+    out.stayAlive = `synced (${sub.status})`;
+    await logBilling({ type: "sync", action: `Stay Alive ${sub.status}`, plan: "stayAlive", email });
+  }
+  const order = (orders.items || []).find((o) => planOf(o.product_id) === "killSheet" && o.status === "paid");
+  if (order && !u.killSheet) {
+    await activateKillSheet(email, { orderId: order.id, checkoutId: order.checkout_id || "", pageUrl: u.pendingUrl || "" });
+    out.killSheet = "synced";
+    await logBilling({ type: "sync", action: "Kill Sheet on", plan: "killSheet", email });
+  }
+  return out;
 }
 
 // The buyer is back from Polar. With an API token we confirm the checkout right away instead of waiting for the webhook.
