@@ -341,3 +341,13 @@ ol, ul { padding: 0; list-style: none; }
 .hood-counts b { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
 .hood-counts span { font-size: 0.875rem; color: var(--body); }
 @media (max-width: 560px) { .unlock-blur { padding: 0.75rem; } .unlock { min-height: 24rem; } }
+
+/* Back from signing in */
+.signed-in { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0.5rem auto 1rem; padding: 0.8rem 1rem; border: 1px solid rgba(29, 122, 69, 0.25); border-radius: 12px; background: rgba(29, 122, 69, 0.08); color: var(--alive); font-size: 0.9375rem; font-weight: 600; }
+.signed-in a { margin-left: auto; color: var(--ink); font-weight: 700; }
+@media (max-width: 560px) { .bar .bar-stamp { display: none; } }
+.signed-in { flex-wrap: nowrap; align-items: flex-start; }
+.signed-in .ic { flex: none; margin-top: 0.2em; }
+.signed-in span { flex: 1; }
+.signed-in a { flex: none; white-space: nowrap; }
+@media (max-width: 560px) { .signed-in { flex-wrap: wrap; } .signed-in span { flex: 1 1 calc(100% - 2rem); } .signed-in a { margin-left: 1.5rem; } }

@@ -781,7 +781,7 @@ function Dashboard({ data, setData, onOut }) {
   useEffect(() => {
     const j = jobs();
     const back = params.get("back") || "";
-    const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(back);
+    const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(`${back}?signedin=1`);
     if (j.length) api("claim", { jobs: j }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
     else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

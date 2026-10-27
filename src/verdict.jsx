@@ -12,6 +12,8 @@ import "./plans.css";
 import { TIERS, embedSvg, svgUri, tickSvg, tierFor } from "./badge.js";
 
 const still = reducedMotion();
+// Back from signing in (email, password, or X) on this stamp's unlock button.
+const justSignedIn = new URLSearchParams(location.search).get("signedin") === "1";
 
 // The closing line, by verdict.
 const NEXT = {
@@ -32,7 +34,8 @@ function Bar() {
         <img src="/brand/smp-mark.svg" alt="" width="26" height="26" />
         <span>Stamp My Page</span>
       </a>
-      <a className="btn btn-line btn-sm" href="/#top">Stamp another page</a>
+      <a className="bar-signin" href="/dashboard">Dashboard</a>
+      <a className="btn btn-line btn-sm bar-stamp" href="/#top">Stamp another page</a>
     </header>
   );
 }
@@ -643,6 +646,15 @@ function Result({ r }) {
     <div className="page">
       <Bar />
       <main>
+        {justSignedIn && !r.locked && (
+          <div className="wrap">
+            <p className="signed-in" role="status">
+              <Icon name="check" size={16} />
+              <span>You're signed in. Every check, the full stack, and speed are unlocked below, and this stamp is saved to your dashboard.</span>
+              <a href="/dashboard">Open dashboard</a>
+            </p>
+          </div>
+        )}
         <Hero r={r} />
         <Status r={r} />
         {r.locked ? <LockedChecks r={r} /> : <Checks r={r} />}
