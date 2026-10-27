@@ -13,3 +13,10 @@ export const CHECKOUT = {
 
 // The provider's customer portal, for receipts and card changes.
 export const PORTAL = "https://polar.sh/launchely/portal";
+
+// Sign in with X runs through the Supabase project's X provider. The publishable key is safe to share, but it
+// stays server-side so the site's JavaScript doesn't name the stack. Env overrides: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY.
+export const SUPABASE = {
+  url: (process.env.SUPABASE_URL || "https://mcylyhskdldapzxkczlr.supabase.co").replace(/\/$/, ""),
+  key: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_4kf1IuABVxmIlARwEatuJg_H7yvDMlT",
+};
