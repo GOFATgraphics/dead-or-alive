@@ -294,25 +294,6 @@ function iconTile(s, className, size) {
   return tile;
 }
 
-function cardRow(s) {
-  const v = String(s.verdict).toLowerCase();
-  const li = document.createElement("li");
-  const name = document.createElement("span");
-  name.className = "row-name";
-  name.textContent = s.host;
-  const bar = document.createElement("span");
-  bar.className = "row-bar";
-  const fill = document.createElement("i");
-  fill.className = v;
-  fill.style.width = `${Math.max(4, Math.min(100, Number(s.score) || (v === "alive" ? 85 : 65)))}%`;
-  bar.append(fill);
-  const tag = document.createElement("b");
-  tag.className = `v-${v}`;
-  tag.textContent = s.verdict;
-  li.append(iconTile(s, "dot-tile", 24), name, bar, tag);
-  return li;
-}
-
 function chip(s) {
   const v = String(s.verdict).toLowerCase();
   const li = document.createElement("li");
@@ -362,9 +343,6 @@ loopTrack();
     const r = await fetch("/api/status?recent=12", { headers: { Accept: "application/json" } });
     const { stamps } = r.ok ? await r.json() : {};
     if (!Array.isArray(stamps) || !stamps.length) return;
-    $("#recent-rows").replaceChildren(...stamps.slice(0, 3).map(cardRow));
-    $("#recent-tag").textContent = "live";
-    $("#recent-dot").hidden = false;
     $("#mq-track").replaceChildren(...stamps.map(chip));
     $("#mq-title").textContent = "Latest stamps";
     $("#mq-dot").hidden = false;
