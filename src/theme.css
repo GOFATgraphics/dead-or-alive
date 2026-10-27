@@ -130,3 +130,4 @@
 [data-theme="dark"] .logo img { filter: brightness(0) invert(1); }
 /* Legal pages */
 [data-theme="dark"] .doc p, [data-theme="dark"] .doc li { color: #c9c7d6; }
+.who .theme-toggle { margin-left: 0; }

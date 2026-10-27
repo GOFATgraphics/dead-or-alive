@@ -33,14 +33,24 @@
   }
   // Headers drawn by React appear after load and can be redrawn (loading screen, then the page), so keep
   // watching and put the switcher back whenever a header is missing it. No header at all: a floating one.
+  // Signed in, the header has an account group (.who): the switcher goes at its start. Otherwise it sits just
+  // before the header's last button. If the header changes shape, the switcher moves with it.
   function place() {
     var bar = document.querySelector("header.bar");
     if (!bar) return false;
-    if (bar.querySelector(".theme-toggle")) return true;
-    var stray = document.querySelector(".theme-toggle.floating");
-    if (stray) stray.remove();
-    var last = bar.lastElementChild;
-    bar.insertBefore(button(false), last && last.classList.contains("btn") ? last : null);
+    var who = bar.querySelector(".who");
+    var t = bar.querySelector(".theme-toggle");
+    if (t && (who ? t.parentNode === who : t.parentNode === bar)) return true;
+    if (!t) {
+      var stray = document.querySelector(".theme-toggle.floating");
+      if (stray) stray.remove();
+      t = button(false);
+    }
+    if (who) who.insertBefore(t, who.firstChild);
+    else {
+      var last = bar.lastElementChild;
+      bar.insertBefore(t, last && last !== t && last.classList.contains("btn") ? last : null);
+    }
     return true;
   }
   function start() {

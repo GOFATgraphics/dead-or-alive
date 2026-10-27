@@ -41,14 +41,20 @@ function Bar({ user, onOut }) {
         <img src="/brand/smp-mark.svg" alt="" width="26" height="26" />
         <span>Stamp My Page</span>
       </a>
-      <nav className="bar-links" aria-label="Sections">
-        <a href="/pricing">Pricing</a>
-        <a href="/#top">Stamp a page</a>
-      </nav>
       {user ? (
-        <button type="button" className="btn btn-line btn-sm" onClick={onOut}><Icon name="log-out" /> Sign out</button>
+        <div className="who">
+          <span className="avatar" aria-hidden="true">{user.email[0].toUpperCase()}</span>
+          <span className="who-email">{user.email}</span>
+          <button type="button" className="btn btn-line btn-sm" onClick={onOut}>Sign out</button>
+        </div>
       ) : (
-        <a className="btn btn-line btn-sm" href="/#top">Stamp my page</a>
+        <>
+          <nav className="bar-links" aria-label="Sections">
+            <a href="/pricing">Pricing</a>
+            <a href="/#top">Stamp a page</a>
+          </nav>
+          <a className="btn btn-line btn-sm" href="/#top">Stamp my page</a>
+        </>
       )}
     </header>
   );
@@ -185,7 +191,27 @@ function Status({ status }) {
   );
 }
 
-function Membership({ user, setup, onChange }) {
+// What each plan is, as quiet rows with a price and one action. Used wherever a plan isn't on yet.
+function PlanRows({ user, only }) {
+  const keys = (only ? [only] : ["killSheet", "stayAlive"]).filter((k) => !(k === "killSheet" ? user.killSheetActive : user.stayAliveActive));
+  if (!keys.length) return null;
+  return (
+    <div className="plan-rows">
+      {keys.map((k) => (
+        <div key={k} className="plan-row">
+          <div>
+            <p className="pr-name">{PLANS[k].name} <span>{PLANS[k].price} {PLANS[k].per}</span></p>
+            <p className="pr-pitch">{PLANS[k].pitch}</p>
+          </div>
+          <a className="btn btn-dark btn-sm" href={planHref(k)}>{k === "killSheet" ? "Get it" : "Start"}</a>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Plans and billing, for the Account section.
+function Billing({ user, setup, onChange }) {
   const sa = user.stayAlive, ks = user.killSheet;
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
@@ -203,60 +229,66 @@ function Membership({ user, setup, onChange }) {
       setBusy("");
     }
   }
-  if (!user.killSheetActive && !user.stayAliveActive) {
-    return (
-      <section className="panel" aria-labelledby="m-h">
-        <div className="panel-head">
-          <h2 id="m-h"><Icon name="user" /> Free account</h2>
-          <p>Your stamps are saved here. Add a plan for the full-page scout, rewrites, monitoring, and an app review.</p>
-        </div>
-        {sa && sa.status !== "active" && <p className="note">Your Stay Alive membership ended{sa.endedAt ? ` on ${fmtDate(sa.endedAt)}` : ""}.</p>}
-        <div className="mini-plans">
-          {["killSheet", "stayAlive"].map((k) => (
-            <a key={k} className="mini-plan" href={planHref(k)}>
-              <b>{PLANS[k].name}</b>
-              <span>{PLANS[k].price} {PLANS[k].per}</span>
-              <em>{PLANS[k].pitch}</em>
-            </a>
-          ))}
-        </div>
-      </section>
-    );
-  }
   return (
-    <section className="panel member" aria-labelledby="m-h">
-      <h2 id="m-h" className="sr-only">Membership</h2>
-      <div className="badges">
-        {user.killSheetActive && (
-          <div className="mbadge">
-            <p className="mb-top">Kill Sheet member</p>
-            <p className="mb-name">You are a Kill Sheet member</p>
-            <p className="mb-meta">Since {fmtDate(ks.since)} · {PLANS.killSheet.price} one-time · {ks.restampsLeft > 0 ? `${ks.restampsLeft} free re-stamp left` : "Re-stamp used"}</p>
-          </div>
-        )}
+    <Panel title="Plan and billing" desc={user.member ? "Your memberships, dates, and billing." : "You're on the free plan."}>
+      <dl className="kv">
+        <div><dt>Plan</dt><dd>{[user.killSheetActive && "Kill Sheet", user.stayAliveActive && "Stay Alive"].filter(Boolean).join(" + ") || "Free"}</dd></div>
+        {user.killSheetActive && <div><dt>Kill Sheet</dt><dd>Since {fmtDate(ks.since)} · {PLANS.killSheet.price} one-time · {ks.restampsLeft > 0 ? "1 free re-stamp left" : "Re-stamp used"}</dd></div>}
         {user.stayAliveActive && (
-          <div className="mbadge alive">
-            <p className="mb-top">Stay Alive member</p>
-            <p className="mb-name">You are a Stay Alive member</p>
-            <p className="mb-meta">Since {fmtDate(sa.since)} · {PLANS.stayAlive.price} {PLANS.stayAlive.per}</p>
-            <p className="mb-meta">
-              {sa.cancelAtPeriodEnd ? <>Cancelled. Stays on until <b>{fmtDate(sa.renews || sa.endsAt)}</b>, then stops. No more charges.</> : <>Next billing date: <b>{fmtDate(sa.renews)}</b></>}
-            </p>
-            <div className="mb-actions">
-              {sa.cancelAtPeriodEnd ? (
-                <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => billing("resume")}>{busy === "resume" ? "Resuming…" : "Keep Stay Alive"}</button>
-              ) : (
-                <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => billing("cancel")}>{busy === "cancel" ? "Cancelling…" : "Cancel Stay Alive"}</button>
-              )}
-              <a className="btn btn-line btn-sm" href={setup?.portal} target="_blank" rel="noopener noreferrer">Receipts and card</a>
-            </div>
+          <div>
+            <dt>Stay Alive</dt>
+            <dd>
+              Since {fmtDate(sa.since)} · {PLANS.stayAlive.price} {PLANS.stayAlive.per}
+              <br />
+              {sa.cancelAtPeriodEnd ? <>Cancelled. On until <b>{fmtDate(sa.renews || sa.endsAt)}</b>, then stops. No more charges.</> : <>Next billing date <b>{fmtDate(sa.renews)}</b></>}
+            </dd>
           </div>
         )}
-      </div>
+        {sa && !user.stayAliveActive && <div><dt>Stay Alive</dt><dd>Ended{sa.endedAt ? ` ${fmtDate(sa.endedAt)}` : ""}</dd></div>}
+      </dl>
+      {user.stayAliveActive && (
+        <div className="row-actions">
+          {sa.cancelAtPeriodEnd ? (
+            <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => billing("resume")}>{busy === "resume" ? "Resuming…" : "Keep Stay Alive"}</button>
+          ) : (
+            <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => billing("cancel")}>{busy === "cancel" ? "Cancelling…" : "Cancel Stay Alive"}</button>
+          )}
+          <a className="btn btn-line btn-sm" href={setup?.portal} target="_blank" rel="noopener noreferrer">Receipts and card</a>
+        </div>
+      )}
       {err && <p className="alert" role="alert">{err}</p>}
-      {!user.stayAliveActive && <p className="fine">Want it watched every week? <a href={planHref("stayAlive")}>Add Stay Alive, {PLANS.stayAlive.price} {PLANS.stayAlive.per}</a>.</p>}
-      {!user.killSheetActive && <p className="fine">Want the rewrite and full-page scout? <a href={planHref("killSheet")}>Get the Kill Sheet, {PLANS.killSheet.price} one-time</a>.</p>}
+      <PlanRows user={user} />
+    </Panel>
+  );
+}
+
+// One titled block. Everything in the dashboard sits in these.
+function Panel({ title, desc, action, children, id }) {
+  return (
+    <section className="panel" id={id} aria-label={title}>
+      <header className="panel-head">
+        <div>
+          <h2>{title}</h2>
+          {desc && <p>{desc}</p>}
+        </div>
+        {action}
+      </header>
+      {children}
     </section>
+  );
+}
+
+// A section a plan unlocks, before it's on.
+function Locked({ plan, title, lines }) {
+  const p = PLANS[plan];
+  return (
+    <Panel title={title} desc={`Part of ${p.name}, ${p.price} ${p.per}.`}>
+      <ul className="locked-list">{lines.map((l) => <li key={l}><Icon name="check" size={15} />{l}</li>)}</ul>
+      <div className="row-actions">
+        <a className="btn btn-dark" href={planHref(plan)}>{p.cta}</a>
+        <a className="btn btn-line" href="/pricing">Compare plans</a>
+      </div>
+    </Panel>
   );
 }
 
@@ -560,28 +592,87 @@ function Reviews({ user, onChange }) {
   );
 }
 
+function StampTable({ stamps }) {
+  return (
+    <div className="tbl" role="table" aria-label="Stamps">
+      <div className="tr th" role="row"><span role="columnheader">Site</span><span role="columnheader">Verdict</span><span role="columnheader">Score</span><span role="columnheader">Date</span></div>
+      {stamps.map((s) => (
+        <a key={s.id} className="tr" role="row" href={`/v/${s.id}`}>
+          <span className="site" role="cell">{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : <i>{s.host[0].toUpperCase()}</i>}{s.host}</span>
+          <span role="cell"><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b></span>
+          <span role="cell" className="num">{s.score ?? "n/a"}</span>
+          <span role="cell" className="muted">{fmtDate(s.at)}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function Stamps({ user }) {
   const stamps = user.stamps || [];
   return (
-    <section className="panel" aria-labelledby="st-h">
-      <div className="panel-head">
-        <h2 id="st-h"><Icon name="list-checks" /> Your stamps</h2>
-        <p>Every stamp you've saved, newest first. Stamps you make in this browser are saved automatically while you're signed in.</p>
+    <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
+      {stamps.length ? <StampTable stamps={stamps} /> : <Empty text="No stamps yet." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
+    </Panel>
+  );
+}
+
+function Empty({ text, action }) {
+  return <div className="empty"><p>{text}</p>{action}</div>;
+}
+
+// The first thing you see: the numbers, recent stamps, and what your plan is doing.
+function Overview({ user, report, monitor, go }) {
+  const stamps = user.stamps || [];
+  const latest = stamps[0];
+  const best = stamps.reduce((m, s) => (s.score != null && s.score > (m?.score ?? -1) ? s : m), null);
+  const checks = monitor?.checks || [];
+  const up = checks.length ? Math.round((checks.filter((c) => c.ok).length / checks.length) * 1000) / 10 : null;
+  return (
+    <>
+      <div className="kpis">
+        <div><p>Stamps saved</p><b>{stamps.length}</b></div>
+        <div><p>Latest</p><b className={latest ? "v-" + latest.verdict.toLowerCase() : ""}>{latest ? `${latest.verdict} ${latest.score ?? ""}` : "None yet"}</b><small>{latest?.host || ""}</small></div>
+        <div><p>Best score</p><b>{best ? best.score : "None yet"}</b><small>{best?.host || ""}</small></div>
+        <div><p>Plan</p><b>{user.killSheetActive && user.stayAliveActive ? "Both plans" : user.killSheetActive ? "Kill Sheet" : user.stayAliveActive ? "Stay Alive" : "Free"}</b><small>{user.stayAliveActive && up != null ? `${up}% uptime` : user.stayAliveActive ? "Monitoring on" : user.killSheetActive ? (report?.status === "ready" ? "Sheet ready" : "Sheet running") : ""}</small></div>
       </div>
-      {stamps.length ? (
-        <ul className="history">
-          {stamps.map((s) => (
-            <li key={s.id}>
-              <span className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</span>
-              <a href={`/v/${s.id}`}>{s.icon && <img src={s.icon} alt="" width="16" height="16" />}{s.host}{s.score != null ? ` · ${s.score}/100` : ""}</a>
-              <time>{fmtDate(s.at)}</time>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="fine">No stamps saved yet. <a href="/#top">Stamp a page free</a>; it's saved here when you're signed in.</p>
-      )}
-    </section>
+
+      <div className="grid2">
+        <Panel title="Recent stamps" action={stamps.length > 5 ? <button type="button" className="link" onClick={() => go("stamps")}>View all</button> : null}>
+          {stamps.length ? <StampTable stamps={stamps.slice(0, 5)} /> : <Empty text="Stamp a page and it shows up here." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>} />}
+        </Panel>
+        {user.member ? (
+          <Panel title="Your plan">
+            <ul className="status-list">
+              {user.killSheetActive && (
+                <li>
+                  <span className={"dot " + (report?.status === "ready" ? "ok" : report?.status === "failed" ? "bad" : "run")}></span>
+                  <div><b>Kill Sheet</b><p>{report?.status === "ready" ? `Ready for ${new URL(report.url).hostname}` : report?.status === "failed" ? "Needs another try" : user.killSheet.url ? "Running now" : "Add your page to start"}</p></div>
+                  <button type="button" className="link" onClick={() => go("kill-sheet")}>Open</button>
+                </li>
+              )}
+              {user.stayAliveActive && (
+                <li>
+                  <span className={"dot " + (checks.at(-1)?.ok === false ? "bad" : monitor ? "ok" : "run")}></span>
+                  <div><b>Monitoring</b><p>{monitor ? `${checks.at(-1)?.ok === false ? "Down at last check" : "Up"} · next billing ${fmtDate(user.stayAlive.renews)}` : user.stayAlive.url ? "Switching on" : "Add your page to start"}</p></div>
+                  <button type="button" className="link" onClick={() => go("monitoring")}>Open</button>
+                </li>
+              )}
+              <li>
+                <span className={"dot " + (user.reviewsLeft?.total ? "ok" : "idle")}></span>
+                <div><b>App review</b><p>{user.reviewsLeft?.total ? "1 review available" : (user.reviews || []).length ? `${user.reviews.length} sent` : "None available"}</p></div>
+                <button type="button" className="link" onClick={() => go("reviews")}>Open</button>
+              </li>
+            </ul>
+            <PlanRows user={user} />
+          </Panel>
+        ) : (
+          <Panel title="Upgrade" desc="Fixes, monitoring, and a human review. Delivered here the moment you pay.">
+            <PlanRows user={user} />
+          </Panel>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -608,15 +699,17 @@ function Settings({ user, onOut }) {
     }
   }
   return (
-    <section className="panel quiet" aria-labelledby="set-h">
-      <div className="panel-head"><h2 id="set-h"><Icon name="lock" /> Account</h2><p>Signed in as <b>{user.email}</b>.</p></div>
+    <Panel title="Sign-in" desc={`Signed in as ${user.email}${user.x?.username ? `, linked to X @${user.x.username}` : ""}.`}>
       <form className="inline-form" onSubmit={setPassword}>
-        <label>{user.hasPassword ? "Change password" : "Set a password (you signed in with an email link)"}<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
+        <label>{user.hasPassword ? "Change password" : "Set a password"}<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
         <button className="btn btn-line" type="submit">Save</button>
       </form>
       {msg && <p className={msg.bad ? "alert" : "note"}>{msg.text}</p>}
-      <p className="fine"><button type="button" className="link danger" onClick={del}><Icon name="trash" /> Delete my account</button></p>
-    </section>
+      <div className="danger-row">
+        <div><b>Delete account</b><p>Removes your account, saved stamps list, reports, and any stored test logins.</p></div>
+        <button type="button" className="btn btn-line btn-sm danger" onClick={del}>Delete</button>
+      </div>
+    </Panel>
   );
 }
 
@@ -685,30 +778,80 @@ function Dashboard({ data, setData, onOut }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onChange = (out) => out?.user !== undefined && setData((d) => ({ ...d, ...out }));
-  const first = user.email.split("@")[0];
+
+  // Sections live in the URL hash, so back and forward work and links can point at one.
+  const first = PAID === "killSheet" ? "kill-sheet" : PAID === "stayAlive" ? "monitoring" : "overview";
+  const [sect, setSect] = useState(() => (SECTIONS.some((x) => x.id === location.hash.slice(1)) ? location.hash.slice(1) : first));
+  useEffect(() => {
+    const on = () => SECTIONS.some((x) => x.id === location.hash.slice(1)) && setSect(location.hash.slice(1));
+    addEventListener("hashchange", on);
+    return () => removeEventListener("hashchange", on);
+  }, []);
+  const go = (id) => {
+    history.replaceState(null, "", `${location.pathname}${location.search}#${id}`);
+    setSect(id);
+    scrollTo({ top: 0 });
+  };
+  const counts = { stamps: (user.stamps || []).length, reviews: (user.reviews || []).filter((r) => r.status !== "delivered").length };
+  const locked = { "kill-sheet": !user.killSheetActive, monitoring: !user.stayAliveActive };
+  const here = SECTIONS.find((x) => x.id === sect);
 
   return (
-    <main className="dash wrap">
-      {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for the ${PLANS[PLAN].name}, with ${user.email} filled in…`} /></div>}
-      {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
-      {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
-      {banner === "active" && <div className="banner ok"><Icon name="check" /> {PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running below." : "You're a Stay Alive member. Monitoring is on."}</div>}
-      {err && <p className="alert" role="alert">{err}</p>}
+    <div className="app wrap">
+      <aside className="side" aria-label="Dashboard">
+        <a className="btn btn-dark side-cta" href="/#top"><Icon name="arrow-right" /> Stamp a page</a>
+        <nav className="side-nav">
+          {SECTIONS.map((x) => (
+            <button key={x.id} type="button" className={sect === x.id ? "on" : ""} aria-current={sect === x.id ? "page" : undefined} onClick={() => go(x.id)}>
+              <Icon name={x.icon} size={16} />
+              <span>{x.label}</span>
+              {locked[x.id] ? <Icon name="lock" size={13} className="side-lock" /> : counts[x.id] ? <em>{counts[x.id]}</em> : null}
+            </button>
+          ))}
+        </nav>
+        <div className="side-plan">
+          <p>{user.member ? "Member" : "Free plan"}</p>
+          <b>{[user.killSheetActive && "Kill Sheet", user.stayAliveActive && "Stay Alive"].filter(Boolean).join(" + ") || "Stamps and full details"}</b>
+          {!user.stayAliveActive && <a href={planHref(user.killSheetActive ? "stayAlive" : "killSheet")}>{user.killSheetActive ? "Add Stay Alive" : "Upgrade"}</a>}
+        </div>
+      </aside>
 
-      <div className="dash-head">
-        <p className="eyebrow">Dashboard</p>
-        <h1>Hi, {first}.</h1>
-      </div>
+      <main className="main">
+        {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for the ${PLANS[PLAN].name}, with ${user.email} filled in…`} /></div>}
+        {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
+        {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
+        {banner === "active" && <div className="banner ok"><Icon name="check" /> {PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running below." : "You're a Stay Alive member. Monitoring is on."}</div>}
+        {err && <p className="alert" role="alert">{err}</p>}
 
-      <Membership user={user} setup={setup} onChange={onChange} />
-      {user.killSheetActive && <KillSheet user={user} report={report} onChange={onChange} />}
-      {user.stayAliveActive && <StayAlive user={user} monitor={monitor} onChange={onChange} />}
-      <Reviews user={user} onChange={onChange} />
-      <Stamps user={user} />
-      <Settings user={user} onOut={onOut} />
-    </main>
+        <div className="page-head">
+          <h1>{here.label}</h1>
+          <p>{here.desc}</p>
+        </div>
+
+        {sect === "overview" && <Overview user={user} report={report} monitor={monitor} go={go} />}
+        {sect === "stamps" && <Stamps user={user} />}
+        {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
+        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitor={monitor} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "One app review a month"]} />)}
+        {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
+        {sect === "account" && (
+          <>
+            <Billing user={user} setup={setup} onChange={onChange} />
+            <Settings user={user} onOut={onOut} />
+          </>
+        )}
+      </main>
+    </div>
   );
 }
+
+const SECTIONS = [
+  { id: "overview", label: "Overview", icon: "gauge", desc: "Your stamps and plan at a glance." },
+  { id: "stamps", label: "Stamps", icon: "list-checks", desc: "Every page you've stamped, with the full checks, stack, and speed behind each." },
+  { id: "kill-sheet", label: "Kill Sheet", icon: "clipboard-list", desc: "The whole page scouted, your copy rewritten, and the fixes ranked." },
+  { id: "monitoring", label: "Monitoring", icon: "activity", desc: "Uptime, speed, weekly re-stamps, and what changed." },
+  { id: "reviews", label: "App review", icon: "search", desc: "A person tests your app end to end. The result lands here." },
+  { id: "account", label: "Account", icon: "user", desc: "Plan, billing, and sign-in." },
+];
 
 function App() {
   const [data, setData] = useState(null);
