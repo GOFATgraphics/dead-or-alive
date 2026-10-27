@@ -32,6 +32,10 @@
     {
       "source": "/auth/x/callback",
       "destination": "/api/account?op=x-callback"
+    },
+    {
+      "source": "/auth/confirm",
+      "destination": "/api/account?op=confirm"
     }
   ],
   "headers": [

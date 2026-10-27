@@ -21,14 +21,15 @@ const font = (n) => opentype.parse(fs.readFileSync(path.join(here, "fonts", n)).
 const HEAVY = font("jakarta-800.woff");
 const MONO = font("plex-mono-500.woff");
 
+// Brand: the stamp red on white, ink for text, and white on dark grounds. (The mark was violet until Oct 2026.)
 export const BRAND = {
-  ink: "#4B2EE0",
-  text: "#12132A",
+  ink: "#B42228",
+  text: "#15142A",
   seal: "#B42228",
-  lavender: "#F4F1FF",
-  inkOnDark: "#A994FF",
-  subline: "#B9A8FF",
-  night: "#14112E",
+  lavender: "#FFFFFF",
+  inkOnDark: "#FF6B6B",
+  subline: "#FFB3AB",
+  night: "#0B0B10",
 };
 
 const f2 = (n) => Math.round(n * 100) / 100;
@@ -196,7 +197,7 @@ const p16 = png(tiny, 16, path.join(pub, "favicon-16.png"));
 const p32 = png(fav, 32, path.join(pub, "favicon-32.png"));
 const p48 = png(fav, 48, path.join(out, "favicon-48.png"));
 fs.writeFileSync(path.join(pub, "favicon.ico"), ico([[16, p16], [32, p32], [48, p48]]));
-// Apple and Android: lavender tile, mark inside the safe zone (iOS rounds the corners itself).
+// Apple and Android: white tile, mark inside the safe zone (iOS rounds the corners itself).
 png(svg(200, 200, mark(BRAND.ink, { x: 30, y: 30, s: 0.7 }), BRAND.lavender), 180, path.join(pub, "apple-touch-icon.png"));
 png(svg(200, 200, mark(BRAND.ink, { x: 26, y: 26, s: 0.74 }), BRAND.lavender), 192, path.join(pub, "icon-192.png"));
 // Maskable: the roundel within the 80% safe circle.

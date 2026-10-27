@@ -23,6 +23,7 @@ import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, resumeSta
 import { readReport, runScout } from "./_scout.js";
 import { readMonitor, runMonitor } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
+import { SAY, passwordSignIn, resendConfirmation, sendSignInLink, signUp, supaReady, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
@@ -63,7 +64,7 @@ async function me(email) {
 }
 
 function setup() {
-  return { ready: storeReady(), emailLinks: mailReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
+  return { ready: storeReady(), emailLinks: supaReady() || mailReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
 }
 
 async function sendLink(email, next) {
@@ -75,6 +76,24 @@ async function sendLink(email, next) {
     html: `<p>Sign in to Stamp My Page:</p><p><a href="${link}" style="display:inline-block;background:#15142a;color:#fff;text-decoration:none;font-weight:600;border-radius:12px;padding:12px 20px">Sign in</a></p><p style="color:#5d6180;font-size:13px">The link works once, for 15 minutes. If you didn't ask for it, ignore this email.</p>`,
   });
 }
+
+// Where a confirmed visitor goes next: the dashboard URL they started from (it comes back as next, with its own
+// query split into the other params), or the dashboard. Only this site's dashboard, never somewhere else.
+function afterConfirm(q) {
+  let path = "/dashboard";
+  const keep = new URLSearchParams();
+  try {
+    const n = new URL(String(q.next || ""), "https://x.invalid");
+    if (n.pathname.replace(/\/$/, "") === "/dashboard") n.searchParams.forEach((v, k) => keep.set(k, v));
+  } catch (_) {}
+  for (const [k, v] of Object.entries(q)) if (!["token_hash", "type", "next", "op"].includes(k) && typeof v === "string") keep.set(k, v);
+  keep.set("confirmed", "1");
+  const qs = [...keep.entries()].filter(([k, v]) => /^[\w-]{1,20}$/.test(k) && String(v).length < 600);
+  return `${path}?${new URLSearchParams(qs).toString()}`;
+}
+
+// The dashboard address a sign-up started from, for the confirmation email to bring them back to.
+const backTo = (next) => `${origin()}/dashboard${typeof next === "string" && /^\?[\w=&%.-]*$/.test(next) ? next : ""}`;
 
 // Free stamps the browser made: the job id is only known to the browser that started it, so it proves the stamp is theirs.
 async function claim(email, jobs) {
@@ -132,6 +151,15 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     if (q.op === "x") return xStart(req, res);
     if (q.op === "x-callback") return xCallback(req, res);
+    // A link from a sign-up confirmation or sign-in email. Supabase's template sends it here with the token hash.
+    if (q.op === "confirm") {
+      const v = await verifyLink(String(q.token_hash || ""), String(q.type || "email")).catch(() => ({ ok: false }));
+      if (!v.ok) return res.redirect(302, "/dashboard?link=expired");
+      const email = normEmail(v.email);
+      await ensureUser(email);
+      await startSession(res, email);
+      return res.redirect(302, afterConfirm(q));
+    }
     if (q.op === "link") {
       const v = await useMagicToken(String(q.t || ""));
       if (!v) return res.redirect(302, "/dashboard?link=expired");
@@ -157,26 +185,55 @@ export default async function handler(req, res) {
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
       if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, or use an email link." });
       const u = await getUser(email);
-      if (!u) {
-        if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters." });
-        await ensureUser(email);
-        await updateUser(email, async (x) => ({ ...x, pass: await hashPassword(password) }));
-      } else if (u.pass) {
+      let created = false;
+      if (u?.pass) {
+        // Accounts made before email confirmation keep their own password.
         if (!(await checkPassword(password, u.pass))) {
           await noteFail(email);
           await new Promise((r) => setTimeout(r, 400));
           return res.status(401).json({ error: "That password doesn't match this email.", code: "wrongpass" });
         }
         await clearFails(email);
+      } else if (supaReady()) {
+        // Sign in; if there's no login for this email yet, sign up, and the confirmation email goes out.
+        const r = await passwordSignIn(email, password);
+        if (!r.ok && r.code === "email_not_confirmed") {
+          await resendConfirmation(email, backTo(b.next)).catch(() => {});
+          return res.status(202).json({ sent: true, note: `Confirm your email first. We sent the link again to ${email}.` });
+        }
+        if (!r.ok) {
+          if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters. Been here before? That password doesn't match." });
+          const up = await signUp(email, password, backTo(b.next));
+          if (up.exists) {
+            await noteFail(email);
+            return res.status(401).json({ error: `That password doesn't match this email.${u?.x ? " This account also signs in with X." : ""}`, code: "wrongpass" });
+          }
+          // Supabase can't send yet (no email service connected there): don't lose the sign-up, keep the password here.
+          if (up.error && !SAY[up.error] && !u) {
+            console.error("Confirmation email failed, account made without it:", up.error, up.msg);
+            await ensureUser(email);
+            await updateUser(email, async (x) => ({ ...x, pass: await hashPassword(password) }));
+            await startSession(res, email);
+            if (Array.isArray(b.jobs)) await claim(email, b.jobs);
+            return res.status(200).json({ ...(await me(email)), created: true, setup: setup() });
+          }
+          if (up.error) return res.status(400).json({ error: SAY[up.error] || up.msg || "That didn't work. Try again." });
+          if (up.sent) return res.status(202).json({ sent: true, confirm: true, note: `Almost there. We sent a confirmation link to ${email}. Open it on any device to finish.` });
+          created = !u;
+        }
+        await clearFails(email);
+        await ensureUser(email);
       } else {
-        // The account exists without a password (made by a payment, an email link, or X). Prove the email first.
-        if (!mailReady()) return res.status(409).json({ error: `That email already has an account${u.x ? " linked to X. Use Continue with X" : `. Write to ${process.env.CONTACT_EMAIL || "us"} and we'll help you in`}.` });
-        await sendLink(email, String(b.next || ""));
-        return res.status(202).json({ sent: true, note: `That email already has an account${u.x ? " linked to X" : ""}. We sent a sign-in link to prove it's yours.` });
+        // No email service: the old way, a password kept here.
+        if (u) return res.status(409).json({ error: `That email already has an account${u.x ? " linked to X. Use Continue with X" : `. Write to ${process.env.CONTACT_EMAIL || "us"} and we'll help you in`}.` });
+        if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters." });
+        await ensureUser(email);
+        await updateUser(email, async (x) => ({ ...x, pass: await hashPassword(password) }));
+        created = true;
       }
       await startSession(res, email);
       if (Array.isArray(b.jobs)) await claim(email, b.jobs);
-      return res.status(200).json({ ...(await me(email)), created: !u, setup: setup() });
+      return res.status(200).json({ ...(await me(email)), created, setup: setup() });
     }
     if (op === "signup" || op === "login") {
       const email = normEmail(b.email);
@@ -211,6 +268,11 @@ export default async function handler(req, res) {
     if (op === "sendlink") {
       const email = normEmail(b.email);
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (supaReady()) {
+        const r = await sendSignInLink(email, backTo(b.next));
+        if (r.ok) return res.status(202).json({ sent: true });
+        if (!mailReady()) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again, or use a password." });
+      }
       if (!mailReady()) return res.status(503).json({ error: "Email links aren't switched on yet. Use a password." });
       const out = await sendLink(email, String(b.next || ""));
       if (!out.emailed) return res.status(502).json({ error: "The email didn't send. Try again, or use a password." });

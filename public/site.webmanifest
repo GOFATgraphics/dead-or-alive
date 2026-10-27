@@ -4,8 +4,8 @@
   "description": "Free first-screen stamp: DEAD, COPE, or ALIVE, with the fix for every fail.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F4F1FF",
-  "theme_color": "#4B2EE0",
+  "background_color": "#FFFFFF",
+  "theme_color": "#B42228",
   "icons": [
     {
       "src": "/icon-192.png",

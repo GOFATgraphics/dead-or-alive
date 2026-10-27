@@ -821,6 +821,7 @@ function Dashboard({ data, setData, onOut }) {
         {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
         {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
         {banner === "active" && <div className="banner ok"><Icon name="check" /> {PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running below." : "You're a Stay Alive member. Monitoring is on."}</div>}
+        {params.get("confirmed") && !banner && <div className="banner ok"><Icon name="check" /> Email confirmed. You're signed in.</div>}
         {err && <p className="alert" role="alert">{err}</p>}
 
         <div className="page-head">
