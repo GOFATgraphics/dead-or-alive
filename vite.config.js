@@ -41,7 +41,7 @@ function siteInfo() {
       const robots = isPreview
         ? "User-agent: *\nDisallow: /\n"
         : `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`;
-      const urls = ["/", "/pricing", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
+      const urls = ["/", "/privacy", "/terms"].map((p) => `  <url><loc>${SITE}${p === "/" ? "/" : p}</loc></url>`).join("\n");
       writeFileSync(resolve(outDir, "robots.txt"), robots);
       writeFileSync(resolve(outDir, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
     },

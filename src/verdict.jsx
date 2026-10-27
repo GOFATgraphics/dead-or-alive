@@ -5,6 +5,7 @@ import { BoxCat, reducedMotion } from "./ui.jsx";
 import DecryptedText from "./bits/DecryptedText.jsx";
 import { Icon } from "./icons.jsx";
 import { track, trackView } from "./track.js";
+import { markChecked } from "./checked.js";
 import { snapshotRows } from "./snapshot.js";
 import { DESK } from "./config.js";
 import { Toast } from "./toast.jsx";
@@ -337,7 +338,7 @@ function Offers({ r }) {
         <h2 id="offers-h">{v === "ALIVE" ? "Pages break quietly. We'll watch it." : "Fix it yourself, or hand it to us."}</h2>
         <p className="sect-sub">{v === "ALIVE" ? "A deploy, a slow script, a new hero. Stay Alive re-stamps every week and tells you first." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}The list above is free. The Kill Sheet is the rewrite and the full-page scout, in your dashboard the moment you pay.`}</p>
       </div>
-      {/* Same cards as the homepage and /pricing, from src/plans.js; clicks on a plan are counted here. */}
+      {/* Same cards as /pricing, from src/plans.js; clicks on a plan are counted here. */}
       <div
         onClick={(e) => {
           const plan = e.target.closest?.("[data-plan]")?.dataset.plan;
@@ -656,6 +657,7 @@ function App() {
         if (!NEXT[r.verdict]) throw new Error("bad verdict");
         document.title = `${r.verdict}: ${r.host} | Stamp My Page`;
         trackView("result", { v: r.verdict });
+        markChecked();
         setState({ status: "ready", r });
       })
       .catch(() => setState({ status: "missing" }));

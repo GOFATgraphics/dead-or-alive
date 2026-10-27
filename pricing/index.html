@@ -5,20 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/src/theme.css" />
-    <title>Pricing: Free Stamp, $19 Kill Sheet, $20/month Stay Alive | Stamp My Page</title>
-    <meta name="description" content="The first-screen stamp is free. The Kill Sheet is $19 one-time: a full-page scout, your copy rewritten, ranked fixes and an app review, instantly in your dashboard. Stay Alive is $20 a month: weekly re-stamps, daily uptime and speed checks." />
+    <title>Plans | Stamp My Page</title>
+    <meta name="description" content="Plans for Stamp My Page show after your free first-screen stamp." />
+    <meta name="robots" content="noindex" />
     <meta name="theme-color" content="#f3f3f4" />
-    <link rel="canonical" href="%SITE_URL%/pricing" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Stamp My Page" />
-    <meta property="og:url" content="%SITE_URL%/pricing" />
-    <meta property="og:title" content="Stamp My Page pricing: free stamp, $19 Kill Sheet, $20/month Stay Alive" />
-    <meta property="og:description" content="Free first-screen stamp. Paid plans open your dashboard the moment you pay." />
-    <meta property="og:image" content="%SITE_URL%/og-card.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="%SITE_URL%/og-card.png" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -26,15 +16,6 @@
     <link rel="preload" href="/fonts/plus-jakarta-sans-latin-v12.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/home.css" />
     <link rel="stylesheet" href="/src/plans.css" />
-    <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    { "@type": "Product", "name": "Kill Sheet", "description": "One-time. A full-page scout, your headline, subhead and button rewritten, 3 to 5 ranked fixes, a free re-stamp, and one app review, in your dashboard the moment you pay.", "brand": { "@type": "Brand", "name": "Stamp My Page" }, "offers": { "@type": "Offer", "price": "19.00", "priceCurrency": "USD", "url": "%SITE_URL%/pricing" } },
-    { "@type": "Product", "name": "Stay Alive", "description": "Monthly. Monitoring on the moment you subscribe: weekly re-stamps, daily uptime and speed checks, and one app review a month.", "brand": { "@type": "Brand", "name": "Stamp My Page" }, "offers": { "@type": "Offer", "price": "20.00", "priceCurrency": "USD", "url": "%SITE_URL%/pricing" } }
-  ]
-}
-    </script>
   </head>
   <body class="home">
     <div class="frame">
@@ -46,7 +27,6 @@
         <nav class="bar-links" aria-label="Sections">
           <a href="/#why">Why pages fail</a>
           <a href="/#how">How it works</a>
-          <a href="/pricing" aria-current="page">Pricing</a>
           <a href="/dashboard">Dashboard</a>
         </nav>
         <a class="bar-signin" href="/dashboard">Sign in</a>
@@ -56,15 +36,19 @@
       <main>
         <section class="sect wrap" aria-labelledby="pricing-h">
           <div class="sect-head">
-            <p class="eyebrow">Pricing</p>
+            <p class="eyebrow">Plans</p>
             <h1 id="pricing-h" class="page-h">Free to stamp. Instant when you pay.</h1>
-            <p class="sect-sub">Every paid plan opens your dashboard the moment your payment is confirmed, with its automated parts already running.</p>
+            <p class="sect-sub" id="plans-sub">Every paid plan opens your dashboard the moment your payment is confirmed, with its automated parts already running.</p>
           </div>
-          <!--plans:free-->
-          <!--plans:review-->
+          <div class="plans-gate" id="plans-gate">
+            <h2>Plans show after your free check</h2>
+            <p>Stamp your page first. It's free, needs no account, and takes about a minute. Your result shows the plans that fit it.</p>
+            <a class="btn btn-red" href="/#top">Stamp my page free</a>
+          </div>
+          <div id="plans" hidden></div>
         </section>
 
-        <section class="sect wrap" aria-labelledby="instant-h">
+        <section class="sect wrap" id="plans-when" aria-labelledby="instant-h" hidden>
           <div class="sect-head">
             <p class="eyebrow">What happens when</p>
             <h2 id="instant-h">What's instant, and what's tracked</h2>
@@ -84,7 +68,7 @@
           </div>
         </section>
 
-        <section class="sect wrap" id="faq" aria-labelledby="faq-h">
+        <section class="sect wrap" id="faq" aria-labelledby="faq-h" hidden>
           <div class="sect-head">
             <p class="eyebrow">FAQ</p>
             <h2 id="faq-h">Billing questions</h2>
@@ -102,10 +86,11 @@
 
       <footer class="foot">
         <a class="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
-        <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></nav>
+        <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:hello@stampmypage.com">hello@stampmypage.com</a></nav>
         <a class="foot-badge" href="https://stampmypage.com/v/-9bwti808jqQ"><img class="for-light" src="/badge/-9bwti808jqQ" alt="Obsidian, alive on Stamp My Page" width="300" height="64" /><img class="for-dark" src="/badge/-9bwti808jqQ?theme=dark" alt="Obsidian, alive on Stamp My Page" width="300" height="64" /></a>
         <span class="foot-meta">© Gofat Labs</span>
       </footer>
     </div>
+    <script type="module" src="/src/pricing.js"></script>
   </body>
 </html>

@@ -8,6 +8,7 @@ import { Toast } from "./toast.jsx";
 import { DESK, PLANS } from "./config.js";
 import { REVIEW_STEPS, planHref, point } from "./plans.js";
 import { track, trackView } from "./track.js";
+import { hasChecked, markChecked } from "./checked.js";
 
 // The dashboard: sign up or in, then everything a membership includes, in one place.
 // URL: ?plan=killSheet|stayAlive&url=… (buying: account first, then checkout), ?paid=…&checkout_id=… (back from checkout),
@@ -60,7 +61,6 @@ function Bar({ user, onOut }) {
       ) : (
         <>
           <nav className="bar-links" aria-label="Sections">
-            <a href="/pricing">Pricing</a>
             <a href="/#top">Stamp a page</a>
           </nav>
           <a className="btn btn-line btn-sm" href="/#top">Stamp my page</a>
@@ -74,7 +74,7 @@ function Foot() {
   return (
     <footer className="foot">
       <a className="mark" href="/"><img src="/brand/smp-mark.svg" alt="" width="22" height="22" /><span>Stamp My Page</span></a>
-      <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href={`mailto:${DESK.contact}`}>{DESK.contact}</a></nav>
+      <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href={`mailto:${DESK.contact}`}>{DESK.contact}</a></nav>
       <span className="foot-meta">© Gofat Labs</span>
     </footer>
   );
@@ -152,7 +152,7 @@ function Auth({ setup, onIn }) {
             <h1>Create your free account, then check out.</h1>
             <p className="sect-sub">Your {plan.name} lands in this dashboard the moment your payment is confirmed. Use the email you'll pay with, so the payment finds your account.</p>
             <div className="auth-plan">
-              <p><b>{plan.name}</b> · {plan.price} {plan.per}</p>
+              <p><b>{plan.name}</b>{hasChecked() && ` · ${plan.price} ${plan.per}`}</p>
               <ul>{plan.points.map(point).map((x) => <li key={x.text}><Icon name="check" size={15} />{x.text.charAt(0).toUpperCase() + x.text.slice(1)}</li>)}</ul>
             </div>
           </>
@@ -202,9 +202,11 @@ function Status({ status }) {
 }
 
 // What each plan is, as quiet rows with a price and one action. Used wherever a plan isn't on yet.
+// Before a first free check there are no prices: one row that sends them to stamp a page.
 function PlanRows({ user, only }) {
   const keys = (only ? [only] : ["killSheet", "stayAlive"]).filter((k) => !(k === "killSheet" ? user.killSheetActive : user.stayAliveActive));
   if (!keys.length) return null;
+  if (!hasChecked(user)) return <FirstCheck />;
   return (
     <div className="plan-rows">
       {keys.map((k) => (
@@ -288,15 +290,31 @@ function Panel({ title, desc, action, children, id }) {
   );
 }
 
+function FirstCheck() {
+  return (
+    <div className="empty">
+      <p>Plans show after your first free check. Stamp any page and the result shows the plans that fit it.</p>
+      <a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>
+    </div>
+  );
+}
+
 // A section a plan unlocks, before it's on.
 function Locked({ plan, title, lines }) {
   const p = PLANS[plan];
+  const priced = hasChecked();
   return (
-    <Panel title={title} desc={`Part of ${p.name}, ${p.price} ${p.per}.`}>
+    <Panel title={title} desc={priced ? `Part of ${p.name}, ${p.price} ${p.per}.` : `Part of ${p.name}. Plans show after your first free check.`}>
       <ul className="locked-list">{lines.map((l) => <li key={l}><Icon name="check" size={15} />{l}</li>)}</ul>
       <div className="row-actions">
-        <a className="btn btn-dark" href={planHref(plan)}>{p.cta}</a>
-        <a className="btn btn-line" href="/pricing">Compare plans</a>
+        {priced ? (
+          <>
+            <a className="btn btn-dark" href={planHref(plan)}>{p.cta}</a>
+            <a className="btn btn-line" href="/pricing">Compare plans</a>
+          </>
+        ) : (
+          <a className="btn btn-dark" href="/#top">Stamp a page first</a>
+        )}
       </div>
     </Panel>
   );
@@ -562,7 +580,7 @@ function Reviews({ user, onChange }) {
           <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "Sending…" : "Send for review"}</button>
         </form>
       )}
-      {!user.member && (
+      {!user.member && hasChecked(user) && (
         <div className="mini-plans">
           {["killSheet", "stayAlive"].map((k) => (
             <a key={k} className="mini-plan" href={planHref(k)}><b>{PLANS[k].name}</b><span>{PLANS[k].price} {PLANS[k].per}</span><em>{k === "killSheet" ? "Includes one app review" : "Includes one app review a month"}</em></a>
@@ -872,6 +890,7 @@ function App() {
     fetch("/api/account", { cache: "no-store" })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
+        if (hasChecked(body.user)) markChecked();
         setData(body);
         setState(r.status === 503 ? "off" : r.ok ? "ready" : "error");
       })

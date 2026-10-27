@@ -2,6 +2,7 @@
 import { DESK } from "./config.js";
 import { KIND_HINT, checkPageUrl, pageKind } from "./url.js";
 import { track, trackView } from "./track.js";
+import { markChecked } from "./checked.js";
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = (s, root = document) => root.querySelector(s);
@@ -104,6 +105,7 @@ form.addEventListener("submit", async (e) => {
     const body = await r.json().catch(() => ({}));
     if (!r.ok || !body.job) return fail(body.error || "The stamp jammed. Try again in a moment.", r.status === 400 ? urlField : null, body.code || `http_${r.status}`);
     track("stamp_start");
+    markChecked();
     // Kept in the URL so a reload picks the same stamp back up.
     history.replaceState(null, "", `?job=${encodeURIComponent(body.job)}&page=${encodeURIComponent(page.url)}#top`);
     watch(body.job, page.url);
