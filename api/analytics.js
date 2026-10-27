@@ -1,7 +1,9 @@
 // Admin-only. Everything the Analytics tab shows, for the last 7, 30, or 90 days.
-// Traffic comes from the anonymous counters in Redis; orders, revenue, and stamps from Polar and Blob.
+// Traffic comes from the anonymous counters in Redis; sales and subscriptions from Polar; stamps from Blob.
 // Each half works on its own: whatever isn't connected yet comes back as null with a note.
-import { fetchPolarOrders, isVerdictOrder, isWaiting, polarReady, publishedStamps, requireAdmin, resultId } from "./_lib.js";
+import { list } from "@vercel/blob";
+import { fetchPolarOrders, polarReady, requireAdmin } from "./_lib.js";
+import { CHECKOUT } from "./_plans.js";
 import { pipeline, redisReady } from "./_redis.js";
 
 const COUNTERS = [
@@ -74,20 +76,42 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+// Which plan a Polar product is. Anything else in the same Polar organization is left out.
+const PRODUCTS = {
+  [CHECKOUT.killSheet.productId]: "killSheet",
+  [CHECKOUT.stayAlive.productId]: "stayAlive",
+  ...(CHECKOUT.stayAlive.yearly ? { [CHECKOUT.stayAlive.yearly.productId]: "stayAlive" } : {}),
+};
+const planOf = (o) => PRODUCTS[o.product_id || o.product?.id] || "";
+
+// Active Stay Alive subscriptions, for monthly recurring revenue: what each actually pays (discounts and extra
+// sites included), a yearly plan counted as a twelfth.
+async function subscriptions() {
+  const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
+  const r = await fetch(`${base}/v1/subscriptions/?active=true&limit=100`, { headers: { Authorization: `Bearer ${process.env.POLAR_ACCESS_TOKEN}`, Accept: "application/json" } });
+  if (!r.ok) throw new Error(`Polar said ${r.status}.`);
+  return ((await r.json()).items || []).filter((s) => planOf(s) === "stayAlive");
+}
+
+// Stamps published in the range, newest first: blob listing gives the dates, the JSON gives the verdict.
+async function stampsSince(from) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await list({ prefix: "verdicts/", limit: 1000, cursor });
+    for (const b of page.blobs) if (/^verdicts\/[A-Za-z0-9_-]+\.json$/.test(b.pathname) && new Date(b.uploadedAt) >= from) out.push(b);
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return out.sort((a, z) => new Date(z.uploadedAt) - new Date(a.uploadedAt));
+}
+
 async function business(days, notes) {
   const from = new Date(days[0] + "T00:00:00Z");
-  const all = await fetchPolarOrders({ since: from });
-  const inRange = all.filter((o) => new Date(o.created_at) >= from && isVerdictOrder(o));
-
-  let stamps = new Map();
-  try {
-    stamps = await publishedStamps();
-  } catch (_) {
-    notes.push("Vercel Blob isn't connected, so verdicts and turnaround can't be counted yet.");
-  }
+  const [orders, subs] = await Promise.all([fetchPolarOrders({ since: from }), subscriptions().catch((e) => (notes.push(`Subscriptions failed: ${e.message}`), []))]);
+  const inRange = orders.filter((o) => planOf(o) && new Date(o.created_at) >= from);
 
   const byDay = new Map(days.map((d) => [d, { day: d, orders: 0, revenue: 0 }]));
-  let revenue = 0, refunds = 0, refunded = 0, paid = 0;
+  let revenue = 0, refunds = 0, refunded = 0, paid = 0, killSheets = 0, stayAlivePayments = 0;
   const currency = (inRange[0]?.currency || "usd").toUpperCase();
   for (const o of inRange) {
     const amount = Number(o.total_amount ?? o.amount ?? 0);
@@ -99,6 +123,8 @@ async function business(days, notes) {
     }
     if (o.status !== "paid" && o.status !== "partially_refunded") continue;
     paid++;
+    if (planOf(o) === "killSheet") killSheets++;
+    else stayAlivePayments++;
     const net = amount - Number(o.refunded_amount || 0);
     revenue += net;
     if (row) {
@@ -107,42 +133,26 @@ async function business(days, notes) {
     }
   }
 
-  // Match each paid order to its published stamp for verdicts and turnaround.
-  const matched = inRange.filter((o) => o.status !== "refunded" && stamps.has(resultId(o.id)));
-  const records = await mapLimit(matched, 16, async (o) => {
-    const r = await fetch(stamps.get(resultId(o.id)), { cache: "no-store" });
-    return r.ok ? { order: o, stamp: await r.json() } : null;
-  });
+  const mrr = Math.round(subs.reduce((a, s) => a + Number(s.amount || 0) / (s.recurring_interval === "year" ? 12 : 1), 0));
+
+  // Verdicts from the newest 300 stamps in the range; the count covers them all.
   const verdicts = { DEAD: 0, COPE: 0, ALIVE: 0 };
-  const hours = [];
-  for (const rec of records) {
-    if (!rec) continue;
-    if (rec.stamp.verdict in verdicts) verdicts[rec.stamp.verdict]++;
-    const h = (new Date(rec.stamp.createdAt) - new Date(rec.order.created_at)) / 3.6e6;
-    if (Number.isFinite(h) && h >= 0) hours.push(h);
+  let stamped = 0;
+  try {
+    const blobs = await stampsSince(from);
+    stamped = blobs.length;
+    const records = await mapLimit(blobs.slice(0, 300), 16, async (b) => (await fetch(b.url, { cache: "no-store" })).json());
+    for (const r of records) if (r && r.verdict in verdicts) verdicts[r.verdict]++;
+  } catch (_) {
+    notes.push("Stamp storage isn't connected, so stamps and verdicts can't be counted.");
   }
-  hours.sort((a, b) => a - b);
-  const pct = (p) => (hours.length ? hours[Math.min(hours.length - 1, Math.floor(p * hours.length))] : null);
 
   return {
     currency,
     daily: [...byDay.values()],
-    totals: {
-      orders: paid,
-      revenue,
-      refunds,
-      refunded,
-      averageOrder: paid ? Math.round(revenue / paid) : 0,
-      stamped: records.filter(Boolean).length,
-      waitingNow: all.filter((o) => isWaiting(o, stamps)).length,
-    },
+    totals: { orders: paid, revenue, refunds, refunded, averageOrder: paid ? Math.round(revenue / paid) : 0, killSheets, stayAlivePayments, stamped },
+    members: { stayAlive: subs.length, yearly: subs.filter((s) => s.recurring_interval === "year").length, extraSites: subs.reduce((a, s) => a + Math.max(0, (s.seats || 1) - 1), 0), mrr },
     verdicts,
-    turnaround: {
-      count: hours.length,
-      medianHours: pct(0.5),
-      p90Hours: pct(0.9),
-      within24h: hours.length ? hours.filter((h) => h <= 24).length / hours.length : null,
-    },
   };
 }
 

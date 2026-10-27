@@ -511,7 +511,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
     const off = rows.filter((r) => !r.on && ["active", "trialing", "paid"].includes(r.status));
     count("payments", off.length || null);
     $("payments").replaceChildren(
-      data.ready ? null : el("p", { className: "note", textContent: "The payment API token isn't set, so payments can't be listed. Payment messages still show below." }),
+      ...[data.ready ? null : el("p", { className: "note", textContent: "The payment API token isn't set, so payments can't be listed. Payment messages still show below." }),
       off.length ? el("p", { className: "alert", textContent: `${plural(off.length, "payment")} without the plan on. Press Sync on ${off.length === 1 ? "it" : "each"}.` }) : null,
       table(
         [
@@ -524,7 +524,8 @@ import { barChart, renderAnalytics } from "./analytics.js";
         ],
         rows,
         { empty: "No payments yet." }
-      )
+      ),
+      ].filter(Boolean)
     );
     const log = data.log || [];
     $("pay-log").replaceChildren(

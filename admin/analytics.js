@@ -27,7 +27,6 @@ const nf = new Intl.NumberFormat();
 const num = (v) => (v == null ? "n/a" : nf.format(v));
 const pct = (a, b) => (!b || a == null ? "n/a" : `${Math.round((a / b) * 100)}%`);
 const money = (cents, cur) => (cents == null ? "n/a" : new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD" }).format(cents / 100));
-const hours = (h) => (h == null ? "n/a" : h < 1 ? `${Math.round(h * 60)} min` : `${h < 10 ? h.toFixed(1) : Math.round(h)} h`);
 const shortDay = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 function section(title, hint) {
@@ -164,8 +163,8 @@ export function renderAnalytics(root, data) {
   tiles.append(
     tile("Visitors", num(t?.totals.visitors), t ? `${num(t.totals.view)} page views` : "Not connected"),
     tile("Stamps started", num(t?.totals.stamp_start), t ? `${pct(t.totals.stamp_start, t.totals.homeVisitors)} of homepage visitors` : "Not connected"),
-    tile("Stamped", num(b?.totals.stamped), b ? `${num(b.totals.waitingNow)} waiting now` : "Not connected"),
-    tile("Median turnaround", hours(b?.turnaround.medianHours), b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}% within 24 h` : "No stamps yet"),
+    tile("Stamped", num(b?.totals.stamped), b ? `${pct(b.totals.stamped, t?.totals.stamp_start)} of stamps started` : "Not connected"),
+    tile("Monthly revenue", money(b?.members.mrr, cur), b ? `${num(b.members.stayAlive)} Stay Alive members${b.members.extraSites ? `, ${num(b.members.extraSites)} extra sites` : ""}` : "Not connected"),
     tile("Result page views", num(t?.totals["view:result"]), t ? `${num(t.totals.share_copy)} shares` : "Not connected"),
     tile("Offer clicks", num(t?.totals.offer_click), t ? `${pct(t.totals.offer_click, t.totals["view:result"])} of result views · Kill Sheet or Stay Alive` : "Not connected"),
     tile("New accounts", num(t?.totals.signup), t ? `${num(t.totals.login)} sign-ins · ${num(t.totals.save_click)} unlock or save clicks` : "Not connected"),
@@ -215,7 +214,7 @@ export function renderAnalytics(root, data) {
   if (charts.childElementCount) out.push(charts);
 
   // Verdicts: each verdict has its own labeled row, so color is never the only cue.
-  const v = section("Verdicts", "Stamped counts orders in this range. Views and copied links count result pages opened in this range.");
+  const v = section("Verdicts", "Stamped counts stamps published in this range. Views and copied links count result pages opened in this range.");
   const vrows = VERDICTS.map((name) => {
     const stamped = b?.verdicts[name];
     return [name, num(stamped), b ? pct(stamped, b.totals.stamped) : "n/a", num(t?.verdictViews[name]), num(t?.verdictShares[name])];
@@ -228,17 +227,18 @@ export function renderAnalytics(root, data) {
   v.append(vt);
   out.push(v);
 
-  // Turnaround and money
+  // Plans and money
   const two = el("div", "an-grid2");
-  const ta = section("Turnaround", "Time from payment to the published stamp.");
+  const ta = section("Plans", "Sales in this range; members and monthly revenue as of now.");
   ta.append(
     table(
       ["Measure", "Value"],
       [
-        ["Median", hours(b?.turnaround.medianHours)],
-        ["Slowest 10% take", b?.turnaround.p90Hours != null ? `${hours(b.turnaround.p90Hours)} or more` : "n/a"],
-        ["Within 24 hours", b?.turnaround.within24h != null ? `${Math.round(b.turnaround.within24h * 100)}%` : "n/a"],
-        ["Stamps measured", num(b?.turnaround.count)],
+        ["Kill Sheets sold", num(b?.totals.killSheets)],
+        ["Stay Alive payments, renewals included", num(b?.totals.stayAlivePayments)],
+        ["Stay Alive members now", b ? `${num(b.members.stayAlive)}${b.members.yearly ? ` (${num(b.members.yearly)} yearly)` : ""}` : "n/a"],
+        ["Extra sites", num(b?.members.extraSites)],
+        ["Monthly recurring revenue", money(b?.members.mrr, cur)],
       ],
       ""
     )

@@ -43,6 +43,7 @@ export default async function handler(req, res) {
       cron: !!process.env.CRON_SECRET,
       siteUrl: !!process.env.SITE_URL,
       contact: !!process.env.CONTACT_EMAIL,
+      resultSecret: !!process.env.RESULT_SECRET,
     };
     const items = [
       ["Admin key", true, "Set. You're in."],
@@ -51,8 +52,9 @@ export default async function handler(req, res) {
       ["Polar webhook", x.webhook, x.webhook ? "Payments switch memberships on instantly." : "Add POLAR_WEBHOOK_SECRET (Polar → Settings → Webhooks → the /api/polar endpoint → Secret). Until then, payments don't reach dashboards."],
       ["Polar API token", x.polarApi, x.polarApi ? "Checkouts are confirmed the moment the buyer lands back, and members can cancel from the dashboard." : "Optional: POLAR_ACCESS_TOKEN (checkouts:read, subscriptions:read, subscriptions:write). Without it, the webhook switches plans on and Cancel opens the customer portal."],
       ["Sign in with X", true, process.env.X_CLIENT_ID && process.env.X_CLIENT_SECRET ? "Continue with X goes to X directly (X_CLIENT_ID and X_CLIENT_SECRET)." : "Continue with X runs through your Supabase project's X provider. In Supabase → Authentication → URL Configuration, add https://<your domain>/auth/x/callback to Redirect URLs and set Site URL to your domain. The X app needs Request email from users on."],
-      ["Email", x.email, x.email ? "Sign-in links and down alerts are emailed." : "Add RESEND_API_KEY and MAIL_FROM for email sign-in links and down alerts. Passwords work without it."],
-      ["Daily monitoring", true, x.cron ? "Vercel cron runs Stay Alive checks every day, signed with CRON_SECRET." : "Vercel cron runs Stay Alive checks every day. Optional: set CRON_SECRET so only Vercel can trigger it."],
+      ["Email", x.email, x.email ? "Down alerts, change alerts, and new-review notices are emailed." : "Needed: Stay Alive promises an email when a page goes down or changes, and you're told about new app reviews by email. Add RESEND_API_KEY and MAIL_FROM (an address on a domain verified in Resend)."],
+      ["Separate stamp secret", x.resultSecret, x.resultSecret ? "Stamp links and saved test logins use RESULT_SECRET, so the admin key can change safely." : "Add RESULT_SECRET with the same value as your current ADMIN_KEY. Then changing the admin key later won't stop people saving earlier stamps or break stored test logins."],
+      ["Daily monitoring", x.cron, x.cron ? "Vercel cron runs Stay Alive checks every day, signed with CRON_SECRET." : "Add CRON_SECRET (any long random text). Vercel then signs the daily Stay Alive run, so nobody else can start it."],
       ["Screenshots", true, x.screenshots ? "Using your Microlink plan." : "Using Microlink's free tier (about 50 a day). Add MICROLINK_API_KEY for more."],
       ["Stamp storage", x.blob, x.blob ? "Published stamps are saved to Vercel Blob." : "Connect a Blob store in Vercel → Storage. It adds BLOB_READ_WRITE_TOKEN."],
       ["Visitor analytics", x.analytics, x.analytics ? "Visits and clicks are being counted." : "Add Upstash Redis from the Vercel Marketplace. It adds KV_REST_API_URL and KV_REST_API_TOKEN."],

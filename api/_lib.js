@@ -1,6 +1,6 @@
 // Shared helpers for the API routes. Files starting with _ are not routes on Vercel.
 import crypto from "node:crypto";
-import { head, list } from "@vercel/blob";
+import { head } from "@vercel/blob";
 
 export const VERDICTS = ["DEAD", "COPE", "ALIVE"];
 
@@ -58,8 +58,8 @@ export async function requireAdmin(req, res) {
   return true;
 }
 
-// Result IDs are derived from the Polar order ID, so republishing an order replaces its stamp
-// and nobody can guess another customer's link.
+// Result IDs are derived from the stamp's job id with the server secret, so a stamp can be found from its job
+// and nobody can guess another stamp's link.
 export function resultId(orderId) {
   const secret = process.env.RESULT_SECRET || process.env.ADMIN_KEY;
   return crypto.createHmac("sha256", secret).update(String(orderId)).digest("base64url").slice(0, 12);
@@ -98,10 +98,10 @@ export function siteOrigin(req) {
 export const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-// Paid orders from Polar, newest first. Throws an Error with a message for the admin.
 export const polarReady = () => !!process.env.POLAR_ACCESS_TOKEN;
 
-// Pass `since` (a Date) to keep paging back until orders are older than that, up to 10 pages.
+// Paid orders from Polar, newest first. Pass `since` (a Date) to keep paging back until orders are older than
+// that, up to 10 pages. Throws an Error with a message for the admin.
 export async function fetchPolarOrders({ since } = {}) {
   const token = process.env.POLAR_ACCESS_TOKEN;
   if (!token) throw new Error("POLAR_ACCESS_TOKEN is not set.");
@@ -130,44 +130,3 @@ export async function fetchPolarOrders({ since } = {}) {
   return items;
 }
 
-// One order by id, or null when Polar doesn't know it.
-export async function fetchPolarOrder(id) {
-  const token = process.env.POLAR_ACCESS_TOKEN;
-  if (!token) throw new Error("POLAR_ACCESS_TOKEN is not set.");
-  const base = (process.env.POLAR_API_BASE || "https://api.polar.sh").replace(/\/$/, "");
-  const r = await fetch(`${base}/v1/orders/${encodeURIComponent(id)}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  }).catch(() => null);
-  if (!r) throw new Error("Polar did not answer.");
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error(`Polar said ${r.status}.`);
-  return r.json();
-}
-
-export const orderPageUrl = (order) => String(order?.custom_field_data?.page_url || "").slice(0, 500);
-
-// Result id -> URL of its JSON, for every published stamp.
-export async function publishedStamps() {
-  const found = new Map();
-  let cursor;
-  do {
-    const page = await list({ prefix: "verdicts/", limit: 1000, cursor });
-    for (const b of page.blobs) if (b.pathname.endsWith(".json")) found.set(b.pathname.slice(9, -5), b.url);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return found;
-}
-
-// An order still waiting on its stamp: paid, not refunded, nothing published.
-// True for orders of the Verdict product, or for every order when POLAR_VERDICT_PRODUCT_ID isn't set.
-// Keeps other products in the same Polar organization out of the desk, the queue, and analytics.
-export function isVerdictOrder(order) {
-  const product = process.env.POLAR_VERDICT_PRODUCT_ID;
-  return !product || order.product_id === product || order.product?.id === product;
-}
-
-export function isWaiting(order, stamps) {
-  const status = order.status || (order.paid ? "paid" : "");
-  if (status !== "paid" || !isVerdictOrder(order)) return false;
-  return !stamps.has(resultId(order.id));
-}
