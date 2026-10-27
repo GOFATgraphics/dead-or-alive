@@ -349,3 +349,17 @@ loopTrack();
     loopTrack();
   } catch (_) {}
 })();
+
+// The demo video plays only while it's on screen. With reduced motion it waits for a press.
+const demo = $(".how-video video");
+if (demo) {
+  if (still || !("IntersectionObserver" in window)) {
+    demo.controls = true;
+    demo.preload = "metadata";
+  } else {
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) demo.play().catch(() => (demo.controls = true));
+      else demo.pause();
+    }, { threshold: 0.35 }).observe(demo);
+  }
+}

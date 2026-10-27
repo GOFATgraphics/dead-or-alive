@@ -129,3 +129,6 @@
 /* Legal pages */
 [data-theme="dark"] .doc p, [data-theme="dark"] .doc li { color: #c9c7d6; }
 .who .theme-toggle { margin-left: 0; }
+/* Sample stamp cards are pictures of light websites: keep their own light colours in dark mode. */
+[data-theme="dark"] .scard { --ink: #15142a; --body: #4f4d63; --soft: #8e8c99; --line: #dcd8ce; --card: #ffffff; --canvas: #f3f3f4; --sheet: #ffffff; --red: #b42228; --green: #1d7a45; --amber: #a85d06; --dead: #b42228; --cope: #a85d06; --alive: #1d7a45; color: #15142a; color-scheme: light; }
+[data-theme="dark"] .hv-chrome i { background: #3a3948; }
