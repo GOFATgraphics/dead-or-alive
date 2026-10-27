@@ -114,8 +114,6 @@
 [data-theme="dark"] img[src$="/smp-mark-ink.svg"]:not(.tier-card img):not(.tcard img) { filter: invert(1) hue-rotate(180deg); }
 [data-theme="dark"] img.invert { filter: none; }
 
-/* Unlock placeholder */
-[data-theme="dark"] .ghost-row { background: #1c1c26; }
 .bar .theme-toggle { margin-left: -1rem; }
 @media (max-width: 860px) { .bar .theme-toggle { margin-left: 0; } }
 .bar-links + .theme-toggle, .mark + .theme-toggle { margin-left: auto; }

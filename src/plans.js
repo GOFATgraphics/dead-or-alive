@@ -27,9 +27,9 @@ const FREE = {
   audience: "Solo founders and hobbyists",
   points: [
     "Your stamp in about a minute: DEAD, COPE or ALIVE",
-    "13 first-screen checks and a score out of 100",
+    "All 13 checks with fixes, the stack, speed, and SEO",
     "A shareable stamp card, and a footer badge for ALIVE",
-    "With a free account: every check, the stack, speed, and SEO, saved",
+    "Save every stamp with a free account",
   ],
   limits: ["No full-page scout", "No copy rewrites", "No monitoring", "Re-stamp by hand"],
   cta: "Stamp my page",

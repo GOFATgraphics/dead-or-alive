@@ -163,8 +163,8 @@ function Auth({ setup, onIn }) {
         ) : params.get("save") ? (
           <>
             <p className="eyebrow">Free account</p>
-            <h1>Create a free account if you don't want to miss your result.</h1>
-            <p className="sect-sub">Save this stamp, see all your stamps in one place, and get your free re-stamp after you fix it. No card.</p>
+            <h1>Create a free account to save it.</h1>
+            <p className="sect-sub">Keep this stamp, see all your stamps in one place, and get a free re-stamp after you fix it. No card.</p>
           </>
         ) : (
           <>
@@ -920,7 +920,7 @@ function Dashboard({ data, setData, onOut }) {
     return () => clearTimeout(t);
   }, [running, data, banner, refresh]);
 
-  // Free stamps from this browser: saved as soon as you're in. Came from a locked result page? Back to it, unlocked.
+  // Free stamps from this browser: saved as soon as you're in. Came from a result page? Back to it.
   useEffect(() => {
     const j = jobs();
     const back = params.get("back") || "";

@@ -14,7 +14,7 @@ import "./plans.css";
 import { TIERS, embedSvg, svgUri, tickSvg, tierFor } from "./badge.js";
 
 const still = reducedMotion();
-// Back from signing in (email, password, or X) on this stamp's unlock button.
+// Back from signing in (email, password, or X) on this stamp's save button.
 const justSignedIn = new URLSearchParams(location.search).get("signedin") === "1";
 
 // The closing line, by verdict.
@@ -98,8 +98,8 @@ function Hero({ r }) {
   const tier = tierFor(v, r.score);
   const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString([], { dateStyle: "medium" }) : "";
   const checks = Array.isArray(r.checks) ? r.checks : [];
-  const measured = r.locked ? { length: r.counts.measured } : checks.filter((k) => !k.skip);
-  const passed = r.locked ? r.counts.passed : measured.filter((k) => k.pass).length;
+  const measured = checks.filter((k) => !k.skip);
+  const passed = measured.filter((k) => k.pass).length;
   return (
     <section className={"hero v-" + v.toLowerCase()} aria-labelledby="verdict-h">
       <div className="hero-grid">
@@ -299,12 +299,12 @@ function SavePrompt({ r }) {
   return (
     <section className="wrap save-wrap" aria-labelledby="save-h">
       <div className="save">
-        <span className="ic-tile"><Icon name={state.status === "in" ? "check" : "lock"} size={20} /></span>
+        <span className="ic-tile"><Icon name={state.status === "in" ? "check" : "user"} size={20} /></span>
         {state.status === "out" ? (
           <>
             <div>
-              <h2 id="save-h">Create a free account if you don't want to miss your result.</h2>
-              <p>Save this stamp, see all your stamps in one place, and get your free re-stamp after you fix it.</p>
+              <h2 id="save-h">Create a free account to save it.</h2>
+              <p>Keep this stamp, see all your stamps in one place, and get a free re-stamp after you fix it. No card.</p>
             </div>
             <div className="save-actions">
               <a className="btn btn-dark" href={next} onClick={() => track("save_click", { v: r.verdict })}>Save it free</a>
@@ -544,95 +544,20 @@ function Snapshot({ s }) {
   );
 }
 
-// Signed out: the one problem that matters most, then what a free account unlocks, as counts over a blurred
-// placeholder. The placeholder is made-up rows, never this page's data, so nothing is hidden only by CSS.
-const unlockHref = (r) => `/dashboard?save=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}`;
-
-function Unlock({ r, title, lines }) {
-  return (
-    <div className="unlock">
-      <div className="unlock-blur" aria-hidden="true">
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="ghost-row"><span></span><i></i><b></b></div>
-        ))}
-      </div>
-      <div className="unlock-card">
-        <span className="ic-tile sm"><Icon name="lock" size={16} /></span>
-        <h3>{title}</h3>
-        <ul>{lines.filter(Boolean).map((l) => <li key={l}><Icon name="check" size={14} />{l}</li>)}</ul>
-        <a className="btn btn-dark" href={unlockHref(r)} onClick={() => track("save_click", { v: r.verdict, from: "unlock" })}>Create a free account to see it all</a>
-        <p className="fine">Free. No card. Your stamp is saved too.</p>
-      </div>
-    </div>
-  );
-}
-
-function LockedChecks({ r }) {
-  const c = r.counts;
-  const top = r.checks[0];
-  return (
-    <section className="sect band" id="checks" aria-labelledby="checks-h">
-      <div className="wrap">
-        <div className="sect-head">
-          <p className="eyebrow">What we checked</p>
-          <h2 id="checks-h">{c.failed ? (c.failed === 1 ? "1 thing holding it back" : `${c.failed} things holding it back`) : "Every check passed"}</h2>
-          <p className="sect-sub">{c.passed} of {c.measured} checks passed, scored by rules, not AI. {top ? "Here's the one that matters most." : ""}</p>
-        </div>
-        {top && (
-          <ol className="fails single">
-            <li>
-              <span className="ic-tile red"><Icon name="x" size={20} /></span>
-              <h3>{top.label}</h3>
-              <p className="fail-detail">{top.detail}</p>
-              <p className="fail-fix"><b>Fix</b>{top.fix}</p>
-            </li>
-          </ol>
-        )}
-        <Unlock
-          r={r}
-          title={`All ${c.checks} checks, with the fix for each`}
-          lines={[`${c.passed} passed and ${c.failed} failed, each with what we found`, c.failed > 1 ? `${c.failed - 1} more problem${c.failed - 1 === 1 ? "" : "s"} with fixes` : "", "Saved to your dashboard, with a free re-stamp after you fix it"]}
-        />
-      </div>
-    </section>
-  );
-}
-
-function LockedHood({ r }) {
-  const c = r.counts;
-  if (!c.stack && !c.speed && !c.seo) return null;
-  return (
-    <section className="sect wrap" id="stack" aria-labelledby="stack-h">
-      <div className="sect-head">
-        <p className="eyebrow">Stack and speed</p>
-        <h2 id="stack-h">Under the hood</h2>
-        <p className="sect-sub">Measured in a real browser and from the page's HTML and headers. Every tool comes with the evidence it was found by.</p>
-      </div>
-      <div className="hood-counts">
-        {c.stack > 0 && <div><b>{c.stack}</b><span>tech item{c.stack === 1 ? "" : "s"} found</span></div>}
-        {c.speed > 0 && <div><b>{c.speed}</b><span>real speed numbers</span></div>}
-        {c.thirdParty > 0 && <div><b>{c.thirdParty}</b><span>other domains loaded</span></div>}
-        {c.seo + c.security > 0 && <div><b>{c.seo + c.security}</b><span>SEO and security facts</span></div>}
-      </div>
-      <Unlock r={r} title="See the full stack, speed, and SEO details" lines={[c.stack ? `All ${c.stack} tech items, each with its evidence` : "", "Load time, largest paint, layout shift, page weight", "Search, security headers, and delivery"]} />
-    </section>
-  );
-}
-
 function Result({ r }) {
   const v = r.verdict;
   return (
     <div className="page">
       <Bar />
       <main>
-        {justSignedIn && !r.locked && <Toast text="Signed in. Everything below is unlocked and saved." href="/dashboard" action="Dashboard" />}
+        {justSignedIn && <Toast text="Signed in. This stamp is saved to your dashboard." href="/dashboard" action="Dashboard" />}
         <Hero r={r} />
         <Status r={r} />
-        {r.locked ? <LockedChecks r={r} /> : <Checks r={r} />}
+        <Checks r={r} />
         <SavePrompt r={r} />
         <Offers r={r} />
         <Share r={r} />
-        {r.locked ? <LockedHood r={r} /> : <Snapshot s={r.snapshot} />}
+        <Snapshot s={r.snapshot} />
         <section className="final" aria-labelledby="final-h">
           <div className="final-in">
             <span className="app-tile"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>
