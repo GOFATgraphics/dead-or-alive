@@ -39,9 +39,13 @@ import { barChart, renderAnalytics } from "./analytics.js";
   const vchip = (v) => el("span", { className: `ad-chip v-${String(v || "").toLowerCase()}`, textContent: v || "?" });
   const muted = (text) => el("span", { className: "ad-muted", textContent: text });
   const plural = (n, one, many = one + "s") => `${num(n)} ${n === 1 ? one : many}`;
-  const KILL_SHEET = 19, STAY_ALIVE = 20, STAY_ALIVE_YEAR = 200;
-  // Monthly recurring revenue from active Stay Alive members: a yearly member counts as a twelfth of the year.
-  const mrrOf = (ms) => Math.round(ms.filter((m) => m.stayAlive?.active).reduce((a, m) => a + (m.stayAlive.interval === "year" ? STAY_ALIVE_YEAR / 12 : STAY_ALIVE), 0));
+  const KILL_SHEET = 19, STAY_ALIVE = 20, STAY_ALIVE_YEAR = 200, EXTRA_SITE = 5, EXTRA_SITE_YEAR = 50;
+  // Monthly recurring revenue from active Stay Alive members, extra sites included: a yearly member counts as a
+  // twelfth of the year.
+  const mrrOf = (ms) => Math.round(ms.filter((m) => m.stayAlive?.active).reduce((a, m) => {
+    const extra = Math.max(0, (m.stayAlive.seats || 1) - 1);
+    return a + (m.stayAlive.interval === "year" ? (STAY_ALIVE_YEAR + extra * EXTRA_SITE_YEAR) / 12 : STAY_ALIVE + extra * EXTRA_SITE);
+  }, 0));
 
   const session = {
     get() { try { return sessionStorage.getItem("doa.key") || ""; } catch (_) { return ""; } },
@@ -463,7 +467,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
         [
           { label: "Member", cell: (m) => person(m.email, `Joined ${date(m.createdAt)}`) },
           { label: "Kill Sheet", cell: (m) => (m.killSheet ? el("span", { className: "ad-stack" }, chip(m.killSheet.active ? "Active" : "Refunded", m.killSheet.active ? "ink" : "bad"), muted(`since ${date(m.killSheet.since)}`)) : muted("None")) },
-          { label: "Stay Alive", cell: (m) => (m.stayAlive ? el("span", { className: "ad-stack" }, chip(m.stayAlive.cancelAtPeriodEnd ? "Cancelling" : m.stayAlive.status, m.stayAlive.active && !m.stayAlive.cancelAtPeriodEnd ? "ok" : "warn"), muted(`${m.stayAlive.interval === "year" ? "Yearly, " : ""}${m.stayAlive.cancelAtPeriodEnd ? "ends" : "renews"} ${date(m.stayAlive.renews)}`)) : muted("None")) },
+          { label: "Stay Alive", cell: (m) => (m.stayAlive ? el("span", { className: "ad-stack" }, chip(m.stayAlive.cancelAtPeriodEnd ? "Cancelling" : m.stayAlive.status, m.stayAlive.active && !m.stayAlive.cancelAtPeriodEnd ? "ok" : "warn"), muted(`${(m.stayAlive.seats || 1) > 1 ? `${m.stayAlive.seats} sites, ` : ""}${m.stayAlive.interval === "year" ? "yearly, " : ""}${m.stayAlive.cancelAtPeriodEnd ? "ends" : "renews"} ${date(m.stayAlive.renews)}`)) : muted("None")) },
           { label: "Page", cls: "hide-md", cell: (m) => { const u = m.stayAlive?.url || m.killSheet?.url; return u ? el("a", { className: "ad-ell", href: u, target: "_blank", rel: "noopener noreferrer", textContent: u.replace(/^https?:\/\//, "") }) : muted("No page yet"); } },
           { label: "Stamps", cls: "num hide-sm", cell: (m) => el("span", { className: "ad-num", textContent: m.stamps }) },
           { label: "", cls: "num", cell: (m) => (m.killSheet?.url ? rescout(m) : "") },

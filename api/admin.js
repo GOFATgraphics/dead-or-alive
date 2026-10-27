@@ -66,7 +66,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       members: users
         .filter((u) => u.killSheet || u.stayAlive)
-        .map((u) => ({ email: u.email, createdAt: u.createdAt, killSheet: u.killSheet ? { since: u.killSheet.since, url: u.killSheet.url, active: hasKillSheet(u), restampsLeft: u.killSheet.restampsLeft } : null, stayAlive: u.stayAlive ? { interval: u.stayAlive.interval || "month", status: u.stayAlive.status, since: u.stayAlive.since, renews: u.stayAlive.renews, cancelAtPeriodEnd: u.stayAlive.cancelAtPeriodEnd, url: u.stayAlive.url, active: hasStayAlive(u) } : null, stamps: (u.stamps || []).length })),
+        .map((u) => ({ email: u.email, createdAt: u.createdAt, killSheet: u.killSheet ? { since: u.killSheet.since, url: u.killSheet.url, active: hasKillSheet(u), restampsLeft: u.killSheet.restampsLeft } : null, stayAlive: u.stayAlive ? { interval: u.stayAlive.interval || "month", seats: u.stayAlive.seats || 1, sites: (u.stayAlive.sites || (u.stayAlive.url ? [u.stayAlive.url] : [])).length, status: u.stayAlive.status, since: u.stayAlive.since, renews: u.stayAlive.renews, cancelAtPeriodEnd: u.stayAlive.cancelAtPeriodEnd, url: u.stayAlive.url, active: hasStayAlive(u) } : null, stamps: (u.stamps || []).length })),
       accounts: users.length,
     });
   }

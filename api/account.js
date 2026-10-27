@@ -19,9 +19,9 @@ import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
 } from "./_account.js";
-import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, resumeStayAlive } from "./_billing.js";
+import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
-import { readMonitor, runMonitor } from "./_monitor.js";
+import { forgetSite, readMonitors, runMonitor, seatsOf, sitesOf } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
 import { SAY, passwordSignIn, resendConfirmation, sendSignInLink, signUp, supaReady, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
@@ -59,8 +59,10 @@ function sameSite(req) {
 async function me(email) {
   const u = await getUser(email);
   if (!u) return { user: null };
-  const [report, monitor] = await Promise.all([hasKillSheet(u) ? readReport(email) : null, u.stayAlive ? readMonitor(email) : null]);
-  return { user: publicUser(u), report, monitor };
+  const [report, monitors] = await Promise.all([hasKillSheet(u) ? readReport(email) : null, u.stayAlive ? readMonitors(email, u) : null]);
+  // monitor: the first site, for the overview; monitors: every site on the account.
+  const monitor = monitors?.[0]?.checks ? monitors[0] : null;
+  return { user: publicUser(u), report, monitor, monitors };
 }
 
 function setup() {
@@ -127,7 +129,7 @@ const APP_LINK = /^https:\/\/(apps\.apple\.com|itunes\.apple\.com|play\.google\.
 async function submitReview(email, b) {
   const u = await getUser(email);
   const left = reviewAllowance(u);
-  if (!left.total) throw Object.assign(new Error(hasKillSheet(u) || hasStayAlive(u) ? "Your included app review is already in. Stay Alive members get a new one each billing month." : "App reviews come with the Kill Sheet or Stay Alive."), { status: 403 });
+  if (!left.total) throw Object.assign(new Error(hasKillSheet(u) || hasStayAlive(u) ? "Your included app review is already in. Stay Alive includes one a month, for the site you choose." : "App reviews come with the Kill Sheet or Stay Alive."), { status: 403 });
   const site = String(b.siteUrl || "").trim() ? checkPageUrl(b.siteUrl) : { url: "" };
   if (site.error) throw Object.assign(new Error(`Site URL: ${site.error}`), { status: 400 });
   const app = String(b.appUrl || "").trim();
@@ -144,6 +146,9 @@ async function submitReview(email, b) {
   const id = crypto.randomBytes(8).toString("base64url");
   if (hasLogin) await set(`cred:${id}`, { sealed: seal(JSON.stringify({ email: loginEmail, password: loginPassword })) }, 60 * 86400);
   const plan = left.killSheet ? "killSheet" : "stayAlive";
+  // One Stay Alive review a month in total, not one per site: the member picks which of their sites gets it.
+  const sites = sitesOf(u);
+  if (plan === "stayAlive" && site.url && sites.length > 1 && !sites.includes(site.url)) throw Object.assign(new Error("Pick one of your Stay Alive sites for this month's review."), { status: 400 });
   const now = new Date().toISOString();
   const review = { id, plan, status: "received", createdAt: now, updatedAt: now, siteUrl: site.url || "", appUrl: app, what, login: hasLogin ? "stored" : "none", result: null };
   await updateUser(email, (x) => (x ? { ...x, reviews: [review, ...(x.reviews || [])].slice(0, 50) } : undefined));
@@ -333,10 +338,45 @@ export default async function handler(req, res) {
         waitUntil(runScout(email, page.url).catch((e) => console.error("Scout failed:", e)));
       } else if (plan === "stayAlive") {
         if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
-        await updateUser(email, (x) => ({ ...x, stayAlive: { ...x.stayAlive, url: page.url } }));
-        waitUntil(runMonitor(email, { restamp: true }).catch((e) => console.error("Monitor failed:", e)));
+        // The plan's first site (set or replaced). More sites go through op "site".
+        await updateUser(email, (x) => {
+          const sites = sitesOf(x).filter((s) => s !== page.url);
+          return { ...x, stayAlive: { ...x.stayAlive, url: page.url, sites: [page.url, ...sites.slice(1)] } };
+        });
+        waitUntil(runMonitor(email, { restamp: true, url: page.url }).catch((e) => console.error("Monitor failed:", e)));
       } else return res.status(400).json({ error: "Unknown plan." });
       return res.status(202).json(await me(email));
+    }
+    // Stay Alive sites: add one into a paid slot, or remove one. The first site comes with the plan.
+    if (op === "site") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url) return res.status(400).json({ error: page.error });
+      const sites = sitesOf(u);
+      if (b.action === "remove") {
+        if (!sites.includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+        await updateUser(email, (x) => {
+          const left = sitesOf(x).filter((s) => s !== page.url);
+          return { ...x, stayAlive: { ...x.stayAlive, sites: left, url: left[0] || "" } };
+        });
+        await forgetSite(email, page.url);
+        return res.status(200).json(await me(email));
+      }
+      if (pageKind(page.url) !== "web") return res.status(400).json({ error: "Use a public web page, not a store listing, file, or login page." });
+      if (sites.includes(page.url)) return res.status(409).json({ error: "That site is already being watched." });
+      if (sites.length >= seatsOf(u)) return res.status(402).json({ error: "Every site you pay for is in use. Add a site slot first.", needSeat: true });
+      await updateUser(email, (x) => {
+        const next = [...sitesOf(x), page.url];
+        return { ...x, stayAlive: { ...x.stayAlive, sites: next, url: next[0] } };
+      });
+      waitUntil(runMonitor(email, { restamp: true, url: page.url }).catch((e) => console.error("Monitor failed:", e)));
+      return res.status(202).json(await me(email));
+    }
+    // How many sites Stay Alive covers: 1 with the plan, each extra one $5 a month, prorated.
+    if (op === "seats") {
+      await setStayAliveSeats(email, b.seats);
+      return res.status(200).json(await me(email));
     }
     if (op === "restamp") {
       const u = await getUser(email);
@@ -367,7 +407,7 @@ export default async function handler(req, res) {
       if (String(b.confirm || "") !== "DELETE") return res.status(400).json({ error: "Type DELETE to confirm." });
       const u = await getUser(email);
       if (hasStayAlive(u) && !u.stayAlive.cancelAtPeriodEnd) return res.status(409).json({ error: "Cancel Stay Alive first, so you aren't billed for a page nobody watches." });
-      await Promise.all([...(u?.reviews || []).map((r) => remove(`cred:${r.id}`)), remove(`report:${email}`), remove(`monitor:${email}`), remove(`uid:${u?.id}`), ...(u?.x?.id ? [remove(`xid:${u.x.id}`)] : []), remove(userKey(email))]);
+      await Promise.all([...(u?.reviews || []).map((r) => remove(`cred:${r.id}`)), remove(`report:${email}`), ...sitesOf(u).map((s) => forgetSite(email, s)), remove(`uid:${u?.id}`), ...(u?.x?.id ? [remove(`xid:${u.x.id}`)] : []), remove(userKey(email))]);
       await endSession(req, res);
       return res.status(200).json({ user: null, deleted: true });
     }

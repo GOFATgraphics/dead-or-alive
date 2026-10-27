@@ -1,12 +1,26 @@
-// Stay Alive: a page watched for its owner. Every day (Vercel cron) it's checked for uptime and speed; every
-// week it's re-stamped. The first check and re-stamp run the moment the membership starts.
-// Results live in monitor:<email> and show in the dashboard. A page that goes down gets an email, when email is set up.
-import { get, set, members } from "./_store.js";
+// Stay Alive: pages watched for their owner. Every day (Vercel cron) each is checked for uptime and speed; every
+// week it's re-stamped. The first check and re-stamp run the moment the membership starts, or a site is added.
+// The plan includes one site; each extra one is a paid seat on the subscription. Results live in
+// monitor:<email>:<site id> and show in the dashboard. A page that goes down gets an email, when email is set up.
+import crypto from "node:crypto";
+import { get, remove, set, members } from "./_store.js";
 import { getUser, hasStayAlive } from "./_account.js";
 import { stampNow } from "./_stamp.js";
 import { mail } from "./_publish.js";
 
-export const monitorKey = (email) => `monitor:${email}`;
+// Every site on the account, in the order they were added (the first came with the plan).
+export function sitesOf(u) {
+  const sa = u?.stayAlive;
+  if (!sa) return [];
+  return [...new Set(sa.sites?.length ? sa.sites : sa.url ? [sa.url] : [])];
+}
+// How many sites are paid for: the plan's one, plus extra seats.
+export const seatsOf = (u) => Math.max(1, parseInt(u?.stayAlive?.seats, 10) || 1);
+// The sites actually watched. If the paid count drops below the list, the newest ones pause.
+export const watchedSites = (u) => sitesOf(u).slice(0, seatsOf(u));
+
+const siteId = (url) => crypto.createHash("sha256").update(url).digest("base64url").slice(0, 12);
+export const monitorKey = (email, url) => `monitor:${email}:${siteId(url)}`;
 const WEEK = 6.5 * 86400000; // a little under a week, so a daily cron never skips one
 
 // One uptime and speed check: did it answer, with what status, how fast.
@@ -22,13 +36,14 @@ export async function checkOnce(pageUrl) {
   }
 }
 
-// Checks one member's page, re-stamps it when a week has passed (or when forced), and saves the history.
-export async function runMonitor(email, { restamp = false } = {}) {
+// Checks one of a member's sites (the first, unless one is named), re-stamps it when a week has passed (or when
+// forced), and saves the history.
+export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   const u = await getUser(email);
-  const pageUrl = u?.stayAlive?.url;
+  const watched = watchedSites(u);
+  const pageUrl = url ? watched.find((s) => s === url) : watched[0];
   if (!pageUrl || !hasStayAlive(u)) return null;
-  const m = (await get(monitorKey(email))) || { url: pageUrl, checks: [], restamps: [] };
-  if (m.url !== pageUrl) Object.assign(m, { url: pageUrl, checks: [], restamps: [] });
+  const m = (await get(monitorKey(email, pageUrl))) || { url: pageUrl, checks: [], restamps: [] };
   const check = await checkOnce(pageUrl);
   const wasUp = m.checks.length ? m.checks[m.checks.length - 1].ok : true;
   m.checks = [...m.checks, check].slice(-90);
@@ -36,7 +51,7 @@ export async function runMonitor(email, { restamp = false } = {}) {
   const due = restamp || !m.lastRestampAt || Date.now() - new Date(m.lastRestampAt).getTime() > WEEK;
   if (due && check.ok) {
     m.restampRunning = true;
-    await set(monitorKey(email), m);
+    await set(monitorKey(email, pageUrl), m);
     const r = await stampNow(pageUrl).catch((e) => ({ failed: e.message }));
     m.restampRunning = false;
     m.lastRestampAt = new Date().toISOString();
@@ -50,7 +65,7 @@ export async function runMonitor(email, { restamp = false } = {}) {
       }
     }
   }
-  await set(monitorKey(email), m);
+  await set(monitorKey(email, pageUrl), m);
   if (wasUp && !check.ok) {
     await mail(email, {
       subject: `Your page is down: ${new URL(pageUrl).hostname}`,
@@ -94,12 +109,17 @@ async function alertChange(email, pageUrl, c) {
   }).catch(() => {});
 }
 
-// The daily run for every Stay Alive member. A few at a time, so the run fits in one function call.
+// The daily run for every watched site of every Stay Alive member. A few at a time, so the run fits in one call.
 export async function monitorAll() {
   const emails = await members("idx:members");
+  const jobs = [];
+  for (const email of emails) {
+    const u = await getUser(email).catch(() => null);
+    if (hasStayAlive(u)) for (const url of watchedSites(u)) jobs.push([email, url]);
+  }
   const out = { checked: 0, restamped: 0 };
-  for (let i = 0; i < emails.length; i += 4) {
-    const batch = await Promise.allSettled(emails.slice(i, i + 4).map((e) => runMonitor(e)));
+  for (let i = 0; i < jobs.length; i += 4) {
+    const batch = await Promise.allSettled(jobs.slice(i, i + 4).map(([e, url]) => runMonitor(e, { url })));
     for (const b of batch) if (b.status === "fulfilled" && b.value) {
       out.checked++;
       if (b.value.restamps?.at(-1)?.at === b.value.lastRestampAt && Date.now() - new Date(b.value.lastRestampAt).getTime() < 600000) out.restamped++;
@@ -108,4 +128,10 @@ export async function monitorAll() {
   return out;
 }
 
-export const readMonitor = (email) => get(monitorKey(email));
+// The history of every site on the account, for the dashboard. A site with no history yet comes back as { url }.
+export async function readMonitors(email, u) {
+  const watched = watchedSites(u);
+  return Promise.all(sitesOf(u).map(async (url) => ({ ...((await get(monitorKey(email, url))) || {}), url, paused: !watched.includes(url) })));
+}
+
+export const forgetSite = (email, url) => remove(monitorKey(email, url));

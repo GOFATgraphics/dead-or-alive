@@ -38,9 +38,10 @@ export const PLANS = {
       "A fresh stamp every week, with the score over time",
       "Daily uptime and speed checks, and an alert when it goes down",
       "Alerts when your stack, speed, or a tracking pixel changes",
-      "One app review every month",
+      "One app review every month, for the site you pick",
+      "More sites for $5 a month each, added from your dashboard",
     ],
-    limits: ["Needs an active subscription", "One page per subscription"],
+    limits: ["Needs an active subscription", "One app review a month in total, not per site"],
     cta: "Start Stay Alive",
   },
 };

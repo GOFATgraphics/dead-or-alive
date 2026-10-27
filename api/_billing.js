@@ -4,7 +4,7 @@
 // moment the buyer lands back, and cancels from the dashboard), POLAR_API_BASE (sandbox).
 import crypto from "node:crypto";
 import { CHECKOUT } from "./_plans.js";
-import { emailForId, ensureUser, getUser, updateUser } from "./_account.js";
+import { emailForId, ensureUser, getUser, hasStayAlive, updateUser } from "./_account.js";
 import { addTo } from "./_store.js";
 import { runScout } from "./_scout.js";
 import { runMonitor } from "./_monitor.js";
@@ -105,14 +105,18 @@ export async function syncStayAlive(email, sub, pageUrl = "") {
       endsAt: sub.ends_at || null,
       endedAt: sub.ended_at || null,
       customerId: sub.customer_id || was?.customerId || "",
-      url: was?.url || pageUrl || u.pendingUrl || "",
+      // Sites paid for: the plan's one plus extra seats ($5 a month each), as the subscription says.
+      seats: Math.max(1, sub.seats || was?.seats || 1),
     };
+    const firstSite = was?.sites?.[0] || was?.url || pageUrl || u.pendingUrl || "";
+    u.stayAlive.sites = was?.sites?.length ? was.sites : firstSite ? [firstSite] : [];
+    u.stayAlive.url = u.stayAlive.sites[0] || "";
     first = on && !wasOn;
     return u;
   });
   if (next?.stayAlive && ["active", "trialing"].includes(next.stayAlive.status)) {
     await addTo("idx:members", email);
-    if (first && next.stayAlive.url) await runMonitor(email, { restamp: true });
+    if (first && next.stayAlive.url) await runMonitor(email, { restamp: true, url: next.stayAlive.url });
   }
 }
 
@@ -165,6 +169,21 @@ export async function resumeStayAlive(email) {
   const id = u?.stayAlive?.subId;
   if (!id) throw new Error("No Stay Alive membership on this account.");
   const sub = await polar(`/v1/subscriptions/${id}`, { method: "PATCH", body: { cancel_at_period_end: false } });
+  await syncStayAlive(email, sub);
+  return sub;
+}
+
+// Change how many sites Stay Alive covers: the plan's one plus extra seats, prorated for the rest of the period.
+// Lowering it below the sites on the account is refused; remove a site first.
+export async function setStayAliveSeats(email, seats) {
+  const u = await getUser(email);
+  const id = u?.stayAlive?.subId;
+  if (!id || !hasStayAlive(u)) throw Object.assign(new Error("Stay Alive isn't on for this account."), { status: 403 });
+  const n = Math.max(1, Math.min(50, parseInt(seats, 10) || 1));
+  const sites = (u.stayAlive.sites || []).length;
+  if (n < sites) throw Object.assign(new Error(`You have ${sites} sites. Remove one first, then lower the count.`), { status: 409 });
+  if (!polarApiReady()) throw Object.assign(new Error("Adding sites isn't switched on yet. Write to us and we'll add it for you."), { status: 503 });
+  const sub = await polar(`/v1/subscriptions/${id}`, { method: "PATCH", body: { seats: n, proration_behavior: "prorate" } });
   await syncStayAlive(email, sub);
   return sub;
 }

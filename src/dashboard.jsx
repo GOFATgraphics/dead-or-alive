@@ -446,8 +446,116 @@ function KillSheet({ user, report, onChange }) {
   );
 }
 
-function StayAlive({ user, monitor, onChange }) {
+// What Stay Alive costs for a number of sites: the plan covers one, each extra one is $5 a month ($50 a year).
+function siteMath(n, yearly) {
+  const base = yearly ? 200 : 20, each = yearly ? 50 : 5, per = yearly ? "a year" : "a month";
+  const extra = Math.max(0, n - 1);
+  return { total: base + extra * each, line: extra ? `$${base} + ${extra} × $${each} = $${base + extra * each} ${per}` : `$${base} ${per}`, each: `$${each} ${per}` };
+}
+
+// Stay Alive: the sites on the account, then the monitoring of the one picked.
+function StayAlive({ user, monitors, onChange }) {
+  const sites = monitors || [];
+  const [pick, setPick] = useState(0);
+  const m = sites[Math.min(pick, sites.length - 1)];
+  return (
+    <>
+      <Sites user={user} sites={sites} pick={pick} setPick={setPick} onChange={onChange} />
+      {m && <SiteMonitor monitor={m} />}
+    </>
+  );
+}
+
+function Sites({ user, sites, pick, setPick, onChange }) {
   const sa = user.stayAlive;
+  const yearly = sa.interval === "year";
+  const seats = Math.max(1, sa.seats || 1);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const math = siteMath(seats, yearly);
+  const free = seats - sites.length;
+  async function run(key, fn) {
+    setBusy(key);
+    setErr("");
+    try {
+      onChange(await fn());
+    } catch (x) {
+      setErr(x.message);
+    } finally {
+      setBusy("");
+    }
+  }
+  const add = (e) => {
+    e.preventDefault();
+    const url = new FormData(e.currentTarget).get("url");
+    const form = e.currentTarget;
+    run("add", async () => {
+      const out = await api("site", { action: "add", url });
+      form.reset();
+      setPick(sites.length);
+      return out;
+    });
+  };
+  const remove = (url) => confirm(`Stop watching ${url}? Its history is deleted. The slot stays paid for until you lower the count.`) && run("rm" + url, () => api("site", { action: "remove", url }));
+  const slot = (n) => {
+    const next = siteMath(n, yearly);
+    const msg = n > seats ? `Add a site slot? Stay Alive becomes ${next.line}. You're charged the difference for the rest of this period now.` : `Remove an empty slot? Stay Alive becomes ${next.line}, with a credit for the rest of this period.`;
+    if (confirm(msg)) run("seats", () => api("seats", { seats: n }));
+  };
+  if (!sites.length) {
+    return (
+      <section className="panel" aria-labelledby="sa-h">
+        <div className="panel-head"><div><h2 id="sa-h"><Icon name="activity" /> Stay Alive monitoring</h2><p>Your plan covers one site. Add more later for {math.each} each.</p></div></div>
+        <PageForm plan="stayAlive" label="Which page should we watch?" onDone={onChange} />
+      </section>
+    );
+  }
+  return (
+    <section className="panel" aria-labelledby="sa-h">
+      <div className="panel-head">
+        <div>
+          <h2 id="sa-h"><Icon name="activity" /> Your sites</h2>
+          <p>{sites.length} of {seats} {seats === 1 ? "site" : "sites"} in use · {math.line}</p>
+        </div>
+      </div>
+      <ul className="site-list">
+        {sites.map((s, i) => {
+          const last = s.checks?.at(-1);
+          const state = s.paused ? ["", "Paused"] : !s.checks ? ["run", "Starting"] : last?.ok === false ? ["bad", "Down"] : ["ok", "Up"];
+          return (
+            <li key={s.url} className={i === pick ? "on" : ""}>
+              <button type="button" className="site-pick" onClick={() => setPick(i)} aria-pressed={i === pick}>
+                <span className={"dot " + state[0]}></span>
+                <span className="site-url">{s.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
+                <span className="site-state">{state[1]}{i === 0 ? " · in plan" : ""}</span>
+              </button>
+              <button type="button" className="link danger" disabled={!!busy} onClick={() => remove(s.url)}>{busy === "rm" + s.url ? "Removing…" : "Remove"}</button>
+            </li>
+          );
+        })}
+      </ul>
+      {free > 0 ? (
+        <form className="inline-form" onSubmit={add}>
+          <label>Add a site <span className="opt">{free} {free === 1 ? "slot" : "slots"} free</span><input name="url" type="text" inputMode="url" placeholder="https://anothersite.com" required /></label>
+          <button className="btn btn-dark" type="submit" disabled={!!busy}>{busy === "add" ? "Adding…" : "Start watching"}</button>
+        </form>
+      ) : (
+        <div className="slot-row">
+          <div>
+            <b>Watch another site</b>
+            <p>{math.each} each. With one more: {siteMath(seats + 1, yearly).line}.</p>
+          </div>
+          <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => slot(seats + 1)}>{busy === "seats" ? "Adding…" : "Add a site slot"}</button>
+        </div>
+      )}
+      {free > 0 && seats > 1 && <button type="button" className="link quiet" disabled={!!busy} onClick={() => slot(seats - 1)}>Remove an empty slot</button>}
+      <p className="fine">Every site gets daily uptime and speed checks, a weekly re-stamp, and change alerts. The app review stays one a month in total: you pick the site in App review.</p>
+      {err && <p className="alert" role="alert">{err}</p>}
+    </section>
+  );
+}
+
+function SiteMonitor({ monitor }) {
   const checks = monitor?.checks || [];
   const last = checks[checks.length - 1];
   const up = checks.length ? Math.round((checks.filter((c) => c.ok).length / checks.length) * 1000) / 10 : null;
@@ -455,15 +563,18 @@ function StayAlive({ user, monitor, onChange }) {
   const restamps = [...(monitor?.restamps || [])].reverse();
   const next = monitor?.lastRestampAt ? new Date(new Date(monitor.lastRestampAt).getTime() + 7 * 86400000).toISOString() : "";
   const maxMs = Math.max(1, ...checks.slice(-30).map((c) => c.ms || 0));
+  const ready = !!monitor.checks;
   return (
-    <section className="panel" aria-labelledby="sa-h">
+    <section className="panel" aria-labelledby="sm-h">
       <div className="panel-head">
-        <h2 id="sa-h"><Icon name="activity" /> Stay Alive monitoring</h2>
-        {sa.url && <p>Watching <a href={sa.url} target="_blank" rel="noopener noreferrer">{sa.url}</a></p>}
+        <div>
+          <h2 id="sm-h">Monitoring</h2>
+          <p>Watching <a href={monitor.url} target="_blank" rel="noopener noreferrer">{monitor.url}</a></p>
+        </div>
       </div>
-      {!sa.url && <PageForm plan="stayAlive" label="Which page should we watch?" onDone={onChange} />}
-      {sa.url && !monitor && <Working text="Switching monitoring on: first uptime check and re-stamp are running." />}
-      {monitor && (
+      {monitor.paused && <p className="note">Paused: you have more sites than site slots. Add a slot or remove a site to watch it again.</p>}
+      {!monitor.paused && !ready && <Working text="Switching monitoring on: first uptime check and re-stamp are running." />}
+      {ready && (
         <>
           <dl className="scout">
             <div><dt>Right now</dt><dd className={last?.ok ? "ok" : "bad"}>{last ? (last.ok ? `Up · ${last.status}` : `Down · ${last.status || last.error}`) : "Checking…"}</dd></div>
@@ -522,6 +633,9 @@ function Reviews({ user, onChange }) {
   const [busy, setBusy] = useState(false);
   const [login, setLogin] = useState(false);
   const left = user.reviewsLeft?.total || 0;
+  // A Stay Alive review covers one site a month, so with several sites the member picks one.
+  const saSites = user.stayAlive?.sites || [];
+  const pickSite = !(user.reviewsLeft?.killSheet > 0) && user.stayAliveActive && saSites.length > 1;
   async function submit(e) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -566,7 +680,13 @@ function Reviews({ user, onChange }) {
       {user.member && left > 0 && (
         <form className="review-form" onSubmit={submit}>
           <div className="row2">
-            <label>Site URL<input name="siteUrl" type="text" inputMode="url" placeholder="https://yourapp.com" defaultValue={user.killSheet?.url || user.stayAlive?.url || ""} /></label>
+            {pickSite ? (
+              <label>Which site gets this month's review
+                <select name="siteUrl" defaultValue={saSites[0]}>{saSites.map((s) => <option key={s} value={s}>{s.replace(/^https?:\/\//, "")}</option>)}</select>
+              </label>
+            ) : (
+              <label>Site URL<input name="siteUrl" type="text" inputMode="url" placeholder="https://yourapp.com" defaultValue={user.killSheet?.url || user.stayAlive?.url || ""} /></label>
+            )}
             <label>App Store or Play link <span className="opt">optional</span><input name="appUrl" type="url" placeholder="https://apps.apple.com/…" /></label>
           </div>
           <label>What to test, back to back<textarea name="what" rows={4} required minLength={10} maxLength={3000} placeholder="1. Land on the homepage logged out. 2. Sign up with email. 3. Finish onboarding. 4. Create your first project. Tell us where you'd expect people to get stuck." /></label>
@@ -686,7 +806,7 @@ function Overview({ user, report, monitor, go }) {
               {user.stayAliveActive && (
                 <li>
                   <span className={"dot " + (checks.at(-1)?.ok === false ? "bad" : monitor ? "ok" : "run")}></span>
-                  <div><b>Monitoring</b><p>{monitor ? `${checks.at(-1)?.ok === false ? "Down at last check" : "Up"} · next billing ${fmtDate(user.stayAlive.renews)}` : user.stayAlive.url ? "Switching on" : "Add your page to start"}</p></div>
+                  <div><b>Monitoring{(user.stayAlive.sites || []).length > 1 ? ` · ${user.stayAlive.sites.length} sites` : ""}</b><p>{monitor ? `${checks.at(-1)?.ok === false ? "Down at last check" : "Up"} · next billing ${fmtDate(user.stayAlive.renews)}` : user.stayAlive.url ? "Switching on" : "Add your page to start"}</p></div>
                   <button type="button" className="link" onClick={() => go("monitoring")}>Open</button>
                 </li>
               )}
@@ -746,7 +866,7 @@ function Settings({ user, onOut }) {
 }
 
 function Dashboard({ data, setData, onOut }) {
-  const { user, report, monitor, setup } = data;
+  const { user, report, monitor, monitors, setup } = data;
   const [banner, setBanner] = useState(PAID ? "confirming" : PLAN ? "checkout" : "");
   const [err, setErr] = useState("");
   const tries = useRef(0);
@@ -789,7 +909,7 @@ function Dashboard({ data, setData, onOut }) {
   }, [active, banner]);
 
   // Poll while anything is running: payment confirmation, the scout, a re-stamp, the first monitor run.
-  const running = banner === "confirming" || report?.status === "working" || monitor?.restampRunning || (user.stayAliveActive && user.stayAlive?.url && !monitor);
+  const running = banner === "confirming" || report?.status === "working" || (monitors || []).some((m) => m.restampRunning || (!m.checks && !m.paused)) || (user.stayAliveActive && user.stayAlive?.url && !monitor);
   useEffect(() => {
     if (!running) return;
     const t = setTimeout(() => {
@@ -864,7 +984,7 @@ function Dashboard({ data, setData, onOut }) {
         {sect === "overview" && <Overview user={user} report={report} monitor={monitor} go={go} />}
         {sect === "stamps" && <Stamps user={user} />}
         {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
-        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitor={monitor} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "One app review a month"]} />)}
+        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
         {sect === "account" && (
           <>
