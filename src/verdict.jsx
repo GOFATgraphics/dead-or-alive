@@ -273,6 +273,11 @@ function SavePrompt({ r }) {
         let saved = (data.user.stamps || []).some((x) => x.id === r.id);
         if (!saved && jobs.length) {
           const c = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "claim", jobs }) }).then((x) => x.json()).catch(() => ({}));
+          if (c.user) {
+            try {
+              localStorage.removeItem("smp.jobs");
+            } catch (_) {}
+          }
           saved = (c.user?.stamps || []).some((x) => x.id === r.id);
         }
         if (live) setState({ status: "in", saved });
@@ -304,7 +309,7 @@ function SavePrompt({ r }) {
           <>
             <div>
               <h2 id="save-h">{state.saved ? "Saved to your dashboard." : "You're signed in."}</h2>
-              <p>{state.saved ? "Every stamp you make while signed in lands there too." : "This stamp was made in another browser, so it can't be saved here. Stamp the page again to add it."}</p>
+              <p>{state.saved ? "Every stamp you make while signed in lands there too." : "This stamp is saved to another account, or was made in another browser. Stamp the page again to add it to yours."}</p>
             </div>
             <div className="save-actions">
               <a className="btn btn-line" href="/dashboard">Open dashboard <Icon name="arrow-right" /></a>

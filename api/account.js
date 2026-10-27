@@ -14,7 +14,7 @@ import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import { readResult, resultId } from "./_lib.js";
 import { mail } from "./_publish.js";
-import { addTo, remove, seal, set, storeReady } from "./_store.js";
+import { addTo, get, remove, seal, set, storeReady } from "./_store.js";
 import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
@@ -100,15 +100,26 @@ async function claim(email, jobs) {
   const ids = [...new Set((Array.isArray(jobs) ? jobs : []).filter((j) => UUID.test(String(j))).slice(0, 50))].map((j) => resultId(j));
   const found = (await Promise.all(ids.map((id) => readResult(id)))).filter(Boolean);
   if (!found.length) return 0;
+  // A stamp belongs to the first account that saves it. Another account signing in on the same browser later
+  // doesn't get it too.
+  const mine = [];
+  for (const r of found) {
+    const owner = await get(`owner:${r.id}`);
+    if (owner && owner !== email) continue;
+    if (!owner) await set(`owner:${r.id}`, email);
+    mine.push(r);
+  }
+  let added = 0;
   await updateUser(email, (u) => {
     if (!u) return undefined;
     const have = new Set((u.stamps || []).map((s) => s.id));
-    const add = found.filter((r) => !have.has(r.id)).map((r) => ({ id: r.id, url: r.pageUrl, host: r.host, verdict: r.verdict, score: r.score ?? null, icon: r.icon || "", at: r.createdAt }));
+    const add = mine.filter((r) => !have.has(r.id)).map((r) => ({ id: r.id, url: r.pageUrl, host: r.host, verdict: r.verdict, score: r.score ?? null, icon: r.icon || "", at: r.createdAt }));
+    added = add.length;
     if (!add.length) return undefined;
     u.stamps = [...(u.stamps || []), ...add].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200);
     return u;
   });
-  return found.length;
+  return added;
 }
 
 const APP_LINK = /^https:\/\/(apps\.apple\.com|itunes\.apple\.com|play\.google\.com|testflight\.apple\.com)\//i;

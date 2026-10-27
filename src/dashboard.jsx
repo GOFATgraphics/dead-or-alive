@@ -27,6 +27,15 @@ function jobs() {
   }
 }
 
+// Once this browser's stamps are saved to an account, the browser forgets them, so a different account
+// signing in here later starts clean.
+function forgetJobs(sent) {
+  try {
+    const left = jobs().filter((j) => !sent.includes(j));
+    left.length ? localStorage.setItem("smp.jobs", JSON.stringify(left)) : localStorage.removeItem("smp.jobs");
+  } catch (_) {}
+}
+
 async function api(op, data = {}) {
   const r = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, ...data }) });
   const body = await r.json().catch(() => ({}));
@@ -773,7 +782,7 @@ function Dashboard({ data, setData, onOut }) {
     const j = jobs();
     const back = params.get("back") || "";
     const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(back);
-    if (j.length) api("claim", { jobs: j }).then((out) => out.saved && out.user && setData((d) => ({ ...d, ...out }))).catch(() => {}).finally(done);
+    if (j.length) api("claim", { jobs: j }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
     else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
