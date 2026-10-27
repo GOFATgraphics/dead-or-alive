@@ -4,7 +4,6 @@ import { PLANS } from "./config.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const CHECK = '<svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-const ARROW = '<svg class="ic" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 export const point = (p) => {
   const m = /^Instant: (.*)$/.exec(p);
@@ -13,38 +12,46 @@ export const point = (p) => {
 
 export const planHref = (key, pageUrl = "") => `/dashboard?plan=${key}${pageUrl ? `&url=${encodeURIComponent(pageUrl)}` : ""}`;
 
-function card(key, { main = false } = {}) {
-  const p = PLANS[key];
-  const ticks = p.points
-    .map(point)
-    .map((x) => `<li>${CHECK}<span>${x.instant ? '<b class="pc-tag">Instant</b> ' : ""}${esc(x.text)}</span></li>`)
-    .join("");
-  return `<article class="pc${main ? " pc-main" : ""}">
-  <p class="pc-label">${key === "stayAlive" ? "Membership" : "One-time"}</p>
-  <h3>${esc(p.name)}</h3>
-  <p class="pc-amount">${esc(p.price)} <span>${esc(p.per)}</span></p>
-  <p class="pc-pitch">${esc(p.pitch)}</p>
-  <ul class="pc-ticks">${ticks}</ul>
-  <a class="btn ${main ? "btn-red" : "btn-dark"}" href="${planHref(key)}" data-plan="${key}">${esc(p.cta)} ${ARROW}</a>
+// Plain feature text: the "Instant:" marker becomes a note under the button instead of a tag on every line.
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const NOTE = {
+  free: "No account needed.",
+  killSheet: "In your dashboard the moment you pay.",
+  stayAlive: "Starts the moment you subscribe. Cancel anytime.",
+};
+const FREE_POINTS = [
+  "Your stamp, score, and the top problem with its fix",
+  "A shareable card, and a footer badge for ALIVE",
+  "With a free account: all 13 checks, the full stack, speed, and SEO",
+  "Every stamp saved, and a free re-stamp after you fix it",
+];
+
+function card({ key, name, pitch, price, per, points, cta, href, featured }) {
+  const list = points.map((t) => `<li>${CHECK}<span>${esc(t)}</span></li>`).join("");
+  return `<article class="pc${featured ? " pc-main" : ""}">
+  <div class="pc-top"><h3>${esc(name)}</h3>${featured ? '<span class="pc-flag">Recommended</span>' : ""}</div>
+  <p class="pc-pitch">${esc(pitch)}</p>
+  <p class="pc-amount"><b>${esc(price)}</b><span>${esc(per)}</span></p>
+  <a class="btn ${featured ? "btn-red" : "btn-line"}" href="${href}"${key !== "free" ? ` data-plan="${key}"` : ""}>${esc(cta)}</a>
+  <p class="pc-note">${esc(NOTE[key])}</p>
+  <ul class="pc-list">${list}</ul>
 </article>`;
 }
 
-const FREE = `<article class="pc pc-free">
-  <p class="pc-label">Always</p>
-  <h3>Free stamp</h3>
-  <p class="pc-amount">$0 <span>no signup</span></p>
-  <p class="pc-pitch">Paste a URL, get DEAD, COPE or ALIVE in about a minute.</p>
-  <ul class="pc-ticks"><li>${CHECK}<span>Your stamp, score, and the one problem that matters most, with its fix</span></li><li>${CHECK}<span>A shareable card and, for ALIVE, a footer badge</span></li><li>${CHECK}<span>With a free account: all 13 checks, the full tech stack, speed, and SEO details</span></li><li>${CHECK}<span>Every stamp saved in one place, and a free re-stamp after you fix it</span></li></ul>
-  <a class="btn btn-line" href="/#top">Stamp my page free ${ARROW}</a>
-</article>`;
+const paid = (key, pageUrl, featured) => {
+  const p = PLANS[key];
+  return card({ key, name: p.name, pitch: p.pitch, price: p.price, per: p.per, points: p.points.map((x) => cap(point(x).text)), cta: p.cta, href: planHref(key, pageUrl), featured });
+};
 
-export function plansHtml({ free = false } = {}) {
-  return `<div class="pc-grid${free ? " three" : ""}">${free ? FREE : ""}${card("killSheet", { main: true })}${card("stayAlive")}</div>
-<ol class="pc-steps" aria-label="How buying works">
-  <li><b>1</b><span>Create a free account with your email.</span></li>
-  <li><b>2</b><span>Check out with the same email. One-time or monthly, no surprises.</span></li>
-  <li><b>3</b><span>Your dashboard opens with everything marked Instant already running.</span></li>
-</ol>`;
+// order: which paid plan comes first (and is recommended). pageUrl: carried to checkout from a result page.
+export function plansHtml({ free = false, order = ["killSheet", "stayAlive"], pageUrl = "" } = {}) {
+  const cards = [
+    free ? card({ key: "free", name: "Free stamp", pitch: "Paste a URL, get DEAD, COPE or ALIVE in about a minute.", price: "$0", per: "forever", points: FREE_POINTS, cta: "Stamp my page", href: "/#top" }) : "",
+    paid(order[0], pageUrl, true),
+    paid(order[1], pageUrl, false),
+  ].join("");
+  return `<div class="pc-grid${free ? " three" : ""}">${cards}</div>
+<p class="pc-how">Paid plans start with a free account. Check out with the same email and your dashboard opens with everything already running. Payments are handled by our payment provider; we never see your card.</p>`;
 }
 
 // How the app review works, in the same words everywhere it's sold.
@@ -57,9 +64,11 @@ export const REVIEW_STEPS = [
 ];
 
 export function reviewHtml() {
-  return `<div class="pc-review">
-  <h3>App review, included with both plans</h3>
-  <p>The Kill Sheet includes one. Stay Alive includes one every month. It's part of your membership, tracked in your dashboard, not something we email you later.</p>
+  return `<section class="pc-review" aria-label="App review">
+  <div>
+    <h3>App review, included</h3>
+    <p>One with the Kill Sheet, one a month with Stay Alive. A person tests your app end to end and the result lands in your dashboard.</p>
+  </div>
   <ol>${REVIEW_STEPS.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
-</div>`;
+</section>`;
 }

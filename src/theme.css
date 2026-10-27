@@ -71,14 +71,12 @@
 /* Surfaces that were solid ink with white text */
 [data-theme="dark"] .btn-dark,
 [data-theme="dark"] .pc .btn-dark { background: #f2f1f7; color: #0b0b10; }
-[data-theme="dark"] .pc-main,
 [data-theme="dark"] .plan.main,
-[data-theme="dark"] .auth-plan,
-[data-theme="dark"] .banner,
+
 [data-theme="dark"] .mbadge { background: var(--solid); border-color: #34334a; color: #f2f1f7; }
 [data-theme="dark"] .mbadge.alive { background: #0f3322; border-color: #1b4d35; }
-[data-theme="dark"] .steps li.now,
-[data-theme="dark"] .pc-steps b { background: #f2f1f7; color: #0b0b10; }
+[data-theme="dark"] .steps li.now { background: #f2f1f7; color: #0b0b10; }
+[data-theme="dark"] .pc-main { border-color: #f2f1f7; box-shadow: 0 0 0 1px #f2f1f7; }
 [data-theme="dark"] .btn-x { background: #f2f1f7; color: #000; }
 [data-theme="dark"] .submit:not(.ghost) { background: #f2f1f7; color: #0b0b10; }
 

@@ -6,8 +6,9 @@ import DecryptedText from "./bits/DecryptedText.jsx";
 import { Icon } from "./icons.jsx";
 import { track, trackView } from "./track.js";
 import { snapshotRows } from "./snapshot.js";
-import { DESK, PLANS } from "./config.js";
-import { REVIEW_STEPS, planHref, point } from "./plans.js";
+import { DESK } from "./config.js";
+import { Toast } from "./toast.jsx";
+import { plansHtml, reviewHtml } from "./plans.js";
 import "./plans.css";
 import { TIERS, embedSvg, svgUri, tickSvg, tierFor } from "./badge.js";
 
@@ -336,37 +337,14 @@ function Offers({ r }) {
         <h2 id="offers-h">{v === "ALIVE" ? "Pages break quietly. We'll watch it." : "Fix it yourself, or hand it to us."}</h2>
         <p className="sect-sub">{v === "ALIVE" ? "A deploy, a slow script, a new hero. Stay Alive re-stamps every week and tells you first." : `${failed ? `${failed} thing${failed === 1 ? "" : "s"} to fix. ` : ""}The list above is free. The Kill Sheet is the rewrite and the full-page scout, in your dashboard the moment you pay.`}</p>
       </div>
-      <div className="pc-grid">
-        {order.map((key, i) => {
-          const p = PLANS[key];
-          return (
-            <article key={key} className={"pc" + (i === 0 ? " pc-main" : "")}>
-              <p className="pc-label">{i === 0 ? "Recommended" : key === "stayAlive" ? "Membership" : "One-time"}</p>
-              <h3>{p.name}</h3>
-              <p className="pc-amount">{p.price} <span>{p.per}</span></p>
-              <p className="pc-pitch">{p.pitch}</p>
-              <ul className="pc-ticks">
-                {p.points.map(point).map((x) => (
-                  <li key={x.text}><Icon name="check" size={16} /><span>{x.instant && <b className="pc-tag">Instant</b>} {x.text}</span></li>
-                ))}
-              </ul>
-              <a className={"btn " + (i === 0 ? "btn-red" : "btn-dark")} href={planHref(key, r.pageUrl)} onClick={() => track("offer_click", { v, plan: key })}>
-                {p.cta} <Icon name="arrow-right" />
-              </a>
-            </article>
-          );
-        })}
-      </div>
-      <ol className="pc-steps" aria-label="How buying works">
-        <li><b>1</b><span>Create a free account with your email.</span></li>
-        <li><b>2</b><span>Check out with the same email.</span></li>
-        <li><b>3</b><span>Your dashboard opens with everything marked Instant already running.</span></li>
-      </ol>
-      <div className="pc-review">
-        <h3>App review, included with both plans</h3>
-        <p>The Kill Sheet includes one. Stay Alive includes one every month. Tracked in your dashboard.</p>
-        <ol>{REVIEW_STEPS.map((x) => <li key={x}>{x}</li>)}</ol>
-      </div>
+      {/* Same cards as the homepage and /pricing, from src/plans.js; clicks on a plan are counted here. */}
+      <div
+        onClick={(e) => {
+          const plan = e.target.closest?.("[data-plan]")?.dataset.plan;
+          if (plan) track("offer_click", { v, plan });
+        }}
+        dangerouslySetInnerHTML={{ __html: plansHtml({ order, pageUrl: r.pageUrl }) + reviewHtml() }}
+      />
     </section>
   );
 }
@@ -646,15 +624,7 @@ function Result({ r }) {
     <div className="page">
       <Bar />
       <main>
-        {justSignedIn && !r.locked && (
-          <div className="wrap">
-            <p className="signed-in" role="status">
-              <Icon name="check" size={16} />
-              <span>You're signed in. Every check, the full stack, and speed are unlocked below, and this stamp is saved to your dashboard.</span>
-              <a href="/dashboard">Open dashboard</a>
-            </p>
-          </div>
-        )}
+        {justSignedIn && !r.locked && <Toast text="Signed in. Everything below is unlocked and saved." href="/dashboard" action="Dashboard" />}
         <Hero r={r} />
         <Status r={r} />
         {r.locked ? <LockedChecks r={r} /> : <Checks r={r} />}

@@ -114,18 +114,17 @@ label.check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color:
 /* Signed out */
 .dash-auth { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(2rem, 5vw, 4rem); align-items: start; padding-top: clamp(2rem, 5vw, 4rem); padding-bottom: clamp(3rem, 6vw, 5rem); }
 .auth-copy h1 { margin-top: 1rem; font-size: clamp(2rem, 4.5vw, 3.2rem); font-weight: 800; line-height: 1.06; letter-spacing: -0.045em; }
-.auth-plan { margin-top: 1.5rem; padding: 1.25rem 1.4rem; border-radius: 18px; background: var(--ink); color: #fff; }
-.auth-plan ul { display: grid; gap: 0.5rem; margin-top: 0.9rem; font-size: 0.9375rem; }
+.auth-plan { margin-top: 1.5rem; padding: 1.1rem 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); }
+.auth-plan ul { display: grid; gap: 0.45rem; margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--line); font-size: 0.875rem; color: var(--body); }
 .auth-plan li { display: flex; align-items: baseline; gap: 0.45rem; }
-.auth-plan .ic { color: #7fd6a2; }
-.auth-plan .pc-tag { background: rgba(127, 214, 162, 0.16); color: #7fd6a2; }
+.auth-plan .ic { color: var(--soft); flex: none; }
 .auth-card { display: grid; gap: 1rem; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 24px; background: var(--card); box-shadow: var(--shadow-3); }
 .seg { display: grid; grid-template-columns: 1fr 1fr; padding: 0.25rem; border-radius: 12px; background: var(--canvas); }
 .seg button { min-height: 2.5rem; border: 0; border-radius: 10px; background: transparent; color: var(--body); font: 700 0.875rem var(--sans); cursor: pointer; }
 .seg button[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: var(--shadow-1); }
 
 /* Banners */
-.banner { padding: 1rem 1.25rem; border-radius: 10px; background: var(--ink); color: #fff; font-weight: 600; }
+.banner { padding: 0.8rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 0.9rem; font-weight: 600; }
 .banner.ok { display: flex; align-items: center; gap: 0.5rem; background: #e6f6ec; color: var(--green); }
 .banner.warn { background: #fdf2e2; color: var(--amber); }
 .working { display: flex; align-items: center; gap: 0.65rem; margin-top: 0.5rem; color: inherit; font-weight: 600; }

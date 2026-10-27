@@ -342,12 +342,17 @@ ol, ul { padding: 0; list-style: none; }
 .hood-counts span { font-size: 0.875rem; color: var(--body); }
 @media (max-width: 560px) { .unlock-blur { padding: 0.75rem; } .unlock { min-height: 24rem; } }
 
-/* Back from signing in */
-.signed-in { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0.5rem auto 1rem; padding: 0.8rem 1rem; border: 1px solid rgba(29, 122, 69, 0.25); border-radius: 12px; background: rgba(29, 122, 69, 0.08); color: var(--alive); font-size: 0.9375rem; font-weight: 600; }
-.signed-in a { margin-left: auto; color: var(--ink); font-weight: 700; }
 @media (max-width: 560px) { .bar .bar-stamp { display: none; } }
-.signed-in { flex-wrap: nowrap; align-items: flex-start; }
-.signed-in .ic { flex: none; margin-top: 0.2em; }
-.signed-in span { flex: 1; }
-.signed-in a { flex: none; white-space: nowrap; }
-@media (max-width: 560px) { .signed-in { flex-wrap: wrap; } .signed-in span { flex: 1 1 calc(100% - 2rem); } .signed-in a { margin-left: 1.5rem; } }
+
+/* Toast */
+.toast { position: fixed; left: 50%; bottom: 1.25rem; z-index: 60; display: flex; align-items: center; gap: 0.75rem; width: max-content; max-width: calc(100% - 2rem); padding: 0.65rem 0.65rem 0.65rem 0.95rem; border-radius: 12px; background: #15142a; color: #f2f1f7; box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.45); font-size: 0.875rem; font-weight: 500; transform: translateX(-50%); animation: toast-in 0.22s ease-out; }
+.toast-dot { width: 0.5rem; height: 0.5rem; flex: none; border-radius: 50%; background: #3ccf86; }
+.toast-text { min-width: 0; }
+.toast a { flex: none; color: #fff; font-weight: 700; text-underline-offset: 3px; }
+.toast button { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border: 0; border-radius: 8px; background: transparent; color: #a3a1b3; cursor: pointer; }
+.toast button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+[data-theme="dark"] .toast { background: #f2f1f7; color: #15142a; }
+[data-theme="dark"] .toast a { color: #15142a; }
+[data-theme="dark"] .toast button { color: #6e6c80; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

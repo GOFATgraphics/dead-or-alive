@@ -4,6 +4,7 @@ import "./result.css";
 import "./plans.css";
 import "./dashboard.css";
 import { Icon } from "./icons.jsx";
+import { Toast } from "./toast.jsx";
 import { DESK, PLANS } from "./config.js";
 import { REVIEW_STEPS, planHref, point } from "./plans.js";
 import { track, trackView } from "./track.js";
@@ -152,7 +153,7 @@ function Auth({ setup, onIn }) {
             <p className="sect-sub">Your {plan.name} lands in this dashboard the moment your payment is confirmed. Use the email you'll pay with, so the payment finds your account.</p>
             <div className="auth-plan">
               <p><b>{plan.name}</b> · {plan.price} {plan.per}</p>
-              <ul>{plan.points.map(point).map((x) => <li key={x.text}><Icon name="check" size={15} />{x.instant && <b className="pc-tag">Instant</b>} {x.text}</li>)}</ul>
+              <ul>{plan.points.map(point).map((x) => <li key={x.text}><Icon name="check" size={15} />{x.text.charAt(0).toUpperCase() + x.text.slice(1)}</li>)}</ul>
             </div>
           </>
         ) : params.get("save") ? (
@@ -829,8 +830,8 @@ function Dashboard({ data, setData, onOut }) {
         {banner === "checkout" && <div className="banner"><Working text={`Taking you to secure checkout for the ${PLANS[PLAN].name}, with ${user.email} filled in…`} /></div>}
         {banner === "confirming" && <div className="banner"><Working text="Payment received. Switching your membership on…" /></div>}
         {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
-        {banner === "active" && <div className="banner ok"><Icon name="check" /> {PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running below." : "You're a Stay Alive member. Monitoring is on."}</div>}
-        {params.get("confirmed") && !banner && <div className="banner ok"><Icon name="check" /> Email confirmed. You're signed in.</div>}
+        {banner === "active" && <Toast text={PAID === "killSheet" ? "You're a Kill Sheet member. Your sheet is running." : "You're a Stay Alive member. Monitoring is on."} />}
+        {params.get("confirmed") && !banner && <Toast text="Email confirmed. You're signed in." />}
         {err && <p className="alert" role="alert">{err}</p>}
 
         <div className="page-head">
