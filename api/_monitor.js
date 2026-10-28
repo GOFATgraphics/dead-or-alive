@@ -19,7 +19,7 @@ export const seatsOf = (u) => Math.max(1, parseInt(u?.stayAlive?.seats, 10) || 1
 // The sites actually watched. If the paid count drops below the list, the newest ones pause.
 export const watchedSites = (u) => sitesOf(u).slice(0, seatsOf(u));
 
-const siteId = (url) => crypto.createHash("sha256").update(url).digest("base64url").slice(0, 12);
+export const siteId = (url) => crypto.createHash("sha256").update(url).digest("base64url").slice(0, 12);
 export const monitorKey = (email, url) => `monitor:${email}:${siteId(url)}`;
 const WEEK = 6.5 * 86400000; // a little under a week, so a daily cron never skips one
 
@@ -109,6 +109,141 @@ async function alertChange(email, pageUrl, c) {
   }).catch(() => {});
 }
 
+// --- Upgrade 3: history, incidents, weekly reports, public status. Pure helpers, so the
+// dashboard, the public status page, and the weekly email all read the same numbers. ---
+const monthKey = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+// Checks grouped by month, newest month first: checks, uptime percent, average speed.
+export function monthlyHistory(checks = []) {
+  const by = {};
+  for (const c of checks) {
+    const k = monthKey(c.at);
+    if (!k) continue;
+    (by[k] ||= { month: k, checks: 0, up: 0, ms: 0, okMs: 0 });
+    by[k].checks++;
+    if (c.ok) { by[k].up++; by[k].ms += c.ms || 0; by[k].okMs++; }
+  }
+  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => ({
+    ...m, uptime: m.checks ? Math.round((m.up / m.checks) * 1000) / 10 : null,
+    avgMs: m.okMs ? Math.round(m.ms / m.okMs) : null,
+  }));
+}
+// Outages as incidents, not a list of failed checks: consecutive failed checks form one
+// incident, from the first failed check to the first good check after it (or "still down").
+export function incidentList(checks = []) {
+  const out = [];
+  let cur = null;
+  for (const c of checks) {
+    if (!c.ok && !cur) cur = { start: c.at, status: c.status || 0 };
+    if (c.ok && cur) { cur.end = c.at; out.push(cur); cur = null; }
+  }
+  if (cur) out.push({ ...cur, ongoing: true });
+  return out.reverse();
+}
+// The numbers a report and the public status page share. Window defaults to the last 30
+// days (public status); the weekly email passes 7. With less history than the window it
+// says so instead of inventing a full window.
+export function reportSummary(m = {}, windowDays = 30) {
+  const checks = (m.checks || []).filter((c) => Date.now() - new Date(c.at).getTime() <= windowDays * 86400000);
+  const windowChecks = checks.length ? checks : (m.checks || []);
+  const up = windowChecks.filter((c) => c.ok);
+  const restamps = (m.restamps || []).filter((r) => !r.failed && r.score != null);
+  const first = restamps[0];
+  const lastR = restamps[restamps.length - 1];
+  const recentChanges = (m.changes || []).filter((c) => Date.now() - new Date(c.at).getTime() <= windowDays * 86400000);
+  return {
+    host: (() => { try { return new URL(m.url).hostname; } catch (_) { return m.url || ""; } })(),
+    url: m.url || "",
+    windowDays: checks.length ? windowDays : null,
+    checks: windowChecks.length,
+    uptime: windowChecks.length ? Math.round((up.length / windowChecks.length) * 1000) / 10 : null,
+    avgMs: up.length ? Math.round(up.reduce((a, c) => a + (c.ms || 0), 0) / up.length) : null,
+    currentUp: windowChecks.length ? !!windowChecks[windowChecks.length - 1].ok : null,
+    lastCheckAt: m.lastCheckAt || null,
+    scoreFrom: first?.score ?? null, scoreTo: lastR?.score ?? null,
+    verdictTo: lastR?.verdict || null, latestStampId: lastR?.id || null,
+    changes: recentChanges.length, incidents: incidentList(windowChecks),
+  };
+}
+function reportMail(email, m, s) {
+  const inc = s.incidents.map((i) => i.ongoing ? `Down since ${new Date(i.start).toDateString()}, still down` : `Down ${new Date(i.start).toDateString()}${i.end ? `, back ${new Date(i.end).toDateString()}` : ""}`).join("\n");
+  const scoreLine = s.scoreFrom != null && s.scoreTo != null ? `Score: ${s.scoreFrom} to ${s.scoreTo}${s.scoreTo > s.scoreFrom ? " (up)" : s.scoreTo < s.scoreFrom ? " (down)" : " (unchanged)"}.` : "No scored re-stamp in this period yet.";
+  const text = `Your Stay Alive weekly report for ${s.host}\n\n` +
+    `Uptime: ${s.uptime != null ? `${s.uptime}%` : "not yet"} over ${s.checks} check${s.checks === 1 ? "" : "s"}${s.windowDays ? " in the last 7 days" : " so far"}.\n` +
+    `Average server answer: ${s.avgMs != null ? `${s.avgMs} ms` : "not yet"}.\n` +
+    `Right now: ${s.currentUp == null ? "checking" : s.currentUp ? "Up" : "Down"}.\n` +
+    `${scoreLine}\n` +
+    `Changes spotted: ${s.changes}. Outages: ${s.incidents.length}.\n` +
+    (inc ? `\nOutages:\n${inc}\n` : "") +
+    `\nDetails in your dashboard: https://stampmypage.com/dashboard`;
+  const html = `<p>Your Stay Alive weekly report for <a href="${s.url}">${s.host}</a></p><ul>` +
+    `<li>Uptime: <b>${s.uptime != null ? `${s.uptime}%` : "not yet"}</b> over ${s.checks} checks${s.windowDays ? " in the last 7 days" : " so far"}</li>` +
+    `<li>Average server answer: <b>${s.avgMs != null ? `${s.avgMs} ms` : "not yet"}</b></li>` +
+    `<li>Right now: <b>${s.currentUp == null ? "checking" : s.currentUp ? "Up" : "Down"}</b></li>` +
+    `<li>${scoreLine}</li><li>Changes spotted: <b>${s.changes}</b>. Outages: <b>${s.incidents.length}</b>.</li></ul>` +
+    `<p><a href="https://stampmypage.com/dashboard">Details in your dashboard</a></p>`;
+  return mail(email, { subject: `Stay Alive weekly report: ${s.host} at ${s.uptime != null ? `${s.uptime}%` : "checking"} uptime`, text, html });
+}
+// One weekly report per watched site, at most every 7 days, only once a site has at
+// least 7 checks, so a brand new site does not get a report built on one check. Runs
+// inside the daily cron; a failed send never blocks the daily checks. Weekly, not
+// monthly, because Stay Alive itself is a monthly sub: a month between proofs is too slow.
+export async function sendWeeklyReports() {
+  const emails = await members("idx:members");
+  let sent = 0;
+  for (const email of emails) {
+    const u = await getUser(email).catch(() => null);
+    if (!hasStayAlive(u)) continue;
+    for (const url of watchedSites(u)) {
+      try {
+        const m = (await get(monitorKey(email, url))) || { url, checks: [] };
+        if ((m.checks || []).length < 7) continue;
+        if (m.lastReportAt && Date.now() - new Date(m.lastReportAt).getTime() < 7 * 86400000) continue;
+        await reportMail(email, m, reportSummary(m, 7));
+        m.lastReportAt = new Date().toISOString();
+        await set(monitorKey(email, url), m);
+        sent++;
+      } catch (e) { console.error("Weekly report failed:", e); }
+    }
+  }
+  return sent;
+}
+// Send this week's report for one site right now, from the dashboard. Used for review
+// and for owners who want the report on demand; it also resets the 7-day clock.
+export async function sendReportNow(email, url) {
+  const u = await getUser(email);
+  const page = sitesOf(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
+  await reportMail(email, m, reportSummary(m, 7));
+  m.lastReportAt = new Date().toISOString();
+  await set(monitorKey(email, page), m);
+  return m;
+}
+// Public status: opt-in only. The owner turns it on in the dashboard; the page then
+// shows uptime, speed, and the latest stamp only, never the email, the stack, or changes.
+export async function setPublicStatus(email, url, on) {
+  const u = await getUser(email);
+  const page = sitesOf(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
+  m.publicStatus = !!on;
+  await set(monitorKey(email, page), m);
+  return m;
+}
+export async function findPublicMonitor(id) {
+  const emails = await members("idx:members");
+  for (const email of emails) {
+    const u = await getUser(email).catch(() => null);
+    if (!hasStayAlive(u)) continue;
+    for (const url of sitesOf(u)) {
+      if (siteId(url) !== id) continue;
+      const m = await get(monitorKey(email, url)).catch(() => null);
+      if (m?.publicStatus) return { ...m, url };
+    }
+  }
+  return null;
+}
+
 // The daily run for every watched site of every Stay Alive member. A few at a time, so the run fits in one call.
 export async function monitorAll() {
   const emails = await members("idx:members");
@@ -125,13 +260,14 @@ export async function monitorAll() {
       if (b.value.restamps?.at(-1)?.at === b.value.lastRestampAt && Date.now() - new Date(b.value.lastRestampAt).getTime() < 600000) out.restamped++;
     }
   }
+  try { out.reports = await sendWeeklyReports(); } catch (e) { console.error("Weekly reports failed:", e); }
   return out;
 }
 
 // The history of every site on the account, for the dashboard. A site with no history yet comes back as { url }.
 export async function readMonitors(email, u) {
   const watched = watchedSites(u);
-  return Promise.all(sitesOf(u).map(async (url) => ({ ...((await get(monitorKey(email, url))) || {}), url, paused: !watched.includes(url) })));
+  return Promise.all(sitesOf(u).map(async (url) => { const m = (await get(monitorKey(email, url))) || {}; return { ...m, url, paused: !watched.includes(url), publicId: m.publicStatus ? siteId(url) : null }; }));
 }
 
 export const forgetSite = (email, url) => remove(monitorKey(email, url));

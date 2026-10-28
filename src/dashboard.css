@@ -339,3 +339,9 @@ select { width: 100%; min-height: 2.9rem; padding: 0.6rem 0.9rem; border: 1px so
 @media (max-width: 640px) {
   .detail-hero { flex-direction: column; }
 }
+
+/* Monitoring history (upgrade 3): trend charts, monthly table. */
+.trend-chart { display: block; width: 100%; max-width: 36rem; height: 90px; margin: 0.5rem 0 1rem; }
+.hist-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.875rem; }
+.hist-table th, .hist-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; }
+.hist-table th { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }

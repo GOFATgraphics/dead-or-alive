@@ -600,7 +600,7 @@ function StayAlive({ user, monitors, onChange }) {
   return (
     <>
       <Sites user={user} sites={sites} pick={pick} setPick={setPick} onChange={onChange} />
-      {m && <SiteMonitor monitor={m} />}
+      {m && <SiteMonitor monitor={m} onChange={onChange} />}
     </>
   );
 }
@@ -694,7 +694,47 @@ function Sites({ user, sites, pick, setPick, onChange }) {
   );
 }
 
-function SiteMonitor({ monitor }) {
+function TrendChart({ points }) {
+  if (points.length < 2) return null;
+  const vals = points.map((x) => x.v);
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  const pts = points.map((x, i) => `${(i / (points.length - 1)) * 280 + 10},${70 - ((x.v - min) / span) * 55}`).join(" ");
+  return (
+    <svg className="trend-chart" viewBox="0 0 300 80" role="img" aria-label={`Trend from ${points[0].v} to ${points[points.length - 1].v}`}>
+      <polyline points={pts} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((x, i) => <circle key={i} cx={(i / (points.length - 1)) * 280 + 10} cy={70 - ((x.v - min) / span) * 55} r="3" fill="var(--card)" stroke="var(--ink)" strokeWidth="1.5" />)}
+    </svg>
+  );
+}
+function monthRows(checks) {
+  const by = {};
+  for (const c of checks || []) {
+    const d = new Date(c.at);
+    if (Number.isNaN(d.getTime())) continue;
+    const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    (by[k] ||= { month: k, checks: 0, up: 0, ms: 0, ok: 0 });
+    by[k].checks++;
+    if (c.ok) { by[k].up++; by[k].ms += c.ms || 0; by[k].ok++; }
+  }
+  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => ({ ...m, uptime: m.checks ? Math.round((m.up / m.checks) * 1000) / 10 : null, avgMs: m.ok ? Math.round(m.ms / m.ok) : null }));
+}
+function incidentRows(checks) {
+  const out = []; let cur = null;
+  for (const c of checks || []) {
+    if (!c.ok && !cur) cur = { start: c.at };
+    if (c.ok && cur) { cur.end = c.at; out.push(cur); cur = null; }
+  }
+  if (cur) out.push({ ...cur, ongoing: true });
+  return out.reverse();
+}
+function SiteMonitor({ monitor, onChange }) {
+  const [busy, setBusy] = useState("");
+  const [note, setNote] = useState("");
+  const run = async (key, fn) => {
+    setBusy(key); setNote("");
+    try { onChange && onChange(await fn()); setNote(key === "report" ? "Report sent to your email." : "Saved."); }
+    catch (x) { setNote(x.message); } finally { setBusy(""); }
+  };
   const checks = monitor?.checks || [];
   const last = checks[checks.length - 1];
   const up = checks.length ? Math.round((checks.filter((c) => c.ok).length / checks.length) * 1000) / 10 : null;
@@ -728,6 +768,44 @@ function SiteMonitor({ monitor }) {
             </div>
           )}
           {monitor.restampRunning && <Working text="Re-stamping your page now." />}
+          <h3>History</h3>
+          {(() => {
+            const months = monthRows(checks);
+            const scores = (monitor.restamps || []).filter((r) => !r.failed && r.score != null).map((r) => ({ v: r.score, at: r.at }));
+            const speeds = checks.slice(-30).filter((c) => c.ok).map((c) => ({ v: c.ms || 0, at: c.at }));
+            const incs = incidentRows(checks);
+            return (
+              <>
+                {scores.length > 1 && (<><p className="muted">Score trend: {scores[0].v} to {scores[scores.length - 1].v} across {scores.length} re-stamps.</p><TrendChart points={scores} /></>)}
+                {speeds.length > 1 && (<><p className="muted">Server answer, last {speeds.length} good checks.</p><TrendChart points={speeds} /></>)}
+                {months.length > 0 && (
+                  <table className="hist-table" aria-label="Uptime by month"><thead><tr><th>Month</th><th>Checks</th><th>Uptime</th><th>Avg answer</th></tr></thead><tbody>
+                    {months.map((mo) => (<tr key={mo.month}><td>{mo.month}</td><td>{mo.checks}</td><td>{mo.uptime != null ? `${mo.uptime}%` : "—"}</td><td>{mo.avgMs != null ? `${mo.avgMs} ms` : "—"}</td></tr>))}
+                  </tbody></table>
+                )}
+                <p className="muted">Outages in this history: {incs.length ? "" : "none."}</p>
+                {incs.length > 0 && (<ul className="history">{incs.map((i, idx) => (<li key={idx}><span className="v-chip">{i.ongoing ? "ONGOING" : "DOWN"}</span><span>{fmtDate(i.start)}{i.end ? ` to ${fmtDate(i.end)}` : ", still down"}</span></li>))}</ul>)}
+                <div className="row-actions">
+                  <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("report", () => api("report-now", { url: monitor.url }))}>{busy === "report" ? "Sending…" : "Email me this week's report now"}</button>
+                  {note && <span className="muted">{note}</span>}
+                </div>
+              </>
+            );
+          })()}
+          <h3>Public status page</h3>
+          <p className="muted">Optional, off by default. When on, anyone with the link sees only uptime, speed, and the latest stamp for this site, never your email, your stack, or your changes.</p>
+          {monitor.publicId ? (
+            <div className="row-actions">
+              <a className="btn btn-line btn-sm" href={`/status/${monitor.publicId}`} target="_blank" rel="noopener noreferrer">Open public status page</a>
+              <Copy text={`${location.origin}/status/${monitor.publicId}`} label="Copy status link" done="Status link copied" />
+              <Copy text={`<a href="${location.origin}/status/${monitor.publicId}"><img src="${location.origin}/status-badge/${monitor.publicId}" alt="${monitor.url} status, monitored by StampMyPage"></a>`} label="Copy status badge" done="Badge copied" />
+              <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("public-off", () => api("public-status", { url: monitor.url, on: false }))}>{busy === "public-off" ? "Saving…" : "Turn public status off"}</button>
+            </div>
+          ) : (
+            <div className="row-actions">
+              <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("public-on", () => api("public-status", { url: monitor.url, on: true }))}>{busy === "public-on" ? "Saving…" : "Make status public"}</button>
+            </div>
+          )}
           <h3>Changes spotted</h3>
           {monitor.changes?.length ? (
             <ul className="changes">

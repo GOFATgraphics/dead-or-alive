@@ -36,6 +36,14 @@
     {
       "source": "/auth/confirm",
       "destination": "/api/account?op=confirm"
+    },
+    {
+      "source": "/status/:id",
+      "destination": "/api/monitor-status?id=:id"
+    },
+    {
+      "source": "/status-badge/:id",
+      "destination": "/api/monitor-status?id=:id&badge=1"
     }
   ],
   "headers": [
@@ -106,6 +114,15 @@
     },
     {
       "source": "/dashboard(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/status(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
