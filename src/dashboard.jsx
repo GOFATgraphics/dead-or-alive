@@ -102,8 +102,12 @@ function Auth({ setup, onIn }) {
   const [busy, setBusy] = useState(false);
   const xNote = X_NOTE[params.get("x")];
   const [msg, setMsg] = useState(params.get("link") === "expired" ? { bad: true, text: "That sign-in link expired or was already used. Send a new one." } : xNote ? { bad: true, text: xNote } : null);
-  const [wrong, setWrong] = useState(false);
   const [codeFor, setCodeFor] = useState("");
+  const [forgot, setForgot] = useState(false);
+  const [resetFor, setResetFor] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [resetVerified, setResetVerified] = useState(false);
   const plan = PLANS[PLAN];
   // Where X sends them back to: the same dashboard URL (plan, page, stamp to save), minus old X notes.
   const next = (() => {
@@ -130,27 +134,13 @@ function Auth({ setup, onIn }) {
         onIn(out);
       }
     } catch (err) {
-      setWrong(err.body?.code === "wrongpass");
       setMsg({ bad: true, text: err.message });
     } finally {
       setBusy(false);
     }
   }
-  async function link(e) {
-    const form = e.currentTarget.closest("form");
-    const email = new FormData(form).get("email");
-    if (!email) return setMsg({ bad: true, text: "Enter your email first." });
-    setBusy(true);
-    try {
-      await api("sendlink", { email, next });
-      setMsg({ text: `We sent a sign-in link to ${email}. It works once, for 15 minutes.` });
-    } catch (err) {
-      setMsg({ bad: true, text: err.message });
-    } finally {
-      setBusy(false);
-    }
-  }
-  // A 6-digit code, instead of a link: easier on a phone, where a link can open in the wrong browser.
+  // Resend the code inside the code box only. There is no link or code option on the main form:
+  // email, password, Continue, then the code. That's the whole sign-in.
   async function sendCode(e) {
     const form = e.currentTarget.closest("form");
     const email = (form && new FormData(form).get("email")) || codeFor;
@@ -160,6 +150,72 @@ function Auth({ setup, onIn }) {
       const out = await api("sendcode", { email, next });
       setCodeFor(email);
       setMsg({ text: out.note || `We sent a 6-digit code to ${email}.` });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  // Forgot password: a link on the form, not a sign-in option. It opens a reset card: email, then a
+  // 6-digit code, then a new password. After the reset, the user signs in the normal way.
+  function openForgot(e) {
+    const form = e.currentTarget.closest("form");
+    const email = form && new FormData(form).get("email");
+    if (email) setResetFor(email);
+    setForgot(true);
+    setResetSent(false);
+    setResetVerified(false);
+    setResetToken("");
+    setMsg(null);
+  }
+  async function sendReset(e) {
+    if (e.preventDefault) e.preventDefault();
+    const form = e.currentTarget.closest("form");
+    const email = (form && new FormData(form).get("email")) || resetFor;
+    if (!email) return setMsg({ bad: true, text: "Enter your email first." });
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("forgot", { email });
+      setResetFor(email);
+      setResetSent(true);
+      setMsg({ text: out.note || `We sent a 6-digit code to ${email}.` });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verifyResetCode(e) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("verify-reset-code", { email: resetFor, token: f.get("code") });
+      setResetToken(out.resetToken);
+      setResetVerified(true);
+      setMsg({ text: out.note || "Code confirmed. Create your new password." });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resetPassword(e) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    if (f.get("password") !== f.get("confirm")) return setMsg({ bad: true, text: "The two passwords don't match. Type them again." });
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("reset-password", { resetToken, password: f.get("password"), confirm: f.get("confirm") });
+      setForgot(false);
+      setResetSent(false);
+      setResetVerified(false);
+      setResetToken("");
+      setResetFor("");
+      setMsg({ text: out.note || "Password changed. Sign in with your new password." });
     } catch (err) {
       setMsg({ bad: true, text: err.message });
     } finally {
@@ -210,7 +266,7 @@ function Auth({ setup, onIn }) {
         )}
       </div>
 
-      <form className="auth-card" onSubmit={submit}>
+      {!forgot && (<form className="auth-card" onSubmit={submit}>
         <h2 className="auth-h">{plan ? "Continue to checkout" : "Sign up or sign in"}</h2>
         {setup?.x && (
           <>
@@ -220,17 +276,32 @@ function Auth({ setup, onIn }) {
         )}
         <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200} /></label>
         <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
-        <p className="fine">New here? Pick any password with 8 or more characters and your account is made. Been here before? Use the one you set.</p>
+        <button type="button" className="link quiet-link" onClick={openForgot} disabled={busy}>Forgot password?</button>
+        <p className="fine">New here? Pick any password with 8 or more characters, then enter the code we send to your email. Been here before? Use the one you set, then enter the code we send.</p>
         <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Continue"}</button>
         {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
-        {setup?.emailLinks && (wrong || !msg) && <button type="button" className="link quiet-link" onClick={link} disabled={busy}><Icon name="mail" /> {wrong ? "Forgot it? Email me a sign-in link" : "Or email me a sign-in link, no password"}</button>}
-        {setup?.code && (wrong || !msg) && <button type="button" className="link quiet-link" onClick={sendCode} disabled={busy}><Icon name="mail" /> Or email me a 6-digit code</button>}
         <p className="fine">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
-      </form>
+      </form>)}
+      {forgot && (
+        <form className="auth-card" onSubmit={resetVerified ? resetPassword : resetSent ? verifyResetCode : sendReset}>
+          <h2 className="auth-h">Reset your password</h2>
+          <p className="sect-sub">Enter your email, we send a code. Enter the code, then create a new password and confirm it. After that, sign in with the new password.</p>
+          {!resetVerified && <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200} defaultValue={resetFor} /></label>}
+          {resetSent && !resetVerified && <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} placeholder="123456" /></label>}
+          {resetVerified && (<>
+            <label>Create new password<input name="password" type="password" autoComplete="new-password" required /></label>
+            <label>Confirm new password<input name="confirm" type="password" autoComplete="new-password" required /></label>
+          </>)}
+          <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : resetVerified ? "Set new password" : resetSent ? "Verify code" : "Send reset code"}</button>
+          {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
+          {resetSent && !resetVerified && <button type="button" className="link quiet-link" onClick={sendReset} disabled={busy}>Send a new code</button>}
+          <button type="button" className="link quiet-link" onClick={() => { setForgot(false); setResetSent(false); setResetVerified(false); setResetToken(""); setMsg(null); }} disabled={busy}>Back to sign in</button>
+        </form>
+      )}
       {codeFor && (
         <form className="auth-card" onSubmit={verifyCode}>
           <h2 className="auth-h">Enter the code</h2>
-          <p className="sect-sub">We sent a 6-digit code to {codeFor}. Enter it to finish signing in. The link in the same email still works too.</p>
+          <p className="sect-sub">We sent a 6-digit code to {codeFor}. Enter it to finish signing in.</p>
           <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} placeholder="123456" /></label>
           <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Verify code"}</button>
           {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}

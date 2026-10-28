@@ -102,6 +102,21 @@ export function gatedSnapshot(snapshot) {
   return gated;
 }
 
+// What a visitor without an account may see of the checks: pass or fail, never the Stage 2 measurements.
+// The speed and weight checks are the leak: their detail carries the load time, the HTML size, and the
+// script count, which Under the hood promises need a free account. Everything else in a check (label, pass,
+// fix, the headline word count, the button count) is Stage 1 reasoning and stays. Skipped checks keep their
+// generic detail, which carries no figure. This runs at read time, so it fixes old stamps too, not just new ones.
+export function publicChecks(checks) {
+  if (!Array.isArray(checks)) return checks;
+  return checks.map((k) => {
+    if (k.skip) return k;
+    if (k.id === "speed") return { ...k, detail: k.pass ? "Main content appears quickly." : "Main content is slow to appear." };
+    if (k.id === "weight") return { ...k, detail: k.pass ? "Light enough for a first screen." : "Too heavy for a first screen." };
+    return k;
+  });
+}
+
 // Move a legacy snapshot out of the public record and into the store, then rewrite the public record
 // without it. Best effort: a failed move still gates the response, it just stays legacy until the next read.
 export async function migrateLegacy(id, record) {

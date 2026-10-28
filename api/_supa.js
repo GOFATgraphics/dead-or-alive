@@ -41,11 +41,24 @@ export const sendSignInLink = (email, redirectTo) => call("otp", { email, create
 export const sendSignInCode = (email) => call("otp", { email, create_user: true });
 
 // The code from an email: the 6 digits the user types in. type "signup" is the confirm-sign-up code,
-// type "email" is the sign-in code. { ok, email } when it's good.
+// type "email" is the sign-in code. { ok, email, accessToken } when it's good. The access token is the
+// user's own verified session, which is how a forgotten password is set without an admin key: the user
+// proves the inbox with the code, then that session is allowed to change its own password.
 export async function verifyCode(email, token, type) {
   const r = await call("verify", { email, token, type });
   const userEmail = r.data.user?.email;
-  return r.ok && userEmail ? { ok: true, email: userEmail } : { ok: false, code: r.code, msg: r.msg };
+  return r.ok && userEmail ? { ok: true, email: userEmail, accessToken: r.data.access_token || null } : { ok: false, code: r.code, msg: r.msg };
+}
+
+// Sets the password of the account that owns this verified session. No admin key, no link.
+export async function updateOwnPassword(accessToken, password) {
+  const r = await fetch(`${SUPABASE.url}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: SUPABASE.key, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, code: data.error_code || data.code || "", msg: data.msg || data.error_description || data.message || "" };
 }
 
 // The link from an email: the token hash and its type. { ok, email } when it's good.

@@ -5,7 +5,7 @@
 import { readResult } from "./_lib.js";
 import { sessionEmail } from "./_account.js";
 import { get } from "./_store.js";
-import { gatedSnapshot, migrateLegacy } from "./_gate.js";
+import { gatedSnapshot, migrateLegacy, publicChecks } from "./_gate.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -22,8 +22,8 @@ export default async function handler(req, res) {
   const gated = gatedSnapshot(snapshot);
   if (!gated) {
     const { snapshot: _drop, ...rest } = r;
-    return res.status(200).json({ ...rest, snapshot: snapshot || null, locked: false });
+    return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: snapshot || null, locked: false });
   }
   const { snapshot: _drop, ...rest } = r;
-  return res.status(200).json({ ...rest, snapshot: gated, locked: true });
+  return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: gated, locked: true });
 }

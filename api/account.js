@@ -16,7 +16,7 @@ import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import { readResult, resultId } from "./_lib.js";
 import { mail } from "./_publish.js";
-import { addTo, get, remove, seal, set, storeReady } from "./_store.js";
+import { addTo, get, remove, seal, set, storeReady, unseal } from "./_store.js";
 import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
@@ -25,7 +25,7 @@ import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, reconcile
 import { readReport, runScout } from "./_scout.js";
 import { forgetSite, readMonitors, runMonitor, seatsOf, sitesOf } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
-import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, verifyCode, verifyLink } from "./_supa.js";
+import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
@@ -217,23 +217,37 @@ export default async function handler(req, res) {
       const email = normEmail(b.email);
       const password = String(b.password || "");
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
-      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, or use an email link." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
       const u = await getUser(email);
       let created = false;
       if (u?.pass) {
-        // Accounts made before email confirmation keep their own password.
+        // Accounts made before email confirmation keep their own password. A correct password earns a
+        // code, not a session yet: email, password, Continue, then the code. Without Supabase, the old
+        // direct sign-in below still applies.
         if (!(await checkPassword(password, u.pass))) {
           await noteFail(email);
           await new Promise((r) => setTimeout(r, 400));
           return res.status(401).json({ error: "That password doesn't match this email.", code: "wrongpass" });
         }
         await clearFails(email);
+        if (supaReady()) {
+          const c = await sendSignInCode(email);
+          if (!c.ok) return res.status(c.status === 429 ? 429 : 502).json({ error: SAY[c.code] || "The code didn't send. Try again." });
+          return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below to continue.` });
+        }
       } else if (supaReady()) {
-        // Sign in; if there's no login for this email yet, sign up, and the confirmation email goes out.
+        // Sign in; if there's no login for this email yet, sign up, and the confirmation code goes out.
+        // A correct password never signs in directly here: it earns a code, and the code signs in.
         const r = await passwordSignIn(email, password);
+        if (r.ok) {
+          const c = await sendSignInCode(email);
+          if (!c.ok) return res.status(c.status === 429 ? 429 : 502).json({ error: SAY[c.code] || "The code didn't send. Try again." });
+          await clearFails(email);
+          return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below to continue.` });
+        }
         if (!r.ok && r.code === "email_not_confirmed") {
           await resendConfirmation(email, backTo(b.next)).catch(() => {});
-          return res.status(202).json({ sent: true, note: `Confirm your email first. We sent the link again to ${email}.` });
+          return res.status(202).json({ sent: true, code: true, note: `Confirm your email first. We sent a 6-digit code to ${email}. Enter it below to continue.` });
         }
         if (!r.ok) {
           if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters. Been here before? That password doesn't match." });
@@ -252,7 +266,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ ...(await me(email)), created: true, setup: setup() });
           }
           if (up.error) return res.status(400).json({ error: SAY[up.error] || up.msg || "That didn't work. Try again." });
-          if (up.sent) return res.status(202).json({ sent: true, confirm: true, code: true, note: `Almost there. We sent a 6-digit code to ${email}. Enter it below to finish, or click the link in the email.` });
+          if (up.sent) return res.status(202).json({ sent: true, confirm: true, code: true, note: `Almost there. We sent a 6-digit code to ${email}. Enter it below to finish.` });
           created = !u;
         }
         await clearFails(email);
@@ -302,30 +316,86 @@ export default async function handler(req, res) {
     if (op === "sendcode") {
       const email = normEmail(b.email);
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
-      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Use a password, or email me a sign-in link." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
       const r = await sendSignInCode(email);
-      if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again, or use a link." });
-      return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below, or click the link in the email.` });
+      if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again." });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below to continue.` });
     }
     if (op === "verify-code") {
       const email = normEmail(b.email);
       const token = String(b.token || "").replace(/[\s-]/g, "");
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
       if (!/^\d{6}$/.test(token)) return res.status(400).json({ error: "Enter the 6-digit code from the email." });
-      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Use the link in the email instead." });
-      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, or use an email link." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
       // A sign-up code first, then a sign-in code: both prove the same inbox.
       const v = (await verifyCode(email, token, "signup").catch(() => ({ ok: false }))) || { ok: false };
       const w = v.ok ? v : await verifyCode(email, token, "email").catch(() => ({ ok: false }));
       if (!w.ok) {
         await noteFail(email);
-        return res.status(400).json({ error: "That code didn't match or it expired. Try again, or click the link in the email.", code: "badcode" });
+        return res.status(400).json({ error: "That code didn't match or it expired. Try again, or send a new code.", code: "badcode" });
       }
       await clearFails(email);
       await ensureUser(w.email);
       await startSession(res, w.email);
       if (Array.isArray(b.jobs)) await claim(w.email, b.jobs);
       return res.status(200).json({ ...(await me(w.email)), verified: true, setup: setup() });
+    }
+    if (op === "forgot") {
+      const email = normEmail(b.email);
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!supaReady()) return res.status(503).json({ error: `Forgot your password and can't get a code? Write to ${process.env.CONTACT_EMAIL || "us"} and we'll help you in.` });
+      const r = await sendSignInCode(email);
+      if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again." });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below with a new password.` });
+    }
+    if (op === "verify-reset-code") {
+      // Step 2 of a reset: the code alone. A good code earns a one-time reset token, good for 15
+      // minutes, that carries the verified session (sealed) into step 3. The code itself is spent here,
+      // so it can't be replayed, and step 3 never needs the code again.
+      const email = normEmail(b.email);
+      const token = String(b.token || "").replace(/[\s-]/g, "");
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!/^\d{6}$/.test(token)) return res.status(400).json({ error: "Enter the 6-digit code from the email." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
+      const v = (await verifyCode(email, token, "signup").catch(() => ({ ok: false }))) || { ok: false };
+      const w = v.ok ? v : await verifyCode(email, token, "email").catch(() => ({ ok: false }));
+      if (!w.ok || !w.accessToken) {
+        await noteFail(email);
+        return res.status(400).json({ error: "That code didn't match or it expired. Try again, or send a new code.", code: "badcode" });
+      }
+      await clearFails(w.email);
+      const resetToken = crypto.randomBytes(32).toString("base64url");
+      const key = `reset:${crypto.createHash("sha256").update(resetToken).digest("base64url")}`;
+      await set(key, { email: w.email, sealed: seal(w.accessToken) }, 15 * 60);
+      return res.status(200).json({ verified: true, resetToken, note: "Code confirmed. Create your new password." });
+    }
+    if (op === "reset-password") {
+      // Step 3 of a reset: new password plus confirmation, authorised by the reset token from step 2.
+      // The email comes from the token, not from the request, so one reset can't be aimed at another
+      // account. No session starts here: the user signs in the normal way, with the new password and a
+      // fresh code.
+      const resetToken = String(b.resetToken || "");
+      const password = String(b.password || "");
+      const confirm = String(b.confirm || "");
+      if (!resetToken || resetToken.length > 100) return res.status(400).json({ error: "That reset session expired. Send a new code and try again." });
+      if (password.length < 8) return res.status(400).json({ error: "Pick a new password with at least 8 characters." });
+      if (password !== confirm) return res.status(400).json({ error: "The two passwords don't match. Type them again." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      const key = `reset:${crypto.createHash("sha256").update(resetToken).digest("base64url")}`;
+      const rec = await get(key);
+      if (rec) await remove(key);
+      if (!rec?.email || !rec?.sealed) return res.status(400).json({ error: "That reset session expired. Send a new code and try again." });
+      let accessToken = "";
+      try { accessToken = unseal(rec.sealed); } catch { accessToken = ""; }
+      if (!accessToken) return res.status(400).json({ error: "That reset session expired. Send a new code and try again." });
+      const upd = await updateOwnPassword(accessToken, password);
+      if (!upd.ok) return res.status(502).json({ error: SAY[upd.code] || "That didn't work. Send a new code and try again." });
+      const u = await getUser(rec.email);
+      if (u?.pass) await updateUser(rec.email, async (x) => ({ ...x, pass: await hashPassword(password) }));
+      await clearFails(rec.email);
+      return res.status(200).json({ reset: true, note: "Password changed. Sign in with your new password." });
     }
     if (op === "sendlink") {
       const email = normEmail(b.email);

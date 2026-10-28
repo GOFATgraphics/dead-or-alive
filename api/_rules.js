@@ -20,6 +20,8 @@ export const FOR = /\b(?:made |built |designed |perfect |ideal |tools? |software
 export const WHO = /\b(founders?|co-?founders?|startups?|indie (?:hackers?|makers?|devs?)|solo(?:preneurs?| founders?)|makers?|creators?|developers?|devs|engineers?|engineering teams?|designers?|marketers?|marketing teams?|growth teams?|sales (?:teams?|reps?)|recruiters?|hr teams?|product (?:teams?|managers?)|freelancers?|agencies|consultants?|coaches|small business(?:es)?|smbs?|enterprises?|e-?commerce (?:brands?|stores?)|shopify (?:stores?|merchants?|brands?)|online stores?|sellers?|merchants?|creators?|youtubers?|podcasters?|writers?|bloggers?|newsletter (?:writers?|creators?)|students?|teachers?|educators?|parents?|families|doctors?|clinics?|dentists?|therapists?|lawyers?|law firms?|accountants?|bookkeepers?|real estate (?:agents?|teams?)|realtors?|landlords?|restaurants?|cafes|gyms?|nonprofits?|churches|b2b|saas (?:founders?|teams?|companies)|remote teams?|support teams?|ops teams?|finance teams?|investors?|traders?|gamers?|streamers?|musicians?|artists?|photographers?|travell?ers?)\b/i;
 
 const words = (s) => String(s || "").split(/\s+/).filter(Boolean);
+// A time in words that never rounds a real measurement down to 0.0s: under a second, show milliseconds.
+const fmtMs = (ms) => ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
 const fogIn = (s) => FOG.filter((w) => String(s || "").toLowerCase().includes(w));
 const unique = (list) => [...new Set(list.map((t) => t.toLowerCase()))];
 
@@ -101,9 +103,9 @@ export function scorePage(snapshot, rendered = null) {
       // A real browser's largest contentful paint when we have it; otherwise how fast the HTML arrived.
       pass: s.browser?.lcp > 0 ? s.browser.lcp <= 2500 : s.loadMs > 0 && s.loadMs <= 2500,
       detail: s.browser?.lcp > 0
-        ? `Main content appeared in ${(s.browser.lcp / 1000).toFixed(1)}s (largest contentful paint, measured in a real browser).`
+        ? `Main content appeared in ${fmtMs(s.browser.lcp)} (largest contentful paint, measured in a real browser).`
         : s.loadMs
-          ? `HTML arrived in ${(s.loadMs / 1000).toFixed(1)}s.`
+          ? `HTML arrived in ${fmtMs(s.loadMs)}.`
           : "Couldn't time it.",
       fix: "Get the main content on screen in under 2.5 seconds: compress the hero image, trim redirects, and move heavy scripts below the fold.",
     },
