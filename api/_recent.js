@@ -41,7 +41,8 @@ const safeIcon = (u) => (/^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.c
 // Newest first, ALIVE always on the card when there is one: up to two ALIVE and one COPE, then whatever is newer.
 function pick(items, show) {
   const seen = new Set();
-  const fresh = items.filter((s) => ["ALIVE", "COPE"].includes(s.verdict) && s.host && !seen.has(s.host) && seen.add(s.host));
+  const norm = (h) => String(h || "").toLowerCase().trim().replace(/^www\./, "");
+  const fresh = items.filter((s) => ["ALIVE", "COPE"].includes(s.verdict) && s.host && !seen.has(norm(s.host)) && seen.add(norm(s.host)));
   const alive = fresh.filter((s) => s.verdict === "ALIVE");
   const cope = fresh.filter((s) => s.verdict === "COPE");
   const chosen = [...alive.slice(0, Math.max(2, show - 1)), ...cope.slice(0, 1)];

@@ -316,26 +316,13 @@ function chip(s) {
   return li;
 }
 
-// Doubles the chips so the loop is seamless (the copies are hidden from screen readers), and paces the speed.
+// Once only: each stamp shows once, no loop clones. The strip is scrollable instead of
+// looping, so a page stamped more than once still appears a single time.
 function loopTrack() {
   const track = $("#mq-track");
   if (!track) return;
   [...track.querySelectorAll("[data-clone]")].forEach((n) => n.remove());
-  const items = [...track.children];
-  // Short lists repeat until the strip is wide enough to loop without a gap.
-  let copies = items.length < 6 ? Math.ceil(6 / Math.max(1, items.length)) : 1;
-  const extra = [];
-  for (let i = 1; i < copies; i++) extra.push(...items.map((n) => n.cloneNode(true)));
-  extra.forEach((n) => n.setAttribute("aria-hidden", "true"));
-  track.append(...extra);
-  const half = [...track.children];
-  half.forEach((n) => {
-    const c = n.cloneNode(true);
-    c.dataset.clone = "";
-    c.setAttribute("aria-hidden", "true");
-    track.append(c);
-  });
-  track.style.setProperty("--mq-dur", `${Math.max(20, half.length * 4.5)}s`);
+  track.style.animation = "none";
 }
 
 loopTrack();
