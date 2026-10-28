@@ -3,14 +3,14 @@
 .dash { display: grid; gap: 1rem; max-width: 60rem; padding-top: 1.5rem; padding-bottom: 4rem; }
 
 .app { display: grid; grid-template-columns: 16.5rem minmax(0, 1fr); gap: 0; align-items: start; padding-top: 0; padding-bottom: 0; }
-.side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem; border-right: 1px solid var(--line); background: var(--canvas); overflow: hidden; }
+.side { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem; border-right: 1px solid var(--line); background: var(--canvas); overflow: visible; }
 .side-cta { width: 100%; justify-content: flex-start; margin-bottom: 1rem; }
 .side-search { position: relative; margin: 0 0 1rem; }
 .side-search-ic { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--soft); pointer-events: none; }
 .side-search input[type="search"] { width: 100%; min-height: 2.5rem; padding: 0 2.25rem 0 2.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 400 0.875rem var(--sans); box-shadow: var(--shadow-1); }
 .side-search input[type="search"]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
 .side-search kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); font: 600 0.6875rem var(--mono); color: var(--soft); }
-.side-nav { display: grid; gap: 0.15rem; flex: 1 1 auto; overflow-y: auto; padding-bottom: 0.75rem; }
+.side-nav { display: grid; gap: 0.15rem; flex: none; overflow: visible; padding-bottom: 0.75rem; }
 .side-nav button { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; align-items: center; gap: 0.65rem; width: 100%; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--body); font: 600 0.875rem var(--sans); text-align: left; cursor: pointer; }
 .side-ic { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: 8px; color: var(--soft); }
 .side-ic .ic { color: inherit; }

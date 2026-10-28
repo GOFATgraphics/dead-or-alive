@@ -27,7 +27,7 @@ body.ad-locked { overflow: hidden; }
    the right, hairline borders, no floating cards. The active item is a light grey
    pill with dark text, not a solid ink pill, and icons sit bare, without chips. */
 .ad .app { grid-template-columns: 16.5rem minmax(0, 1fr); gap: 0; padding-top: 0; transition: grid-template-columns 0.25s ease; }
-.ad .side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem 0.75rem 0; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--canvas); box-shadow: none; overflow: hidden; }
+.ad .side { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem 0.75rem 0; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--canvas); box-shadow: none; overflow: visible; }
 .ad .main { min-width: 0; padding: 1.5rem 2rem 4rem; }
 
 /* Expandable side panel: the toggle row sits above the nav. Collapsed, the panel
@@ -58,7 +58,7 @@ body.ad-locked { overflow: hidden; }
   body.side-closed .side-foot-row { justify-content: center; }
   body.side-closed .side-foot-row > span:last-child, body.side-closed .side-foot-link, body.side-closed .side-foot .ad-muted { display: none; }
 }
-.ad .side-nav { flex: 1 1 auto; overflow-y: auto; gap: 0.15rem; padding-bottom: 0.75rem; }
+.ad .side-nav { flex: none; overflow: visible; gap: 0.15rem; padding-bottom: 0.75rem; }
 .ad .side-group { display: grid; gap: 0.15rem; }
 .ad .side-group + .side-group { margin-top: 1.25rem; padding-top: 0; border-top: 0; }
 .ad .side-group-label { padding: 0 0.75rem 0.5rem; font: 500 0.6875rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); }
