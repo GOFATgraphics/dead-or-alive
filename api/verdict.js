@@ -3,7 +3,7 @@
 // DNS check just to read it. Everyone else gets section headings and stack categories, never the values,
 // and never through a cached copy: the response varies by account, so it is never cached publicly.
 import { readResult } from "./_lib.js";
-import { sessionEmail } from "./_account.js";
+import { getUser, sessionEmail } from "./_account.js";
 import { get } from "./_store.js";
 import { gatedSnapshot, migrateLegacy, publicChecks } from "./_gate.js";
 
@@ -18,12 +18,23 @@ export default async function handler(req, res) {
     snapshot = await get(`snap:${r.id}`).catch(() => null);
   }
   const email = await sessionEmail(req).catch(() => "");
-  if (email && snapshot) return res.status(200).json({ ...r, snapshot, locked: false });
+  // The stamp's owner, when they linked X: only public X profile facts, never their email. The owner is
+  // the first account that saved the stamp, so a later visitor saving it cannot take the card over. No
+  // X link, or no owner yet, means no card, and the free-account card stays as before.
+  let ownerX = null;
+  try {
+    const ownerEmail = await get(`owner:${r.id}`).catch(() => null);
+    if (ownerEmail) {
+      const owner = await getUser(ownerEmail);
+      if (owner?.x?.username) ownerX = { username: owner.x.username, name: owner.x.name || "", avatar: owner.x.avatar || "", verified: owner.x.verified === true };
+    }
+  } catch (_) {}
+  if (email && snapshot) return res.status(200).json({ ...r, snapshot, locked: false, ownerX });
   const gated = gatedSnapshot(snapshot);
   if (!gated) {
     const { snapshot: _drop, ...rest } = r;
-    return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: snapshot || null, locked: false });
+    return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: snapshot || null, locked: false, ownerX });
   }
   const { snapshot: _drop, ...rest } = r;
-  return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: gated, locked: true });
+  return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: gated, locked: true, ownerX });
 }
