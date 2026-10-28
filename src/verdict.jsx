@@ -655,9 +655,10 @@ function Result({ r }) {
       <main>
         {justSignedIn && <Toast text="Signed in. This stamp is saved to your dashboard." href="/dashboard" action="Dashboard" />}
         <Hero r={r} />
+        {r.ownerX && <OwnedBy owner={r.ownerX} />}
         <Status r={r} />
         <Checks r={r} />
-        {r.ownerX ? <OwnedBy owner={r.ownerX} /> : (<><ClaimSite r={r} /><SavePrompt r={r} /></>)}
+        {!r.ownerX && (<><ClaimSite r={r} /><SavePrompt r={r} /></>)}
         <Share r={r} />
         {!r.ownerX && <Offers r={r} />}
         {!r.ownerX && <Snapshot s={r.snapshot} r={r} />}
