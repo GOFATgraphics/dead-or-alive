@@ -71,6 +71,26 @@ import { barChart, renderAnalytics } from "./analytics.js";
   $("side-toggle").onclick = () => { sideClosed.set(!sideClosed.get()); syncSide(); };
   syncSide();
 
+  // Sidebar search, in the reference shell's style: filters sections, ⌘K / Ctrl+K focuses it.
+  const sideSearch = $("side-search");
+  function applySideFilter() {
+    const q = (sideSearch?.value || "").trim().toLowerCase();
+    for (const g of document.querySelectorAll("#side-nav .side-group")) {
+      let shown = 0;
+      for (const b of g.querySelectorAll("button")) {
+        const hit = !q || (b.querySelector(".side-label")?.textContent || "").toLowerCase().includes(q);
+        b.hidden = !hit;
+        if (hit) shown++;
+      }
+      g.hidden = shown === 0;
+    }
+  }
+  sideSearch?.addEventListener("input", applySideFilter);
+  sideSearch?.addEventListener("keydown", (e) => { if (e.key === "Escape") { sideSearch.value = ""; applySideFilter(); sideSearch.blur(); } });
+  addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); sideSearch?.focus(); }
+  });
+
   async function call(op, body) {
     const r = await fetch(`/api/admin?op=${op}`, body ? { method: "POST", headers: { "x-admin-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) } : { headers: { "x-admin-key": key }, cache: "no-store" });
     const data = await r.json().catch(() => ({}));
@@ -163,7 +183,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
     );
     const foot = $("side-foot");
     const items = setup.items || [];
-    if (!items.length) { foot.hidden = true; return; }
+    if (!items.length) { foot.hidden = true; applySideFilter(); return; }
     const missing = items.filter(([, ok]) => !ok).length;
     foot.hidden = false;
     foot.replaceChildren(
@@ -172,6 +192,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
         ? el("button", { type: "button", className: "side-foot-link", textContent: `${num(missing)} to connect`, onclick: () => go("setup") })
         : el("span", { className: "ad-muted", textContent: "All connected" })
     );
+    applySideFilter();
   }
   const count = (id, n) => { counts[id] = n; renderNav(); };
 
