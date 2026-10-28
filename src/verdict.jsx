@@ -195,7 +195,7 @@ function Status({ r }) {
         </div>
       </div>
 
-      {!(r.ownerX && !r.isOwner) && (
+      {!r.ownerX && (
       <div className="embed">
         <div>
           <h3>Put it in your footer</h3>
