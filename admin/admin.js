@@ -53,6 +53,24 @@ import { barChart, renderAnalytics } from "./analytics.js";
   };
   let key = session.get();
 
+  // Expandable side panel: the collapsed state sticks in this browser.
+  const sideClosed = {
+    get() { try { return localStorage.getItem("smp.side") === "closed"; } catch (_) { return false; } },
+    set(v) { try { v ? localStorage.setItem("smp.side", "closed") : localStorage.removeItem("smp.side"); } catch (_) {} },
+  };
+  function syncSide() {
+    const closed = sideClosed.get();
+    document.body.classList.toggle("side-closed", closed);
+    const t = $("side-toggle");
+    if (!t) return;
+    t.setAttribute("aria-expanded", String(!closed));
+    t.setAttribute("aria-label", closed ? "Expand sidebar" : "Collapse sidebar");
+    t.title = closed ? "Expand sidebar" : "Collapse sidebar";
+    t.replaceChildren(icon(closed ? "chevron-right" : "chevron-left"));
+  }
+  $("side-toggle").onclick = () => { sideClosed.set(!sideClosed.get()); syncSide(); };
+  syncSide();
+
   async function call(op, body) {
     const r = await fetch(`/api/admin?op=${op}`, body ? { method: "POST", headers: { "x-admin-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) } : { headers: { "x-admin-key": key }, cache: "no-store" });
     const data = await r.json().catch(() => ({}));
@@ -134,6 +152,8 @@ import { barChart, renderAnalytics } from "./analytics.js";
       let g = groups.find((x) => x.label === group);
       if (!g) { g = { label: group, items: [] }; groups.push(g); }
       const b = el("button", { type: "button", className: id === pane ? "on" : "" }, el("span", { className: "side-ic" }, icon(ic)), el("span", { className: "side-label", textContent: label }), counts[id] != null ? el("em", { className: id === "reviews" && counts[id] ? "hot" : "", textContent: num(counts[id]) }) : null);
+      b.title = label;
+      if (counts[id] != null) b.setAttribute("aria-label", `${label}, ${num(counts[id])}`);
       if (id === pane) b.setAttribute("aria-current", "page");
       b.onclick = () => go(id);
       g.items.push(b);
@@ -147,7 +167,7 @@ import { barChart, renderAnalytics } from "./analytics.js";
     const missing = items.filter(([, ok]) => !ok).length;
     foot.hidden = false;
     foot.replaceChildren(
-      el("span", { className: "side-foot-row" }, el("span", { className: `dot ${DESK.queueOpen ? "ok" : "run"}` }), el("span", { textContent: DESK.queueOpen ? "Stamping on" : "Stamping paused" })),
+      el("span", { className: "side-foot-row", title: DESK.queueOpen ? "Stamping on" : "Stamping paused" }, el("span", { className: `dot ${DESK.queueOpen ? "ok" : "run"}` }), el("span", { textContent: DESK.queueOpen ? "Stamping on" : "Stamping paused" })),
       missing
         ? el("button", { type: "button", className: "side-foot-link", textContent: `${num(missing)} to connect`, onclick: () => go("setup") })
         : el("span", { className: "ad-muted", textContent: "All connected" })
