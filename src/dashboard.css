@@ -2,24 +2,35 @@
    1px borders, small radii, no heavy shadows, tight type. Tokens come from result.css; dark mode from theme.css. */
 .dash { display: grid; gap: 1rem; max-width: 60rem; padding-top: 1.5rem; padding-bottom: 4rem; }
 
-.app { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 0; align-items: start; padding-top: 1.25rem; padding-bottom: 4rem; }
-.side { position: sticky; top: 1rem; display: grid; gap: 1.25rem; align-content: start; min-height: calc(100vh - 3rem); padding-right: 1.5rem; border-right: 1px solid var(--line); }
-.side-cta { width: 100%; justify-content: flex-start; }
-.side-nav { display: grid; gap: 2px; }
-.side-nav button { display: grid; grid-template-columns: 1.1rem minmax(0, 1fr) auto; align-items: center; gap: 0.7rem; width: 100%; min-height: 2.4rem; padding: 0 0.75rem; border: 0; border-radius: 8px; background: transparent; color: var(--body); font: 600 0.9rem var(--sans); text-align: left; cursor: pointer; }
-.side-nav button:hover { background: var(--canvas); color: var(--ink); }
-.side-nav button.on { background: var(--canvas); color: var(--ink); box-shadow: none; font-weight: 700; }
+.app { display: grid; grid-template-columns: 16.5rem minmax(0, 1fr); gap: 0; align-items: start; padding-top: 0; padding-bottom: 0; }
+.side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem; border-right: 1px solid var(--line); background: var(--canvas); overflow: hidden; }
+.side-cta { width: 100%; justify-content: flex-start; margin-bottom: 1rem; }
+.side-search { position: relative; margin: 0 0 1rem; }
+.side-search-ic { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--soft); pointer-events: none; }
+.side-search input[type="search"] { width: 100%; min-height: 2.5rem; padding: 0 2.25rem 0 2.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 400 0.875rem var(--sans); box-shadow: var(--shadow-1); }
+.side-search input[type="search"]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.side-search kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); font: 600 0.6875rem var(--mono); color: var(--soft); }
+.side-nav { display: grid; gap: 0.15rem; flex: 1 1 auto; overflow-y: auto; padding-bottom: 0.75rem; }
+.side-nav button { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; align-items: center; gap: 0.65rem; width: 100%; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--body); font: 600 0.875rem var(--sans); text-align: left; cursor: pointer; }
+.side-ic { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: 8px; color: var(--soft); }
+.side-ic .ic { color: inherit; }
+.side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-nav button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+.side-nav button.on { background: var(--card); border-color: var(--line); color: var(--ink); box-shadow: var(--shadow-1); font-weight: 700; }
+.side-nav button.on .side-ic { color: var(--ink); }
 .side-nav .ic { color: var(--soft); }
 .side-nav button.on .ic { color: var(--ink); }
-.side-nav em { min-width: 1.4rem; padding: 0 0.35rem; border-radius: 6px; background: var(--canvas); font: 600 0.75rem var(--mono); font-style: normal; text-align: center; color: var(--body); }
-.side-nav button.on em { background: var(--card); }
+.side-nav em { min-width: 1.4rem; padding: 0 0.35rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); font: 600 0.75rem var(--mono); font-style: normal; text-align: center; color: var(--body); }
+.side-nav button.on em { background: var(--canvas); }
 .side-lock { opacity: 0.6; }
-.side-plan { display: grid; gap: 0.15rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 12px; font-size: 0.8125rem; }
+.side-plan { display: grid; gap: 0.15rem; flex: none; margin-top: auto; padding: 1rem 0.75rem 0.75rem; border: 0; border-top: 1px solid var(--line); font-size: 0.8125rem; }
+.side-plan-links { display: flex; gap: 1rem; margin-top: 0.35rem; }
 .side-plan p { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
 .side-plan b { font-size: 0.875rem; }
-.side-plan a { margin-top: 0.35rem; font-weight: 700; color: var(--ink); }
+.side-plan a { font-weight: 700; color: var(--ink); }
+.side-plan-links a:last-child { color: var(--soft); }
 
-.main { display: grid; gap: 1rem; min-width: 0; padding-left: 2rem; }
+.main { display: grid; gap: 1rem; min-width: 0; padding: 1.5rem 0 4rem 2rem; }
 .page-head { padding-bottom: 0.25rem; }
 .page-head h1 { font-size: 1.625rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
 .page-head p { margin-top: 0.25rem; color: var(--body); font-size: 0.9375rem; }
@@ -234,13 +245,13 @@ label.check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color:
 
 @media (max-width: 960px) {
   .app { grid-template-columns: minmax(0, 1fr); gap: 1rem; padding-top: 0.5rem; }
-  .side { position: static; gap: 0.75rem; min-height: 0; padding-right: 0; border-right: 0; }
-  .main { padding-left: 0; }
-  .side-cta, .side-plan { display: none; }
+  .side { position: static; height: auto; gap: 0.75rem; min-height: 0; padding: 0.75rem 1rem 0; border-right: 0; background: transparent; overflow: visible; }
+  .main { padding: 1rem 1rem 3rem; }
+  .side-cta, .side-plan, .side-search { display: none; }
   .side-nav { display: flex; gap: 0.25rem; overflow-x: auto; margin: 0 -1rem; padding: 0 1rem 0.5rem; border-bottom: 1px solid var(--line); scrollbar-width: none; }
   .side-nav::-webkit-scrollbar { display: none; }
   .side-nav button { display: inline-flex; width: auto; flex: none; gap: 0.45rem; min-height: 2.25rem; padding: 0 0.8rem; white-space: nowrap; }
-  .side-nav button.on { box-shadow: inset 0 -2px 0 var(--ink); border-radius: 8px 8px 0 0; }
+  .side-nav button.on { background: var(--card); border-color: var(--line); box-shadow: var(--shadow-1); border-radius: 10px; }
   .grid2 { grid-template-columns: minmax(0, 1fr); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpis > div:nth-child(3) { border-left: 0; }

@@ -1273,6 +1273,13 @@ function Dashboard({ data, setData, onOut }) {
 
   // Sections live in the URL hash, so back and forward work and links can point at one.
   const first = PAID === "killSheet" ? "kill-sheet" : PAID === "stayAlive" ? "monitoring" : "overview";
+  const [sideQ, setSideQ] = useState("");
+  const sideSearchRef = useRef(null);
+  useEffect(() => {
+    const onKey = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); sideSearchRef.current?.focus(); } };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
   const [sect, setSect] = useState(() => (SECTIONS.some((x) => x.id === location.hash.slice(1)) ? location.hash.slice(1) : first));
   useEffect(() => {
     const on = () => SECTIONS.some((x) => x.id === location.hash.slice(1)) && setSect(location.hash.slice(1));
@@ -1292,11 +1299,16 @@ function Dashboard({ data, setData, onOut }) {
     <div className="app wrap">
       <aside className="side" aria-label="Dashboard">
         <a className="btn btn-dark side-cta" href="/#top"><Icon name="arrow-right" /> Stamp a page</a>
+        <div className="side-search">
+          <Icon name="search" size={16} className="side-search-ic" />
+          <input type="search" value={sideQ} onChange={(e) => setSideQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setSideQ(""); }} placeholder="Search sections…" aria-label="Search sections" autoComplete="off" ref={sideSearchRef} />
+          <kbd>⌘K</kbd>
+        </div>
         <nav className="side-nav">
-          {SECTIONS.map((x) => (
+          {SECTIONS.filter((x) => !sideQ.trim() || x.label.toLowerCase().includes(sideQ.trim().toLowerCase())).map((x) => (
             <button key={x.id} type="button" className={sect === x.id ? "on" : ""} aria-current={sect === x.id ? "page" : undefined} onClick={() => go(x.id)}>
-              <Icon name={x.icon} size={16} />
-              <span>{x.label}</span>
+              <span className="side-ic"><Icon name={x.icon} size={16} /></span>
+              <span className="side-label">{x.label}</span>
               {locked[x.id] ? <Icon name="lock" size={13} className="side-lock" /> : counts[x.id] ? <em>{counts[x.id]}</em> : null}
             </button>
           ))}
@@ -1304,7 +1316,10 @@ function Dashboard({ data, setData, onOut }) {
         <div className="side-plan">
           <p>{user.member ? "Member" : "Free plan"}</p>
           <b>{[user.killSheetActive && "Kill Sheet", user.stayAliveActive && "Stay Alive"].filter(Boolean).join(" + ") || "Stamps and full details"}</b>
-          {!user.stayAliveActive && <a href={planHref(user.killSheetActive ? "stayAlive" : "killSheet")}>{user.killSheetActive ? "Add Stay Alive" : "Upgrade"}</a>}
+          <div className="side-plan-links">
+            {!user.stayAliveActive && <a href={planHref(user.killSheetActive ? "stayAlive" : "killSheet")}>{user.killSheetActive ? "Add Stay Alive" : "Upgrade"}</a>}
+            <a href="/">View site</a>
+          </div>
         </div>
       </aside>
 
