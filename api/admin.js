@@ -16,7 +16,7 @@ import { waitUntil } from "@vercel/functions";
 import { polarReady, requireAdmin } from "./_lib.js";
 import { readFullResult } from "./_gate.js";
 import { redisReady } from "./_redis.js";
-import { get, members, remove, storeReady, unseal } from "./_store.js";
+import { get, members, remove, set, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
 import { paymentsOverview, polarApiReady, reconcile } from "./_billing.js";
 import { runScout } from "./_scout.js";
@@ -99,6 +99,8 @@ export default async function handler(req, res) {
     // Which account saved each stamp.
     const owners = new Map();
     for (const u of (await Promise.all((await members("idx:users")).map((e) => getUser(e)))).filter(Boolean)) for (const st of u.stamps || []) owners.set(st.id, u.email);
+    const hiddenRaw = await get("carousel:hidden").catch(() => null);
+    const hiddenSet = new Set(Array.isArray(hiddenRaw) ? hiddenRaw.map((h) => String(h).toLowerCase().trim()) : []);
     const rows = await Promise.all(
       slice.map(async (x) => {
         const id = x.pathname.slice(9, -5);
@@ -106,14 +108,25 @@ export default async function handler(req, res) {
         if (!r) return null;
         const checks = Array.isArray(r.checks) ? r.checks.filter((k) => !k.skip) : [];
         const snap = r.snapshot || (await get(`snap:${id}`).catch(() => null));
+        // Who claimed it: this stamp's claim, or its host's claim inherited by re-stamps.
+        // Admin-only: email is shown here, never on the public result page.
+        let claimed = null;
+        try {
+          const claimEmail = (await get(`claim:${id}`).catch(() => null)) || (r.host ? await get(`claimhost:${String(r.host).toLowerCase().trim()}`).catch(() => null) : null);
+          if (claimEmail) {
+            const cu = await getUser(claimEmail);
+            claimed = { email: claimEmail, username: cu?.x?.username || "", name: cu?.x?.name || "" };
+          }
+        } catch (_) {}
         return {
           id, number: r.number, host: r.host, pageUrl: r.pageUrl, verdict: r.verdict, score: r.score ?? null, createdAt: r.createdAt, icon: r.icon || "",
           failed: checks.filter((k) => !k.pass).map((k) => k.label), stack: (snap?.stack || []).length, lcp: snap?.browser?.lcp || null,
           owner: owners.get(id) || "",
+          claimed, hidden: hiddenSet.has(String(r.host || "").toLowerCase().trim()),
         };
       })
     );
-    return res.status(200).json({ stamps: rows.filter(Boolean), total: blobs.length, page: pageNo, pages: Math.ceil(blobs.length / per) });
+    return res.status(200).json({ stamps: rows.filter(Boolean), total: blobs.length, page: pageNo, pages: Math.ceil(blobs.length / per), hiddenHosts: [...hiddenSet] });
   }
 
   if (op === "stamp") {
@@ -136,6 +149,17 @@ export default async function handler(req, res) {
   if (op === "payments") return res.status(200).json(await paymentsOverview());
 
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
+
+  if (op === "carousel-hide" || op === "carousel-show") {
+    const host = String(b.host || "").toLowerCase().trim();
+    if (!host) return res.status(400).json({ error: "Which site?" });
+    const raw = await get("carousel:hidden").catch(() => null);
+    let hidden = Array.isArray(raw) ? raw.map((h) => String(h).toLowerCase().trim()).filter(Boolean) : [];
+    if (op === "carousel-hide") { if (!hidden.includes(host)) hidden.push(host); }
+    else hidden = hidden.filter((h) => h !== host);
+    await set("carousel:hidden", hidden);
+    return res.status(200).json({ ok: true, host, hidden, hiddenHosts: hidden });
+  }
 
   if (op === "sync") {
     const email = String(b.email || "").trim().toLowerCase();

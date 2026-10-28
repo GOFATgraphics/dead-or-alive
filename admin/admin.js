@@ -369,7 +369,13 @@ import { barChart, renderAnalytics } from "./analytics.js";
       cols.push(
         { label: "Failed", cls: "num hide-sm", cell: (r) => el("span", { className: "ad-num", title: r.failed.join(", "), textContent: r.failed.length }) },
         { label: "Main content", cls: "num hide-sm", cell: (r) => lcp(r.lcp) },
-        { label: "Saved by", cls: "hide-md", cell: (r) => (r.owner ? el("span", { className: "ad-ell", textContent: r.owner }) : muted("Not saved")) }
+        { label: "Saved by", cls: "hide-md", cell: (r) => (r.owner ? el("span", { className: "ad-ell", textContent: r.owner }) : muted("Not saved")) },
+        { label: "Claimed by", cls: "hide-md", cell: (r) => (r.claimed ? el("span", { className: "ad-ell", title: `${r.claimed.name ? `${r.claimed.name} · ` : ""}${r.claimed.email}`, textContent: r.claimed.username ? `@${r.claimed.username}` : r.claimed.email }) : muted("Not claimed")) },
+        { label: "Carousel", cls: "hide-md", cell: (r) => {
+          const b = el("button", { type: "button", className: "btn btn-line btn-sm", textContent: r.hidden ? "Show in carousel" : "Hide from carousel" });
+          b.onclick = async () => { b.disabled = true; try { await call(r.hidden ? "carousel-show" : "carousel-hide", { host: r.host }); r.hidden = !r.hidden; renderStamps(); } catch (err) { fail("st-alert", err); b.disabled = false; } };
+          return b;
+        } }
       );
     }
     cols.push({ label: "Stamped", cls: "num hide-sm", cell: (r) => muted(ago(r.createdAt)) });
@@ -404,10 +410,12 @@ import { barChart, renderAnalytics } from "./analytics.js";
   function renderStamps() {
     if (!stData) return;
     const q = $("st-q").value.trim().toLowerCase();
-    const rows = stData.stamps.filter((r) => (!stV || r.verdict === stV) && (!q || `${r.host} ${r.owner} ${r.pageUrl}`.toLowerCase().includes(q)));
-    $("stamps").replaceChildren(table(stampCols(false), rows, { onRow: openStamp, empty: q || stV ? "No stamps on this page match." : "No stamps yet." }));
+    const claimedOnly = $("st-claimed")?.checked;
+    const rows = stData.stamps.filter((r) => (!stV || r.verdict === stV) && (!claimedOnly || r.claimed) && (!q || `${r.host} ${r.owner} ${r.claimed?.username || ""} ${r.claimed?.email || ""} ${r.pageUrl}`.toLowerCase().includes(q)));
+    $("stamps").replaceChildren(table(stampCols(false), rows, { onRow: openStamp, empty: q || stV || claimedOnly ? "No stamps on this page match." : "No stamps yet." }));
   }
 
+  if ($("st-claimed")) $("st-claimed").onchange = () => renderStamps();
   async function openStamp(row) {
     openDrawer(row.host, [el("p", { className: "ad-loading", textContent: "Loading…" })]);
     try {
@@ -435,6 +443,8 @@ import { barChart, renderAnalytics } from "./analytics.js";
       el("dl", { className: "kv" },
         el("div", {}, el("dt", { textContent: "Page" }), el("dd", { className: "ad-break", textContent: r.pageUrl })),
         el("div", {}, el("dt", { textContent: "Saved by" }), el("dd", { textContent: row.owner || "Not saved to an account" })),
+        el("div", {}, el("dt", { textContent: "Claimed by" }), el("dd", { textContent: row.claimed ? `${row.claimed.username ? `@${row.claimed.username}` : row.claimed.email}${row.claimed.name ? ` · ${row.claimed.name}` : ""} (${row.claimed.email})` : "Not claimed" })),
+        el("div", {}, el("dt", { textContent: "Carousel" }), el("dd", { textContent: row.hidden ? "Hidden from the homepage carousel" : "Shown in the homepage carousel" })),
         el("div", {}, el("dt", { textContent: "Checks" }), el("dd", { textContent: `${passed} of ${checks.length} passed` }))
       )
     );

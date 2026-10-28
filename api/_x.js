@@ -117,6 +117,11 @@ async function finish(res, x, next, fail, claimId = "") {
       await set(`claim:${claimId}`, email).catch(() => {});
       const rr = await readResult(claimId).catch(() => null);
       if (rr) {
+        const h = String(rr.host || "").toLowerCase().trim();
+        if (h) {
+          const hostClaim = await get(`claimhost:${h}`).catch(() => null);
+          if (!hostClaim) await set(`claimhost:${h}`, email).catch(() => {});
+        }
         await updateUser(email, (u) => {
           if (!u) return undefined;
           if ((u.stamps || []).some((s) => s.id === claimId)) return undefined;

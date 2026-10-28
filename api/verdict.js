@@ -4,7 +4,7 @@
 // and never through a cached copy: the response varies by account, so it is never cached publicly.
 import { readResult } from "./_lib.js";
 import { getUser, sessionEmail } from "./_account.js";
-import { get } from "./_store.js";
+import { get, set } from "./_store.js";
 import { gatedSnapshot, migrateLegacy, publicChecks } from "./_gate.js";
 
 export default async function handler(req, res) {
@@ -25,7 +25,18 @@ export default async function handler(req, res) {
   let ownerX = null;
   let isOwner = false;
   try {
-    const claimEmail = await get(`claim:${r.id}`).catch(() => null);
+    // Claim is per site, not per stamp: a stamp inherits its host's claim, so a re-stamp of an
+    // already claimed site shows the same Owned by card and the same visitor view, instead of
+    // starting unclaimed and showing Claim, Save, Pricing, and Under the hood again.
+    const hostKey = String(r.host || "").toLowerCase().trim();
+    let claimEmail = await get(`claim:${r.id}`).catch(() => null);
+    if (claimEmail && hostKey) {
+      // Backfill: old claims were set before host claims existed, so one read of the old
+      // claimed stamp also records its host, and later stamps for that site then inherit it.
+      const hostClaim = await get(`claimhost:${hostKey}`).catch(() => null);
+      if (!hostClaim) await set(`claimhost:${hostKey}`, claimEmail).catch(() => {});
+    }
+    if (!claimEmail && hostKey) claimEmail = await get(`claimhost:${hostKey}`).catch(() => null);
     if (claimEmail) {
       if (email && String(email).toLowerCase().trim() === String(claimEmail).toLowerCase().trim()) isOwner = true;
       const owner = await getUser(claimEmail);

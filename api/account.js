@@ -160,6 +160,11 @@ async function claimSite(email, id) {
   const hasX = !!u?.x?.username;
   if (!existing) {
     await set(`claim:${id}`, email);
+    const h = String(r.host || "").toLowerCase().trim();
+    if (h) {
+      const hostClaim = await get(`claimhost:${h}`).catch(() => null);
+      if (!hostClaim) await set(`claimhost:${h}`, email).catch(() => {});
+    }
     await updateUser(email, (cur) => {
       if (!cur) return undefined;
       if ((cur.stamps || []).some((s) => s.id === id)) return undefined;
