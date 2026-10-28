@@ -8,6 +8,8 @@ import { Toast } from "./toast.jsx";
 import { DESK, PLANS } from "./config.js";
 import { REVIEW_STEPS, planHref, point } from "./plans.js";
 import { track, trackView } from "./track.js";
+import { embedSvg, svgUri, tierFor } from "./badge.js";
+import { snapshotRows } from "./snapshot.js";
 import { hasChecked, markChecked } from "./checked.js";
 
 // The dashboard: sign up or in, then everything a membership includes, in one place.
@@ -47,6 +49,25 @@ async function api(op, data = {}) {
   const body = await r.json().catch(() => ({}));
   if (!r.ok && r.status !== 202) throw Object.assign(new Error(body.error || `Error ${r.status}.`), { body, status: r.status });
   return body;
+}
+
+
+function Copy({ text, label, done = "Copied", className = "btn btn-line btn-sm" }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button type="button" className={className} onClick={async () => {
+      try { await navigator.clipboard.writeText(text); } catch (_) {
+        const el = document.createElement("textarea"); el.value = text; document.body.appendChild(el); el.select(); document.execCommand("copy"); el.remove();
+      }
+      setOk(true); setTimeout(() => setOk(false), 2000);
+    }}>{ok ? done : label}</button>
+  );
+}
+
+// Badge embed code for one stamp, steel or dark, as on the result page.
+function badgeEmbed(s, theme) {
+  const origin = location.origin;
+  return `<a href="${origin}/v/${s.id}"><img src="${origin}/badge/${s.id}${theme === "steel" ? "" : `?theme=${theme}`}" alt="${s.host}, alive on Stamp My Page" width="300" height="64"></a>`;
 }
 
 function Bar({ user, onOut }) {
@@ -878,12 +899,98 @@ function StampTable({ stamps }) {
   );
 }
 
-function Stamps({ user }) {
+
+function StampDetail({ stamp, onClose }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/verdict?id=${encodeURIComponent(stamp.id)}`, { cache: "no-store" })
+      .then((r) => r.json().then((b) => ({ ok: r.ok, b })))
+      .then(({ ok, b }) => { if (live) { if (!ok) setErr(b.error || "Could not load this stamp."); else setData(b); } })
+      .catch(() => live && setErr("Could not load this stamp."));
+    return () => { live = false; };
+  }, [stamp.id]);
+  const rows = data?.snapshot ? snapshotRows(data.snapshot) : [];
+  const checks = Array.isArray(data?.checks) ? data.checks : [];
+  return (
+    <section className="panel detail-panel" aria-label={`Details for ${stamp.host}`}>
+      <header className="panel-head">
+        <div><h2>{stamp.host}</h2><p>{stamp.verdict}{stamp.score != null ? ` · ${stamp.score} / 100` : ""} · {fmtDate(stamp.at)}</p></div>
+        <button type="button" className="btn btn-line btn-sm" onClick={onClose}>Close</button>
+      </header>
+      {err && <p className="alert" role="alert">{err}</p>}
+      {!data && !err && <p className="muted">Loading details…</p>}
+      {data && data.locked && <p className="note">Full details live on the result page. <a href={`/v/${stamp.id}`}>Open the result</a>.</p>}
+      {rows.length > 0 && (
+        <>
+          <h3>Tech stack and speed</h3>
+          <div className="kv">{rows.map((r) => (<div key={r.label}><dt>{r.label}</dt><dd>{r.value}</dd></div>))}</div>
+        </>
+      )}
+      {checks.length > 0 && (
+        <>
+          <h3>Checks</h3>
+          <ul className="status-list">{checks.map((c) => (
+            <li key={c.id || c.label}><span className={"dot " + (c.pass ? "ok" : c.skip ? "" : "bad")} /><div><b>{c.label}</b><p>{c.detail || (c.pass ? "Passed" : "Failed")}</p></div></li>
+          ))}</ul>
+        </>
+      )}
+      {data && <div className="row-actions"><a className="btn btn-dark btn-sm" href={`/v/${stamp.id}`}>Open full result</a><Copy text={`${location.origin}/v/${stamp.id}`} label="Copy link" done="Link copied" /></div>}
+    </section>
+  );
+}
+
+function MyCards({ user }) {
   const stamps = user.stamps || [];
   return (
-    <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
-      {stamps.length ? <StampTable stamps={stamps} /> : <Empty text="No stamps yet." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
+    <Panel title="My cards" desc="Your status badges to copy into a footer, and every stamp's link to share. ALIVE stamps earn a badge; other stamps show their result link until they climb to 80.">
+      {stamps.length ? (
+        <div className="stamp-cards">
+          {stamps.map((s) => {
+            const tier = s.verdict === "ALIVE" ? tierFor(s.verdict, s.score) : null;
+            return (
+              <article key={s.id} className="stamp-card">
+                <p className="stamp-card-host">{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : null}{s.host}</p>
+                <p><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b>{s.score != null && <span className="num"> {s.score} / 100</span>}{tier && <span className="muted"> · {tier.name}</span>}</p>
+                {tier && <img className="stamp-card-badge" src={svgUri(embedSvg({ tier, score: s.score, theme: "steel" }))} alt={`${tier.name}, alive on Stamp My Page`} width="300" height="64" />}
+                <div className="row-actions">
+                  {tier && <><Copy text={badgeEmbed(s, "steel")} label="Copy steel badge" /><Copy text={badgeEmbed(s, "dark")} label="Copy dark badge" /></>}
+                  <Copy text={`${location.origin}/v/${s.id}`} label="Copy link" done="Link copied" />
+                  <a className="btn btn-line btn-sm" href={`/v/${s.id}`}>Open result</a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : <Empty text="No stamps yet. Stamp a page and your cards show up here." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
     </Panel>
+  );
+}
+
+function Stamps({ user }) {
+  const stamps = user.stamps || [];
+  const [picked, setPicked] = useState(null);
+  return (
+    <>
+      <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically. Tap Details on any stamp for its tech stack, speed, and security." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
+        {stamps.length ? (
+          <div className="tbl" role="table" aria-label="Stamps">
+            <div className="tr th" role="row"><span role="columnheader">Site</span><span role="columnheader">Verdict</span><span role="columnheader">Score</span><span role="columnheader">Date</span><span role="columnheader" /></div>
+            {stamps.map((s) => (
+              <div key={s.id} className="tr" role="row">
+                <a className="site" role="cell" href={`/v/${s.id}`}>{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : <i>{s.host[0].toUpperCase()}</i>}{s.host}</a>
+                <span role="cell"><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b></span>
+                <span role="cell" className="num">{s.score ?? "n/a"}</span>
+                <span role="cell" className="muted">{fmtDate(s.at)}</span>
+                <span role="cell"><button type="button" className="btn btn-line btn-sm" onClick={() => setPicked(s)}>Details</button></span>
+              </div>
+            ))}
+          </div>
+        ) : <Empty text="No stamps yet." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
+      </Panel>
+      {picked && <StampDetail stamp={picked} onClose={() => setPicked(null)} />}
+    </>
   );
 }
 
@@ -942,9 +1049,16 @@ function Overview({ user, report, monitor, go }) {
           </Panel>
         )}
       </div>
+{latest && latest.verdict === "ALIVE" && (() => { const tier = tierFor(latest.verdict, latest.score); return (
+        <Panel title="Your status badge" desc={`Your latest stamp, ${latest.host}, earned ${tier.name}. Copy a badge into your footer, it links back to that stamp.`} action={<button type="button" className="link" onClick={() => go("cards")}>All my cards</button>}>
+          <img className="stamp-card-badge" src={svgUri(embedSvg({ tier, score: latest.score, theme: "steel" }))} alt={`${tier.name}, alive on Stamp My Page`} width="300" height="64" />
+          <div className="row-actions"><Copy text={badgeEmbed(latest, "steel")} label="Copy steel badge" /><Copy text={badgeEmbed(latest, "dark")} label="Copy dark badge" /></div>
+        </Panel>
+      ); })()}
     </>
   );
 }
+
 
 function Settings({ user, onOut }) {
   const [msg, setMsg] = useState(null);
@@ -1174,6 +1288,7 @@ function Dashboard({ data, setData, onOut }) {
 
         {sect === "overview" && <Overview user={user} report={report} monitor={monitor} go={go} />}
         {sect === "stamps" && <Stamps user={user} />}
+        {sect === "cards" && <MyCards user={user} />}
         {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
         {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
@@ -1191,6 +1306,7 @@ function Dashboard({ data, setData, onOut }) {
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: "gauge", desc: "Your stamps and plan at a glance." },
   { id: "stamps", label: "Stamps", icon: "list-checks", desc: "Every page you've stamped, with the full checks, stack, and speed behind each." },
+  { id: "cards", label: "My cards", icon: "image", desc: "Your status badges to copy into a footer, and every stamp's link to share." },
   { id: "kill-sheet", label: "Kill Sheet", icon: "clipboard-list", desc: "The whole page scouted, your copy rewritten, and the fixes ranked." },
   { id: "monitoring", label: "Monitoring", icon: "activity", desc: "Uptime, speed, weekly re-stamps, and what changed." },
   { id: "reviews", label: "App review", icon: "search", desc: "A person tests your app end to end. The result lands here." },
