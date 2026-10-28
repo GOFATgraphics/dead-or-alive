@@ -5,6 +5,7 @@
 import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import { processStamp } from "./_stamp.js";
+import { sessionEmail } from "./_account.js";
 import { takeStamp } from "./_limit.js";
 import { precheck } from "./_inspect.js";
 import { DESK } from "../src/config.js";
@@ -54,10 +55,12 @@ export default async function handler(req, res) {
   const gate = await takeStamp(req);
   if (!gate.ok) return res.status(429).json({ error: gate.error, code: "limit" });
 
-  // Random and only known to this browser, so it stands in for a login while the stamp is made.
+  // Signed in (the dashboard's "Stamp a page" lands here): the verdict email goes to
+  // the account email. Signed out, nothing changes: no email, no address collected.
+  const email = await sessionEmail(req).catch(() => "");
   const job = crypto.randomUUID();
   waitUntil(
-    processStamp(job, page.url)
+    processStamp(job, page.url, email)
       .then((out) => (out?.failed ? gate.giveBack() : null))
       .catch((err) => {
         console.error("Stamp failed:", job, err);

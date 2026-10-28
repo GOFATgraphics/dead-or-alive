@@ -130,7 +130,7 @@ export function failReason(msg) {
   return "other";
 }
 
-export async function processStamp(jobId, pageUrl) {
+export async function processStamp(jobId, pageUrl, email = "") {
   const id = resultId(jobId);
   let shot, snapshot;
   try {
@@ -160,12 +160,13 @@ export async function processStamp(jobId, pageUrl) {
     return await publishStamp({
       orderId: jobId,
       pageUrl,
+      email: email || undefined,
       verdict,
       sentence,
       image: clean,
       shot: clean,
       focus: boxes.length ? { top: Math.min(...boxes.map((b) => b.y)) / 1000, bottom: Math.max(...boxes.map((b) => b.y + b.h)) / 1000 } : null,
-      sendMail: false,
+      sendMail: !!email,
       origin: publicOrigin(),
       extra: { snapshot, score, checks, icon },
     });
