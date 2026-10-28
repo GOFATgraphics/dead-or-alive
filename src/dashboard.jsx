@@ -600,7 +600,7 @@ function StayAlive({ user, monitors, onChange }) {
   return (
     <>
       <Sites user={user} sites={sites} pick={pick} setPick={setPick} onChange={onChange} />
-      {m && <SiteMonitor monitor={m} onChange={onChange} />}
+      {m && <SiteMonitor key={m.url} monitor={m} onChange={onChange} />}
     </>
   );
 }
@@ -660,7 +660,7 @@ function Sites({ user, sites, pick, setPick, onChange }) {
       <ul className="site-list">
         {sites.map((s, i) => {
           const last = s.checks?.at(-1);
-          const state = s.paused ? ["", "Paused"] : !s.checks ? ["run", "Starting"] : last?.ok === false ? ["bad", "Down"] : ["ok", "Up"];
+          const state = s.pausedManual ? ["", "Paused"] : s.paused ? ["", "Paused"] : !s.checks ? ["run", "Starting"] : last?.ok === false ? ["bad", "Down"] : ["ok", "Up"];
           return (
             <li key={s.url} className={i === pick ? "on" : ""}>
               <button type="button" className="site-pick" onClick={() => setPick(i)} aria-pressed={i === pick}>
@@ -730,6 +730,11 @@ function incidentRows(checks) {
 function SiteMonitor({ monitor, onChange }) {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
+  const [alertDown, setAlertDown] = useState(monitor.alerts?.down !== false);
+  const [alertChanges, setAlertChanges] = useState(monitor.alerts?.changes !== false);
+  const [quietStart, setQuietStart] = useState(monitor.alerts?.quietStart ?? "");
+  const [quietEnd, setQuietEnd] = useState(monitor.alerts?.quietEnd ?? "");
+  const [webhook, setWebhook] = useState(monitor.webhookUrl || "");
   const run = async (key, fn) => {
     setBusy(key); setNote("");
     try { onChange && onChange(await fn()); setNote(key === "report" ? "Report sent to your email." : "Saved."); }
@@ -752,7 +757,7 @@ function SiteMonitor({ monitor, onChange }) {
         </div>
       </div>
       {monitor.paused && <p className="note">Paused: you have more sites than site slots. Add a slot or remove a site to watch it again.</p>}
-      {!monitor.paused && !ready && <Working text="Switching monitoring on: first uptime check and re-stamp are running." />}
+      {!monitor.paused && !monitor.pausedManual && !ready && <Working text="Switching monitoring on: first uptime check and re-stamp are running." />}
       {ready && (
         <>
           <dl className="scout">
@@ -806,6 +811,32 @@ function SiteMonitor({ monitor, onChange }) {
               <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("public-on", () => api("public-status", { url: monitor.url, on: true }))}>{busy === "public-on" ? "Saving…" : "Make status public"}</button>
             </div>
           )}
+          {monitor.pausedManual && <p className="note">Paused by you: no checks or alerts run for this site until you resume it.</p>}
+          <h3>Alerts</h3>
+          <p className="muted">Per site, not per account. Turning an alert off never stops the checks or the history, it only stops that notification.</p>
+          {!monitor.paused && (
+            <div className="row-actions">
+              {monitor.pausedManual
+                ? <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("resume", () => api("pause-site", { url: monitor.url, paused: false }))}>{busy === "resume" ? "Resuming…" : "Resume watching"}</button>
+                : <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => confirm(`Pause watching ${monitor.url}? No checks or alerts will run until you resume it.`) && run("pause", () => api("pause-site", { url: monitor.url, paused: true }))}>{busy === "pause" ? "Pausing…" : "Pause watching"}</button>}
+            </div>
+          )}
+          <div className="alert-form">
+            <label className="check"><input type="checkbox" checked={alertDown} onChange={(e) => setAlertDown(e.target.checked)} /> Down alerts by email</label>
+            <label className="check"><input type="checkbox" checked={alertChanges} onChange={(e) => setAlertChanges(e.target.checked)} /> Change alerts by email</label>
+            <div className="quiet-row">
+              <label>Quiet hours (UTC)<select value={quietStart} onChange={(e) => setQuietStart(e.target.value)}><option value="">Off</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
+              <span>to</span>
+              <label><span className="sr-only">Quiet hours end</span><select value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)}><option value="">Off</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
+            </div>
+            <p className="muted">Quiet hours silence change alerts only, never down alerts. A down page at night is still urgent, a stack change can wait until morning. Times are UTC.</p>
+            <label>Webhook URL (optional)<input type="url" value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://example.com/hooks/stampmypage" /></label>
+            <p className="muted">When set, down and change alerts also POST as JSON to this URL. Email stays on unless you turn it off above. Leave it blank to remove it.</p>
+            <div className="row-actions">
+              <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("alerts", () => api("alerts", { url: monitor.url, down: alertDown, changes: alertChanges, quietStart: quietStart === "" ? null : Number(quietStart), quietEnd: quietEnd === "" ? null : Number(quietEnd), webhook }))}>{busy === "alerts" ? "Saving…" : "Save alert settings"}</button>
+              {note && <span className="muted">{note}</span>}
+            </div>
+          </div>
           <h3>Changes spotted</h3>
           {monitor.changes?.length ? (
             <ul className="changes">

@@ -36,6 +36,67 @@ export async function checkOnce(pageUrl) {
   }
 }
 
+// --- Upgrade 4: alert control. Defaults preserve the old behaviour: down and change
+// alerts on, no quiet hours, no webhook, not paused. A setting only ever silences the
+// owner's own alerts; it never changes what is checked or recorded. ---
+export function alertSettings(m = {}) {
+  return {
+    down: m.alerts?.down !== false,
+    changes: m.alerts?.changes !== false,
+    quietStart: Number.isInteger(m.alerts?.quietStart) ? m.alerts.quietStart : null,
+    quietEnd: Number.isInteger(m.alerts?.quietEnd) ? m.alerts.quietEnd : null,
+    webhook: m.webhookUrl || "",
+  };
+}
+// Quiet hours are UTC hours, and they silence change alerts only, never down alerts:
+// a down page at 3am is still urgent, a stack change can wait until morning.
+export function inQuietHours(a, now = new Date()) {
+  if (a.quietStart == null || a.quietEnd == null) return false;
+  const h = now.getUTCHours();
+  return a.quietStart < a.quietEnd ? h >= a.quietStart && h < a.quietEnd : h >= a.quietStart || h < a.quietEnd;
+}
+async function postWebhook(url, payload) {
+  if (!url) return;
+  try {
+    await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "StampMyPage-Monitor/1.0" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(5000) });
+  } catch (_) { /* A dead webhook must never break the email alert or the check. */ }
+}
+function validWebhook(raw) {
+  if (!raw) return "";
+  let u;
+  try { u = new URL(raw); } catch (_) { throw new Error("Webhook must be a full https:// URL."); }
+  if (u.protocol !== "https:" || u.username || u.password) throw new Error("Webhook must be a plain https:// URL, no login in it.");
+  if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(u.hostname)) throw new Error("Webhook must be a public https:// URL, not a local address.");
+  return u.toString();
+}
+function validHour(v) {
+  if (v == null || v === "") return null;
+  const n = parseInt(v, 10);
+  if (!Number.isInteger(n) || n < 0 || n > 23) throw new Error("Quiet hours must be whole hours from 0 to 23.");
+  return n;
+}
+export async function setAlertSettings(email, url, { down, changes, quietStart, quietEnd, webhook }) {
+  const u = await getUser(email);
+  const page = sitesOf(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const qs = validHour(quietStart), qe = validHour(quietEnd);
+  if ((qs == null) !== (qe == null)) throw new Error("Set both quiet hours, or neither.");
+  const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
+  m.alerts = { down: down !== false, changes: changes !== false, quietStart: qs, quietEnd: qe };
+  m.webhookUrl = validWebhook(webhook);
+  await set(monitorKey(email, page), m);
+  return m;
+}
+export async function setPaused(email, url, paused) {
+  const u = await getUser(email);
+  const page = sitesOf(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
+  m.pausedManual = !!paused;
+  await set(monitorKey(email, page), m);
+  return m;
+}
+
 // Checks one of a member's sites (the first, unless one is named), re-stamps it when a week has passed (or when
 // forced), and saves the history.
 export async function runMonitor(email, { restamp = false, url = "" } = {}) {
@@ -44,6 +105,7 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   const pageUrl = url ? watched.find((s) => s === url) : watched[0];
   if (!pageUrl || !hasStayAlive(u)) return null;
   const m = (await get(monitorKey(email, pageUrl))) || { url: pageUrl, checks: [], restamps: [] };
+  if (m.pausedManual) return m;
   const check = await checkOnce(pageUrl);
   const wasUp = m.checks.length ? m.checks[m.checks.length - 1].ok : true;
   m.checks = [...m.checks, check].slice(-90);
@@ -61,17 +123,18 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
       m.lastSeen = seen(r);
       if (change) {
         m.changes = [{ at: m.lastRestampAt, stampId: r.id, ...change }, ...(m.changes || [])].slice(0, 30);
-        await alertChange(email, pageUrl, change);
+        await alertChange(email, pageUrl, change, m);
       }
     }
   }
   await set(monitorKey(email, pageUrl), m);
-  if (wasUp && !check.ok) {
+  if (wasUp && !check.ok && alertSettings(m).down) {
     await mail(email, {
       subject: `Your page is down: ${new URL(pageUrl).hostname}`,
       text: `Stay Alive checked ${pageUrl} at ${check.at} and it ${check.status ? `answered ${check.status}` : check.error.toLowerCase()}.\n\nSee the history in your dashboard: https://stampmypage.com/dashboard`,
       html: `<p>Stay Alive checked <a href="${pageUrl}">${pageUrl}</a> at ${check.at} and it ${check.status ? `answered ${check.status}` : check.error.toLowerCase()}.</p><p><a href="https://stampmypage.com/dashboard">See the history in your dashboard</a></p>`,
     }).catch(() => {});
+    await postWebhook(alertSettings(m).webhook, { event: "down", url: pageUrl, host: new URL(pageUrl).hostname, status: check.status, error: check.error || null, at: check.at });
   }
   return m;
 }
@@ -94,7 +157,9 @@ function diff(before, now) {
   return { added, removed, lcp, verdict, pixels: [...added, ...removed].some((t) => /^(Ads & pixels|Analytics):/.test(t)) };
 }
 
-async function alertChange(email, pageUrl, c) {
+async function alertChange(email, pageUrl, c, m = {}) {
+  const a = alertSettings(m);
+  if (!a.changes || inQuietHours(a)) return;
   const host = new URL(pageUrl).hostname;
   const lines = [
     ...c.added.map((t) => `Added: ${t}`),
@@ -107,6 +172,7 @@ async function alertChange(email, pageUrl, c) {
     text: `Stay Alive re-stamped ${pageUrl} and noticed:\n\n${lines.join("\n")}\n\nDetails in your dashboard: https://stampmypage.com/dashboard`,
     html: `<p>Stay Alive re-stamped <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard">Details in your dashboard</a></p>`,
   }).catch(() => {});
+  await postWebhook(a.webhook, { event: "change", url: pageUrl, host, at: new Date().toISOString(), added: c.added, removed: c.removed, lcp: c.lcp, verdict: c.verdict });
 }
 
 // --- Upgrade 3: history, incidents, weekly reports, public status. Pure helpers, so the
@@ -273,7 +339,7 @@ export async function monitorAll() {
   const out = { checked: 0, restamped: 0 };
   for (let i = 0; i < jobs.length; i += 4) {
     const batch = await Promise.allSettled(jobs.slice(i, i + 4).map(([e, url]) => runMonitor(e, { url })));
-    for (const b of batch) if (b.status === "fulfilled" && b.value) {
+    for (const b of batch) if (b.status === "fulfilled" && b.value && !b.value.pausedManual) {
       out.checked++;
       if (b.value.restamps?.at(-1)?.at === b.value.lastRestampAt && Date.now() - new Date(b.value.lastRestampAt).getTime() < 600000) out.restamped++;
     }

@@ -23,7 +23,7 @@ import {
 } from "./_account.js";
 import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
-import { forgetSite, readMonitors, runMonitor, seatsOf, setPublicStatus, sendReportNow, sitesOf } from "./_monitor.js";
+import { forgetSite, readMonitors, runMonitor, seatsOf, setAlertSettings, setPaused, setPublicStatus, sendReportNow, sitesOf } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
 import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
@@ -545,6 +545,24 @@ export default async function handler(req, res) {
       const page = checkPageUrl(b.url);
       if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
       await setPublicStatus(email, page.url, !!b.on);
+      return res.status(200).json(await me(email));
+    }
+    if (op === "alerts") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      try {
+        await setAlertSettings(email, page.url, { down: b.down, changes: b.changes, quietStart: b.quietStart, quietEnd: b.quietEnd, webhook: b.webhook });
+      } catch (e) { return res.status(400).json({ error: e.message }); }
+      return res.status(200).json(await me(email));
+    }
+    if (op === "pause-site") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      await setPaused(email, page.url, !!b.paused);
       return res.status(200).json(await me(email));
     }
     if (op === "report-now") {

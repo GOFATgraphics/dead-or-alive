@@ -345,3 +345,11 @@ select { width: 100%; min-height: 2.9rem; padding: 0.6rem 0.9rem; border: 1px so
 .hist-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.875rem; }
 .hist-table th, .hist-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; }
 .hist-table th { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+
+/* Alert settings (upgrade 4). */
+.alert-form { display: grid; gap: 0.75rem; max-width: 32rem; margin: 0.5rem 0 1rem; }
+.alert-form .check { display: flex; gap: 0.6rem; align-items: center; font-weight: 600; }
+.quiet-row { display: flex; align-items: end; gap: 0.75rem; }
+.quiet-row label { flex: 1; display: grid; gap: 0.3rem; font-size: 0.875rem; font-weight: 600; }
+.quiet-row select { min-height: 2.5rem; padding: 0.5rem 0.75rem; border-radius: 10px; font-size: 0.9375rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
