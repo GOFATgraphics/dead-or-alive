@@ -27,53 +27,62 @@ body.ad-locked { overflow: hidden; }
    the right, hairline borders, no floating cards. The active item is a light grey
    pill with dark text, not a solid ink pill, and icons sit bare, without chips. */
 .ad .app { grid-template-columns: 16.5rem minmax(0, 1fr); gap: 0; padding-top: 0; transition: grid-template-columns 0.25s ease; }
-.ad .side { position: sticky; top: 0; height: 100vh; overflow-y: auto; gap: 0; padding: 0.75rem; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--card); box-shadow: none; }
+.ad .side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem 0.75rem 0; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--canvas); box-shadow: none; overflow: hidden; }
 .ad .main { min-width: 0; padding: 1.5rem 2rem 4rem; }
 
 /* Expandable side panel: the toggle row sits above the nav. Collapsed, the panel
    becomes an icon rail: labels, group names, and footer text hide, while icons,
    tooltips, count badges, and the stamping dot stay visible. State sticks per browser. */
-.side-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.25rem 0.75rem 0.75rem; }
-.side-top-label { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.side-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.25rem 0.75rem 0.5rem; }
+.side-brand { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.side-brand img { flex: none; }
+.side-brand span { display: grid; min-width: 0; line-height: 1.15; }
+.side-brand b { font-size: 0.9375rem; font-weight: 800; letter-spacing: -0.01em; }
+.side-brand small { font-size: 0.6875rem; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-top-label { display: none; }
 .side-toggle { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--body); cursor: pointer; }
 .side-toggle:hover { background: var(--canvas); color: var(--ink); }
 .side-toggle .ic { width: 1.05rem; height: 1.05rem; }
 .side-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* Sidebar search, like the reference: a quiet input with a ⌘K hint. */
-.side-search { position: relative; margin: 0 0 0.75rem; }
-.side-search input[type="search"] { width: 100%; min-height: 2.25rem; padding: 0 2.25rem 0 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--ink); font: 400 0.875rem var(--sans); }
+.side-search { position: relative; margin: 0 0 1rem; }
+.side-search-ic { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--soft); pointer-events: none; }
+.side-search input[type="search"] { width: 100%; min-height: 2.5rem; padding: 0 2.25rem 0 2.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 400 0.875rem var(--sans); box-shadow: var(--shadow-1); }
 .side-search input[type="search"]:focus { outline: 2px solid var(--ink); outline-offset: 1px; background: var(--card); }
 .side-search kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); font: 600 0.6875rem var(--mono); color: var(--soft); }
 @media (min-width: 961px) {
   body.side-closed .ad .app { grid-template-columns: 4.25rem minmax(0, 1fr); }
   body.side-closed .ad .side { padding: 0.5rem 0.4rem; }
   body.side-closed .side-top { justify-content: center; padding: 0.25rem 0.25rem 0.6rem; }
-  body.side-closed .side-top-label, body.side-closed .side-group-label, body.side-closed .side-label, body.side-closed .side-search { display: none; }
+  body.side-closed .side-brand span, body.side-closed .side-group-label, body.side-closed .side-label, body.side-closed .side-search, body.side-closed .side-foot-links { display: none; }
   body.side-closed .side-group + .side-group { margin-top: 0.5rem; padding-top: 0.5rem; }
   body.side-closed .side-nav button { position: relative; grid-template-columns: 1.75rem; justify-content: center; padding: 0; }
   body.side-closed .side-nav button em { position: absolute; top: 0.2rem; right: 0.15rem; min-width: 1.15rem; height: 1.15rem; padding: 0 0.25rem; border-radius: 999px; font-size: 0.625rem; line-height: 1.15rem; box-shadow: 0 0 0 2px var(--card); }
-  body.side-closed .side-foot { margin-top: auto; padding: 0.6rem 0 0.2rem; border: 0; background: transparent; }
+  body.side-closed .side-foot { padding: 0.75rem 0 0.5rem; border-top: 1px solid var(--line); background: transparent; }
   body.side-closed .side-foot-row { justify-content: center; }
   body.side-closed .side-foot-row > span:last-child, body.side-closed .side-foot-link, body.side-closed .side-foot .ad-muted { display: none; }
 }
-.ad .side-nav { gap: 0.15rem; }
+.ad .side-nav { flex: 1 1 auto; overflow-y: auto; gap: 0.15rem; padding-bottom: 0.75rem; }
 .ad .side-group { display: grid; gap: 0.15rem; }
-.ad .side-group + .side-group { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
-.ad .side-group-label { padding: 0 0.75rem 0.35rem; font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
-.ad .side-nav button { grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 0.65rem; min-height: 2.25rem; padding: 0 0.75rem; border-radius: 8px; font-size: 0.875rem; }
+.ad .side-group + .side-group { margin-top: 1.25rem; padding-top: 0; border-top: 0; }
+.ad .side-group-label { padding: 0 0.75rem 0.5rem; font: 500 0.6875rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); }
+.ad .side-nav button { grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 0.65rem; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 10px; font-size: 0.875rem; font-weight: 600; }
 .ad .side-ic { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: 8px; background: transparent; color: var(--soft); }
 .ad .side-ic .ic { width: 1.05rem; height: 1.05rem; color: inherit; }
 .ad .side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ad .side-nav button:hover { background: var(--canvas); }
+.ad .side-nav button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .ad .side-nav button:hover .side-ic { background: transparent; color: var(--body); }
-.ad .side-nav button.on { background: color-mix(in srgb, var(--ink) 7%, var(--card)); color: var(--ink); font-weight: 700; }
+.ad .side-nav button.on { background: var(--card); border-color: var(--line); color: var(--ink); font-weight: 700; box-shadow: var(--shadow-1); }
 .ad .side-nav button.on .side-ic { background: transparent; color: var(--ink); }
-.ad .side-nav button.on em { background: var(--page); color: var(--ink); }
+.ad .side-nav button.on em { background: var(--canvas); color: var(--ink); }
 .ad .side-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ad .side-nav em.hot { background: var(--red); color: #fff; }
 .ad .side-nav button.on em.hot { background: var(--red); color: #fff; }
-.ad .side-foot { display: grid; gap: 0.45rem; margin-top: auto; padding: 0.9rem 0.75rem; border: 1px solid var(--line); border-radius: 12px; background: var(--canvas); font-size: 0.8125rem; font-weight: 600; }
+.ad .side-foot { display: grid; gap: 0.55rem; flex: none; margin-top: auto; padding: 1rem 0.75rem 0.75rem; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; font-size: 0.8125rem; font-weight: 600; }
+.side-foot-links { display: flex; gap: 1rem; padding-top: 0.25rem; }
+.side-foot-links a { color: var(--soft); font-weight: 600; text-decoration: none; }
+.side-foot-links a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .ad .side-foot[hidden] { display: none; }
 .ad .side-foot-row { display: flex; align-items: center; gap: 0.55rem; }
 .ad .side-foot-link { justify-self: start; padding: 0; border: 0; background: none; color: var(--amber); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
@@ -258,7 +267,7 @@ body.ad-locked { overflow: hidden; }
   .ad .side-group-label, .ad .side-foot { display: none; }
   .ad .side-nav { display: flex; margin: 0; padding: 0 0 0.5rem; }
   .ad .side-nav button { flex: none; width: auto; }
-  .ad .side-nav button.on { box-shadow: none; }
+  .ad .side-nav button.on { background: var(--card); border-color: var(--line); box-shadow: var(--shadow-1); }
 }
 @media (max-width: 640px) {
   .hide-sm { display: none; }

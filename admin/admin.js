@@ -183,14 +183,18 @@ import { barChart, renderAnalytics } from "./analytics.js";
     );
     const foot = $("side-foot");
     const items = setup.items || [];
-    if (!items.length) { foot.hidden = true; applySideFilter(); return; }
     const missing = items.filter(([, ok]) => !ok).length;
     foot.hidden = false;
     foot.replaceChildren(
       el("span", { className: "side-foot-row", title: DESK.queueOpen ? "Stamping on" : "Stamping paused" }, el("span", { className: `dot ${DESK.queueOpen ? "ok" : "run"}` }), el("span", { textContent: DESK.queueOpen ? "Stamping on" : "Stamping paused" })),
-      missing
-        ? el("button", { type: "button", className: "side-foot-link", textContent: `${num(missing)} to connect`, onclick: () => go("setup") })
-        : el("span", { className: "ad-muted", textContent: "All connected" })
+      items.length
+        ? (missing
+          ? el("button", { type: "button", className: "side-foot-link", textContent: `${num(missing)} to connect`, onclick: () => go("setup") })
+          : el("span", { className: "ad-muted", textContent: "All connected" }))
+        : null,
+      el("div", { className: "side-foot-links" },
+        el("a", { href: "/", textContent: "View site" }),
+        el("a", { href: "/dashboard", textContent: "Dashboard" }))
     );
     applySideFilter();
   }

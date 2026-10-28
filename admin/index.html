@@ -42,11 +42,15 @@
       <div class="app" id="app" hidden>
         <aside class="side">
           <div class="side-top">
-            <span class="side-top-label">Menu</span>
+            <div class="side-brand">
+              <img src="/brand/smp-mark.svg" alt="" width="28" height="28" />
+              <span><b>Admin</b><small>Stamp My Page</small></span>
+            </div>
             <button type="button" class="side-toggle" id="side-toggle" aria-expanded="true" aria-label="Collapse sidebar"></button>
           </div>
           <div class="side-search">
-            <input type="search" id="side-search" placeholder="Search..." aria-label="Search sections" autocomplete="off" />
+            <svg class="side-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+            <input type="search" id="side-search" placeholder="Search sections…" aria-label="Search sections" autocomplete="off" />
             <kbd>⌘K</kbd>
           </div>
           <nav class="side-nav" id="side-nav" aria-label="Admin"></nav>
