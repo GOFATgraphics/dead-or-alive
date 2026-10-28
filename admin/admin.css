@@ -34,12 +34,7 @@ body.ad-locked { overflow: hidden; }
    becomes an icon rail: labels, group names, and footer text hide, while icons,
    tooltips, count badges, and the stamping dot stay visible. State sticks per browser. */
 .side-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.25rem 0.75rem 0.5rem; }
-.side-brand { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
-.side-brand img { flex: none; }
-.side-brand span { display: grid; min-width: 0; line-height: 1.15; }
-.side-brand b { font-size: 0.9375rem; font-weight: 800; letter-spacing: -0.01em; }
-.side-brand small { font-size: 0.6875rem; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.side-top-label { display: none; }
+.side-top-label { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
 .side-toggle { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--body); cursor: pointer; }
 .side-toggle:hover { background: var(--canvas); color: var(--ink); }
 .side-toggle .ic { width: 1.05rem; height: 1.05rem; }
@@ -55,7 +50,7 @@ body.ad-locked { overflow: hidden; }
   body.side-closed .ad .app { grid-template-columns: 4.25rem minmax(0, 1fr); }
   body.side-closed .ad .side { padding: 0.5rem 0.4rem; }
   body.side-closed .side-top { justify-content: center; padding: 0.25rem 0.25rem 0.6rem; }
-  body.side-closed .side-brand span, body.side-closed .side-group-label, body.side-closed .side-label, body.side-closed .side-search, body.side-closed .side-foot-links { display: none; }
+  body.side-closed .side-top-label, body.side-closed .side-group-label, body.side-closed .side-label, body.side-closed .side-search, body.side-closed .side-foot-links { display: none; }
   body.side-closed .side-group + .side-group { margin-top: 0.5rem; padding-top: 0.5rem; }
   body.side-closed .side-nav button { position: relative; grid-template-columns: 1.75rem; justify-content: center; padding: 0; }
   body.side-closed .side-nav button em { position: absolute; top: 0.2rem; right: 0.15rem; min-width: 1.15rem; height: 1.15rem; padding: 0 0.25rem; border-radius: 999px; font-size: 0.625rem; line-height: 1.15rem; box-shadow: 0 0 0 2px var(--card); }
