@@ -903,6 +903,7 @@ function StampTable({ stamps }) {
 function StampDetail({ stamp, onClose }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  useEffect(() => { scrollTo({ top: 0 }); }, [stamp.id]);
   useEffect(() => {
     let live = true;
     fetch(`/api/verdict?id=${encodeURIComponent(stamp.id)}`, { cache: "no-store" })
@@ -914,30 +915,37 @@ function StampDetail({ stamp, onClose }) {
   const rows = data?.snapshot ? snapshotRows(data.snapshot) : [];
   const checks = Array.isArray(data?.checks) ? data.checks : [];
   return (
-    <section className="panel detail-panel" aria-label={`Details for ${stamp.host}`}>
-      <header className="panel-head">
-        <div><h2>{stamp.host}</h2><p>{stamp.verdict}{stamp.score != null ? ` · ${stamp.score} / 100` : ""} · {fmtDate(stamp.at)}</p></div>
-        <button type="button" className="btn btn-line btn-sm" onClick={onClose}>Close</button>
-      </header>
-      {err && <p className="alert" role="alert">{err}</p>}
-      {!data && !err && <p className="muted">Loading details…</p>}
-      {data && data.locked && <p className="note">Full details live on the result page. <a href={`/v/${stamp.id}`}>Open the result</a>.</p>}
+    <div className="detail-page">
+      <button type="button" className="btn btn-line btn-sm detail-back" onClick={onClose}><Icon name="chevron-left" size={16} /> Back to Stamps</button>
+      <section className="panel detail-hero" aria-label={`Details for ${stamp.host}`}>
+        <div className="detail-hero-main">
+          <p className="muted">Stamps / {stamp.host}</p>
+          <h2>{stamp.icon ? <img src={stamp.icon} alt="" width="26" height="26" /> : null}{stamp.host}</h2>
+          <p><b className={"v-chip v-" + stamp.verdict.toLowerCase()}>{stamp.verdict}</b>{stamp.score != null && <span className="num"> {stamp.score} / 100</span>}<span className="muted"> · {fmtDate(stamp.at)}</span></p>
+          {err && <p className="alert" role="alert">{err}</p>}
+          {!data && !err && <p className="muted">Loading details…</p>}
+          {data && data.locked && <p className="note">Full details live on the result page. <a href={`/v/${stamp.id}`}>Open the result</a>.</p>}
+        </div>
+        <div className="row-actions detail-actions">
+          <a className="btn btn-dark btn-sm" href={`/v/${stamp.id}`}>Open full result</a>
+          <Copy text={`${location.origin}/v/${stamp.id}`} label="Copy link" done="Link copied" />
+        </div>
+      </section>
       {rows.length > 0 && (
-        <>
-          <h3>Tech stack and speed</h3>
+        <section className="panel" aria-label="Tech stack and speed">
+          <header className="panel-head"><div><h2>Tech stack and speed</h2><p>What this page is built with, and how fast it loads.</p></div></header>
           <div className="kv">{rows.map((r) => (<div key={r.label}><dt>{r.label}</dt><dd>{r.value}</dd></div>))}</div>
-        </>
+        </section>
       )}
       {checks.length > 0 && (
-        <>
-          <h3>Checks</h3>
+        <section className="panel" aria-label="Checks">
+          <header className="panel-head"><div><h2>Checks</h2><p>All 13 first-screen checks for this stamp.</p></div></header>
           <ul className="status-list">{checks.map((c) => (
             <li key={c.id || c.label}><span className={"dot " + (c.pass ? "ok" : c.skip ? "" : "bad")} /><div><b>{c.label}</b><p>{c.detail || (c.pass ? "Passed" : "Failed")}</p></div></li>
           ))}</ul>
-        </>
+        </section>
       )}
-      {data && <div className="row-actions"><a className="btn btn-dark btn-sm" href={`/v/${stamp.id}`}>Open full result</a><Copy text={`${location.origin}/v/${stamp.id}`} label="Copy link" done="Link copied" /></div>}
-    </section>
+    </div>
   );
 }
 
@@ -1006,9 +1014,10 @@ function MyCards({ user }) {
 function Stamps({ user }) {
   const stamps = user.stamps || [];
   const [picked, setPicked] = useState(null);
+  if (picked) return <StampDetail stamp={picked} onClose={() => { setPicked(null); scrollTo({ top: 0 }); }} />;
   return (
     <>
-      <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically. Tap Details on any stamp for its tech stack, speed, and security." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
+      <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically. Tap Details on any stamp to open its full detail page." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
         {stamps.length ? (
           <div className="tbl" role="table" aria-label="Stamps">
             <div className="tr th" role="row"><span role="columnheader">Site</span><span role="columnheader">Verdict</span><span role="columnheader">Score</span><span role="columnheader">Date</span><span role="columnheader" /></div>
@@ -1024,7 +1033,6 @@ function Stamps({ user }) {
           </div>
         ) : <Empty text="No stamps yet." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
       </Panel>
-      {picked && <StampDetail stamp={picked} onClose={() => setPicked(null)} />}
     </>
   );
 }
@@ -1296,7 +1304,7 @@ function Dashboard({ data, setData, onOut }) {
   const here = SECTIONS.find((x) => x.id === sect);
 
   return (
-    <div className="app wrap">
+    <div className="app">
       <aside className="side" aria-label="Dashboard">
         <a className="btn btn-dark side-cta" href="/#top"><Icon name="arrow-right" /> Stamp a page</a>
         <div className="side-search">
