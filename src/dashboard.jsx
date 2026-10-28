@@ -943,26 +943,61 @@ function StampDetail({ stamp, onClose }) {
 
 function MyCards({ user }) {
   const stamps = user.stamps || [];
+  // One card per page, latest run only: stamps are newest first, so the first stamp
+  // per normalized host (lowercase, www. stripped) wins. Both kinds show: pages claimed
+  // with X, and pages saved to this account. Claimed pages are marked once their
+  // verdict check comes back, and a filter narrows the list to claimed only.
+  const deduped = [];
+  const seen = new Set();
+  for (const s of stamps) {
+    const key = String(s.host || "").toLowerCase().trim().replace(/^www\./, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(s);
+  }
+  const [claimed, setClaimed] = useState(new Set());
+  const [claimedOnly, setClaimedOnly] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.all(deduped.map((s) =>
+      fetch(`/api/verdict?id=${encodeURIComponent(s.id)}`, { cache: "no-store" })
+        .then((r) => r.json().catch(() => ({})))
+        .then((b) => (b.isOwner ? s.id : null))
+        .catch(() => null)
+    )).then((ids) => { if (live) setClaimed(new Set(ids.filter(Boolean))); });
+    return () => { live = false; };
+  }, [user.stamps]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = claimedOnly ? deduped.filter((s) => claimed.has(s.id)) : deduped;
   return (
-    <Panel title="My cards" desc="Your status badges to copy into a footer, and every stamp's link to share. ALIVE stamps earn a badge; other stamps show their result link until they climb to 80.">
-      {stamps.length ? (
-        <div className="stamp-cards">
-          {stamps.map((s) => {
-            const tier = s.verdict === "ALIVE" ? tierFor(s.verdict, s.score) : null;
-            return (
-              <article key={s.id} className="stamp-card">
-                <p className="stamp-card-host">{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : null}{s.host}</p>
-                <p><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b>{s.score != null && <span className="num"> {s.score} / 100</span>}{tier && <span className="muted"> · {tier.name}</span>}</p>
-                {tier && <img className="stamp-card-badge" src={svgUri(embedSvg({ tier, score: s.score, theme: "steel" }))} alt={`${tier.name}, alive on Stamp My Page`} width="300" height="64" />}
-                <div className="row-actions">
-                  {tier && <><Copy text={badgeEmbed(s, "steel")} label="Copy steel badge" /><Copy text={badgeEmbed(s, "dark")} label="Copy dark badge" /></>}
-                  <Copy text={`${location.origin}/v/${s.id}`} label="Copy link" done="Link copied" />
-                  <a className="btn btn-line btn-sm" href={`/v/${s.id}`}>Open result</a>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+    <Panel title="My cards" desc="One card per page, latest run only. Claimed pages and account pages both show here; claimed pages are marked. If you stamped a page more than once, only its newest run gets a card.">
+      {deduped.length ? (
+        <>
+          <div className="row-actions" style={{ marginTop: 0, marginBottom: "1rem" }}>
+            <button type="button" className={claimedOnly ? "btn btn-dark btn-sm" : "btn btn-line btn-sm"} onClick={() => setClaimedOnly(!claimedOnly)}>
+              {claimedOnly ? "Showing claimed only" : "Show claimed only"}
+            </button>
+            <span className="muted">{deduped.length} page{deduped.length === 1 ? "" : "s"} · {claimed.size} claimed</span>
+          </div>
+          <div className="stamp-cards">
+            {shown.map((s) => {
+              const tier = s.verdict === "ALIVE" ? tierFor(s.verdict, s.score) : null;
+              const isClaimed = claimed.has(s.id);
+              return (
+                <article key={s.id} className="stamp-card">
+                  <p className="stamp-card-host">{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : null}{s.host}{isClaimed && <b className="v-chip v-alive">Claimed</b>}</p>
+                  <p><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b>{s.score != null && <span className="num"> {s.score} / 100</span>}{tier && <span className="muted"> · {tier.name}</span>}</p>
+                  {tier && <img className="stamp-card-badge" src={svgUri(embedSvg({ tier, score: s.score, theme: "steel" }))} alt={`${tier.name}, alive on Stamp My Page`} width="300" height="64" />}
+                  <div className="row-actions">
+                    {tier && <><Copy text={badgeEmbed(s, "steel")} label="Copy steel badge" /><Copy text={badgeEmbed(s, "dark")} label="Copy dark badge" /></>}
+                    <Copy text={`${location.origin}/v/${s.id}`} label="Copy link" done="Link copied" />
+                    <a className="btn btn-line btn-sm" href={`/v/${s.id}`}>Open result</a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {!shown.length && <p className="note">No claimed pages yet. Tap a stamp's result page and claim it with X, and it will show here.</p>}
+        </>
       ) : <Empty text="No stamps yet. Stamp a page and your cards show up here." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
     </Panel>
   );
