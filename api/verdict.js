@@ -23,19 +23,21 @@ export default async function handler(req, res) {
   // there is no fallback to saved stamps. Only public X profile facts, never their email. No X link,
   // or no manual claim yet, means no card.
   let ownerX = null;
+  let isOwner = false;
   try {
     const claimEmail = await get(`claim:${r.id}`).catch(() => null);
     if (claimEmail) {
+      if (email && String(email).toLowerCase().trim() === String(claimEmail).toLowerCase().trim()) isOwner = true;
       const owner = await getUser(claimEmail);
       if (owner?.x?.username) ownerX = { username: owner.x.username, name: owner.x.name || "", avatar: owner.x.avatar || "", verified: owner.x.verified === true };
     }
   } catch (_) {}
-  if (email && snapshot) return res.status(200).json({ ...r, snapshot, locked: false, ownerX });
+  if (email && snapshot) return res.status(200).json({ ...r, snapshot, locked: false, ownerX, isOwner });
   const gated = gatedSnapshot(snapshot);
   if (!gated) {
     const { snapshot: _drop, ...rest } = r;
-    return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: snapshot || null, locked: false, ownerX });
+    return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: snapshot || null, locked: false, ownerX, isOwner });
   }
   const { snapshot: _drop, ...rest } = r;
-  return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: gated, locked: true, ownerX });
+  return res.status(200).json({ ...rest, checks: publicChecks(rest.checks), snapshot: gated, locked: true, ownerX, isOwner });
 }

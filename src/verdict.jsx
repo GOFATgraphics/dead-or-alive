@@ -195,6 +195,7 @@ function Status({ r }) {
         </div>
       </div>
 
+      {!(r.ownerX && !r.isOwner) && (
       <div className="embed">
         <div>
           <h3>Put it in your footer</h3>
@@ -209,6 +210,7 @@ function Status({ r }) {
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }
@@ -273,14 +275,14 @@ function OwnedBy({ owner }) {
     <section className="wrap save-wrap" aria-labelledby="owned-h">
       <div className="save">
         {owner.avatar ? (
-          <a href={url} target="_blank" rel="noreferrer"><img src={owner.avatar} alt="" width="48" height="48" style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /></a>
+          <a href={url} target="_blank" rel="noreferrer"><img src={owner.avatar} alt="" width="48" height="48" style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = "none"; }} /></a>
         ) : (
           <span className="ic-tile"><Icon name="user" size={20} /></span>
         )}
         <div>
           <p className="eyebrow">Owned by</p>
           <h2 id="owned-h"><a href={url} target="_blank" rel="noreferrer">@{owner.username}</a>{owner.verified ? (<span> <Icon name="shield-check" size={16} /> Verified</span>) : null}</h2>
-          <p>{owner.name ? `${owner.name} · ` : ""}Owner of this stamp. Open their X profile to check who stamped it.</p>
+          <p>{owner.name ? `${owner.name} · ` : ""}Owner of this stamp.</p>
         </div>
         <div className="save-actions">
           <a className="btn btn-line" href={url} target="_blank" rel="noreferrer">View on X <Icon name="external-link" /></a>
