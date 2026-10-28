@@ -4,7 +4,7 @@
 // and never through a cached copy: the response varies by account, so it is never cached publicly.
 import { readResult } from "./_lib.js";
 import { getUser, sessionEmail } from "./_account.js";
-import { get, members, set } from "./_store.js";
+import { get } from "./_store.js";
 import { gatedSnapshot, migrateLegacy, publicChecks } from "./_gate.js";
 
 export default async function handler(req, res) {
@@ -18,27 +18,15 @@ export default async function handler(req, res) {
     snapshot = await get(`snap:${r.id}`).catch(() => null);
   }
   const email = await sessionEmail(req).catch(() => "");
-  // The stamp's owner, when they linked X: only public X profile facts, never their email. The owner is
-  // the first account that saved the stamp, so a later visitor saving it cannot take the card over. No
-  // X link, or no owner yet, means no card, and the free-account card stays as before.
+  // Manual claim only: the Owned by card shows only when someone pressed Claim this site for this
+  // stamp. Saving a stamp, or having it in a dashboard list, never creates the card on its own, and
+  // there is no fallback to saved stamps. Only public X profile facts, never their email. No X link,
+  // or no manual claim yet, means no card.
   let ownerX = null;
   try {
-    let ownerEmail = await get(`owner:${r.id}`).catch(() => null);
-    // Retroactive: old stamps saved to an account before an owner record was kept have no owner:<id>
-    // yet, even though an account is attached to them. Find that account from its saved stamps list,
-    // the same way the admin list does, and cache the owner so later reads and claims respect it.
-    if (!ownerEmail) {
-      for (const e of await members("idx:users").catch(() => [])) {
-        const u = await getUser(e).catch(() => null);
-        if (u && (u.stamps || []).some((s) => s.id === r.id)) {
-          ownerEmail = u.email;
-          await set(`owner:${r.id}`, ownerEmail).catch(() => {});
-          break;
-        }
-      }
-    }
-    if (ownerEmail) {
-      const owner = await getUser(ownerEmail);
+    const claimEmail = await get(`claim:${r.id}`).catch(() => null);
+    if (claimEmail) {
+      const owner = await getUser(claimEmail);
       if (owner?.x?.username) ownerX = { username: owner.x.username, name: owner.x.name || "", avatar: owner.x.avatar || "", verified: owner.x.verified === true };
     }
   } catch (_) {}

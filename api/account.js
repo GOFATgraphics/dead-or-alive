@@ -147,6 +147,30 @@ async function claim(email, jobs, directIds = []) {
   return added;
 }
 
+// Manual site claim, separate from saving a stamp. Saving never creates a claim card on its own;
+// only an explicit Claim this site press sets claim:<id>. First claimer wins, and a later claimer
+// gets taken:true, never the card over. The stamp is also added to the claimer's dashboard list.
+async function claimSite(email, id) {
+  if (!isResultId(id)) return { error: "No such stamp." };
+  const r = await readResult(id);
+  if (!r) return { error: "No such stamp." };
+  const existing = await get(`claim:${id}`).catch(() => null);
+  if (existing && existing !== email) return { taken: true };
+  const u = await getUser(email);
+  const hasX = !!u?.x?.username;
+  if (!existing) {
+    await set(`claim:${id}`, email);
+    await updateUser(email, (cur) => {
+      if (!cur) return undefined;
+      if ((cur.stamps || []).some((s) => s.id === id)) return undefined;
+      const add = { id: r.id, url: r.pageUrl, host: r.host, verdict: r.verdict, score: r.score ?? null, icon: r.icon || "", at: r.createdAt };
+      cur.stamps = [...(cur.stamps || []), add].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200);
+      return cur;
+    });
+  }
+  return { claimed: true, hasX, username: u?.x?.username || "" };
+}
+
 const APP_LINK = /^https:\/\/(apps\.apple\.com|itunes\.apple\.com|play\.google\.com|testflight\.apple\.com)\//i;
 
 async function submitReview(email, b) {
@@ -239,7 +263,7 @@ export default async function handler(req, res) {
         if (supaReady()) {
           const c = await sendSignInCode(email);
           if (!c.ok) return res.status(c.status === 429 ? 429 : 502).json({ error: SAY[c.code] || "The code didn't send. Try again." });
-          return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below to continue.` });
+          return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below to continue.` });
         }
       } else if (supaReady()) {
         // Sign in; if there's no login for this email yet, sign up, and the confirmation code goes out.
@@ -249,11 +273,11 @@ export default async function handler(req, res) {
           const c = await sendSignInCode(email);
           if (!c.ok) return res.status(c.status === 429 ? 429 : 502).json({ error: SAY[c.code] || "The code didn't send. Try again." });
           await clearFails(email);
-          return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below to continue.` });
+          return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below to continue.` });
         }
         if (!r.ok && r.code === "email_not_confirmed") {
           await resendConfirmation(email, backTo(b.next)).catch(() => {});
-          return res.status(202).json({ sent: true, code: true, note: `Confirm your email first. We sent a 6-digit code to ${email}. Enter it below to continue.` });
+          return res.status(202).json({ sent: true, code: true, note: `Confirm your email first. We sent a code to ${email}. Enter it below to continue.` });
         }
         if (!r.ok) {
           if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters. Been here before? That password doesn't match." });
@@ -272,7 +296,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ ...(await me(email)), created: true, setup: setup() });
           }
           if (up.error) return res.status(400).json({ error: SAY[up.error] || up.msg || "That didn't work. Try again." });
-          if (up.sent) return res.status(202).json({ sent: true, confirm: true, code: true, note: `Almost there. We sent a 6-digit code to ${email}. Enter it below to finish.` });
+          if (up.sent) return res.status(202).json({ sent: true, confirm: true, code: true, note: `Almost there. We sent a code to ${email}. Enter it below to finish.` });
           created = !u;
         }
         await clearFails(email);
@@ -325,13 +349,13 @@ export default async function handler(req, res) {
       if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
       const r = await sendSignInCode(email);
       if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again." });
-      return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below to continue.` });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below to continue.` });
     }
     if (op === "verify-code") {
       const email = normEmail(b.email);
       const token = String(b.token || "").replace(/[\s-]/g, "");
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
-      if (!/^\d{6}$/.test(token)) return res.status(400).json({ error: "Enter the 6-digit code from the email." });
+      if (!/^\d{6,8}$/.test(token)) return res.status(400).json({ error: "Enter the code from the email." });
       if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
       if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
       // A sign-up code first, then a sign-in code: both prove the same inbox.
@@ -353,7 +377,7 @@ export default async function handler(req, res) {
       if (!supaReady()) return res.status(503).json({ error: `Forgot your password and can't get a code? Write to ${process.env.CONTACT_EMAIL || "us"} and we'll help you in.` });
       const r = await sendSignInCode(email);
       if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again." });
-      return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below with a new password.` });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below with a new password.` });
     }
     if (op === "verify-reset-code") {
       // Step 2 of a reset: the code alone. A good code earns a one-time reset token, good for 15
@@ -362,7 +386,7 @@ export default async function handler(req, res) {
       const email = normEmail(b.email);
       const token = String(b.token || "").replace(/[\s-]/g, "");
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
-      if (!/^\d{6}$/.test(token)) return res.status(400).json({ error: "Enter the 6-digit code from the email." });
+      if (!/^\d{6,8}$/.test(token)) return res.status(400).json({ error: "Enter the code from the email." });
       if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
       if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
       const v = (await verifyCode(email, token, "signup").catch(() => ({ ok: false }))) || { ok: false };
@@ -433,6 +457,11 @@ export default async function handler(req, res) {
     if (op === "claim") {
       const n = await claim(email, b.jobs, b.ids);
       return res.status(200).json({ saved: n, ...(await me(email)) });
+    }
+    if (op === "claim-site") {
+      const out = await claimSite(email, String(b.id || ""));
+      if (out.error) return res.status(404).json(out);
+      return res.status(200).json({ ...out, ...(await me(email)) });
     }
     // Stage 3, website verification: the DNS TXT record for this account and host, and the check that
     // marks the site verified. Reading the technical report (Stage 2) does not need this.

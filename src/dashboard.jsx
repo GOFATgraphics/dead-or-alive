@@ -12,7 +12,7 @@ import { hasChecked, markChecked } from "./checked.js";
 
 // The dashboard: sign up or in, then everything a membership includes, in one place.
 // URL: ?plan=killSheet|stayAlive&url=… (buying: account first, then checkout), ?paid=…&checkout_id=… (back from checkout),
-// ?save=<stamp id> (save a free stamp), ?mode=signup|login, ?link=expired.
+// ?save=<stamp id> (save a free stamp), ?claim=<stamp id> (manual site claim), ?mode=signup|login, ?link=expired.
 
 const params = new URLSearchParams(location.search);
 const PLAN = PLANS[params.get("plan")] ? params.get("plan") : "";
@@ -149,7 +149,7 @@ function Auth({ setup, onIn }) {
     try {
       const out = await api("sendcode", { email, next });
       setCodeFor(email);
-      setMsg({ text: out.note || `We sent a 6-digit code to ${email}.` });
+      setMsg({ text: out.note || `We sent a code to ${email}.` });
     } catch (err) {
       setMsg({ bad: true, text: err.message });
     } finally {
@@ -157,7 +157,7 @@ function Auth({ setup, onIn }) {
     }
   }
   // Forgot password: a link on the form, not a sign-in option. It opens a reset card: email, then a
-  // 6-digit code, then a new password. After the reset, the user signs in the normal way.
+  // code, then a new password. After the reset, the user signs in the normal way.
   function openForgot(e) {
     const form = e.currentTarget.closest("form");
     const email = form && new FormData(form).get("email");
@@ -179,7 +179,7 @@ function Auth({ setup, onIn }) {
       const out = await api("forgot", { email });
       setResetFor(email);
       setResetSent(true);
-      setMsg({ text: out.note || `We sent a 6-digit code to ${email}.` });
+      setMsg({ text: out.note || `We sent a code to ${email}.` });
     } catch (err) {
       setMsg({ bad: true, text: err.message });
     } finally {
@@ -287,7 +287,7 @@ function Auth({ setup, onIn }) {
           <h2 className="auth-h">Reset your password</h2>
           <p className="sect-sub">Enter your email, we send a code. Enter the code, then create a new password and confirm it. After that, sign in with the new password.</p>
           {!resetVerified && <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200} defaultValue={resetFor} /></label>}
-          {resetSent && !resetVerified && <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} placeholder="123456" /></label>}
+          {resetSent && !resetVerified && <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={8} placeholder="Enter code" /></label>}
           {resetVerified && (<>
             <label>Create new password<input name="password" type="password" autoComplete="new-password" required /></label>
             <label>Confirm new password<input name="confirm" type="password" autoComplete="new-password" required /></label>
@@ -301,8 +301,8 @@ function Auth({ setup, onIn }) {
       {codeFor && (
         <form className="auth-card" onSubmit={verifyCode}>
           <h2 className="auth-h">Enter the code</h2>
-          <p className="sect-sub">We sent a 6-digit code to {codeFor}. Enter it to finish signing in.</p>
-          <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} placeholder="123456" /></label>
+          <p className="sect-sub">We sent a code to {codeFor}. Enter it to finish signing in.</p>
+          <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={8} placeholder="Enter code" /></label>
           <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Verify code"}</button>
           {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
           <button type="button" className="link quiet-link" onClick={sendCode} disabled={busy}>Send a new code</button>
@@ -1096,15 +1096,27 @@ function Dashboard({ data, setData, onOut }) {
   }, [running, data, banner, refresh]);
 
   // Free stamps from this browser: saved as soon as you're in. Came from a result page? Back to it.
-  // A ?save= stamp id is claimed too, so a visitor who opens the result in another browser can
-  // still claim it, not only the browser that made it. First saver still wins on the server.
+  // A ?save= stamp id is saved too, so a visitor who opens the result in another browser can
+  // still save it, not only the browser that made it. First saver still wins on the server.
+  // A ?claim= stamp id is a manual site claim, separate from saving: it sets the Owned by card,
+  // and only a Claim this site press sends it, never an automatic save.
   useEffect(() => {
     const j = jobs();
     const saveId = params.get("save") || "";
     const ids = /^[A-Za-z0-9_-]{6,40}$/.test(saveId) ? [saveId] : [];
+    const claimId = params.get("claim") || "";
+    const claimIds = /^[A-Za-z0-9_-]{6,40}$/.test(claimId) ? [claimId] : [];
     const back = params.get("back") || "";
     const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(`${back}?signedin=1`);
-    if (j.length || ids.length) api("claim", { jobs: j, ids }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
+    const run = async () => {
+      if (j.length || ids.length) {
+        const out = await api("claim", { jobs: j, ids }).catch(() => ({}));
+        forgetJobs(j);
+        if (out.saved && out.user) setData((d) => ({ ...d, ...out }));
+      }
+      if (claimIds.length) await api("claim-site", { id: claimIds[0] }).catch(() => ({}));
+    };
+    if (j.length || ids.length || claimIds.length) run().finally(done);
     else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

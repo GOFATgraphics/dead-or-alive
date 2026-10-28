@@ -1,7 +1,7 @@
 // Supabase Auth for email sign-up, email links, and email codes. Supabase sends the emails (confirm sign-up,
 // sign-in link, sign-in code); with Resend set as its custom SMTP, those emails come from the verified
 // domain instead of Supabase's shared sender. A link verifies with a token hash, a code verifies with the
-// 6-digit token the user types in. Either way the link/code only proves the email; accounts, plans, and
+// verification token the user types in. Either way the link/code only proves the email; accounts, plans, and
 // stamps stay in our store, keyed by the confirmed email, and our own session starts here.
 // Everything runs server-side with the project's publishable key (api/_plans.js SUPABASE).
 import { SUPABASE } from "./_plans.js";
@@ -36,11 +36,11 @@ export async function signUp(email, password, redirectTo) {
 
 export const resendConfirmation = (email, redirectTo) => call("resend", { type: "signup", email }, { redirect_to: redirectTo });
 export const sendSignInLink = (email, redirectTo) => call("otp", { email, create_user: true }, { redirect_to: redirectTo });
-// A 6-digit code for sign-in, instead of a link. Whether the email actually carries a code depends on the
+// A verification code for sign-in, instead of a link. Whether the email actually carries a code depends on the
 // Magic Link template in Supabase: it must include {{ .Token }}. The link in the same email still works.
 export const sendSignInCode = (email) => call("otp", { email, create_user: true });
 
-// The code from an email: the 6 digits the user types in. type "signup" is the confirm-sign-up code,
+// The code from an email: the digits the user types in. type "signup" is the confirm-sign-up code,
 // type "email" is the sign-in code. { ok, email, accessToken } when it's good. The access token is the
 // user's own verified session, which is how a forgotten password is set without an admin key: the user
 // proves the inbox with the code, then that session is allowed to change its own password.
