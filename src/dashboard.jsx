@@ -103,6 +103,7 @@ function Auth({ setup, onIn }) {
   const xNote = X_NOTE[params.get("x")];
   const [msg, setMsg] = useState(params.get("link") === "expired" ? { bad: true, text: "That sign-in link expired or was already used. Send a new one." } : xNote ? { bad: true, text: xNote } : null);
   const [wrong, setWrong] = useState(false);
+  const [codeFor, setCodeFor] = useState("");
   const plan = PLANS[PLAN];
   // Where X sends them back to: the same dashboard URL (plan, page, stamp to save), minus old X notes.
   const next = (() => {
@@ -120,7 +121,10 @@ function Auth({ setup, onIn }) {
     setMsg(null);
     try {
       const out = await api("continue", { email: f.get("email"), password: f.get("password"), jobs: jobs(), next });
-      if (out.sent) setMsg({ text: out.note || "Check your email for a sign-in link." });
+      if (out.sent) {
+        if (out.code) setCodeFor(f.get("email"));
+        setMsg({ text: out.note || "Check your email for a sign-in link." });
+      }
       else {
         track(out.created ? "signup" : "login", { plan: PLAN || "none" });
         onIn(out);
@@ -140,6 +144,37 @@ function Auth({ setup, onIn }) {
     try {
       await api("sendlink", { email, next });
       setMsg({ text: `We sent a sign-in link to ${email}. It works once, for 15 minutes.` });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  // A 6-digit code, instead of a link: easier on a phone, where a link can open in the wrong browser.
+  async function sendCode(e) {
+    const form = e.currentTarget.closest("form");
+    const email = (form && new FormData(form).get("email")) || codeFor;
+    if (!email) return setMsg({ bad: true, text: "Enter your email first." });
+    setBusy(true);
+    try {
+      const out = await api("sendcode", { email, next });
+      setCodeFor(email);
+      setMsg({ text: out.note || `We sent a 6-digit code to ${email}.` });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verifyCode(e) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("verify-code", { email: codeFor, token: f.get("code"), jobs: jobs(), next });
+      track("login", { plan: PLAN || "none" });
+      onIn(out);
     } catch (err) {
       setMsg({ bad: true, text: err.message });
     } finally {
@@ -189,8 +224,19 @@ function Auth({ setup, onIn }) {
         <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Continue"}</button>
         {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
         {setup?.emailLinks && (wrong || !msg) && <button type="button" className="link quiet-link" onClick={link} disabled={busy}><Icon name="mail" /> {wrong ? "Forgot it? Email me a sign-in link" : "Or email me a sign-in link, no password"}</button>}
+        {setup?.code && (wrong || !msg) && <button type="button" className="link quiet-link" onClick={sendCode} disabled={busy}><Icon name="mail" /> Or email me a 6-digit code</button>}
         <p className="fine">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
       </form>
+      {codeFor && (
+        <form className="auth-card" onSubmit={verifyCode}>
+          <h2 className="auth-h">Enter the code</h2>
+          <p className="sect-sub">We sent a 6-digit code to {codeFor}. Enter it to finish signing in. The link in the same email still works too.</p>
+          <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} placeholder="123456" /></label>
+          <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Verify code"}</button>
+          {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
+          <button type="button" className="link quiet-link" onClick={sendCode} disabled={busy}>Send a new code</button>
+        </form>
+      )}
     </main>
   );
 }

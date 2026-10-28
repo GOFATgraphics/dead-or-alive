@@ -303,8 +303,8 @@ function SavePrompt({ r }) {
         {state.status === "out" ? (
           <>
             <div>
-              <h2 id="save-h">Create a free account to save it.</h2>
-              <p>Keep this stamp, see all your stamps in one place, and get a free re-stamp after you fix it. No card.</p>
+              <h2 id="save-h">Create a free account to save it and see the details.</h2>
+              <p>Keep this stamp, see all your stamps in one place, get a free re-stamp after you fix it, and see the full technical report under the hood. No card.</p>
             </div>
             <div className="save-actions">
               <a className="btn btn-dark" href={next} onClick={() => track("save_click", { v: r.verdict })}>Save it free</a>
@@ -463,8 +463,9 @@ function Stack({ stack }) {
 function Snapshot({ s, r }) {
   // Locked, Stage 1: headings and stack categories only, never values. No DNS check here: a free account
   // is all it takes to read the full report (Stage 2), and the server already withheld the values.
+  // Locked: headings only, no second button. The SavePrompt card earlier on the page is the one
+  // free-account card, and it covers both saving the stamp and seeing these details.
   if (s?.locked) {
-    const next = r ? `/dashboard?save=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}` : "/dashboard";
     return (
       <section className="sect wrap" id="stack" aria-labelledby="stack-h">
         <div className="sect-head">
@@ -512,11 +513,6 @@ function Snapshot({ s, r }) {
             <p className="hood-list">HTML size, script count, and load measurements need a free account.</p>
           </div>
         )}
-        <div className="hood-block">
-          <div className="save-actions">
-            <a className="btn btn-dark" href={next}>Create a free account to see the details</a>
-          </div>
-        </div>
       </section>
     );
   }
@@ -614,8 +610,8 @@ function Result({ r }) {
         <Status r={r} />
         <Checks r={r} />
         <SavePrompt r={r} />
-        <Offers r={r} />
         <Share r={r} />
+        <Offers r={r} />
         <Snapshot s={r.snapshot} r={r} />
         <section className="final" aria-labelledby="final-h">
           <div className="final-in">

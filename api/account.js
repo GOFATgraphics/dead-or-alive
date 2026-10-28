@@ -2,7 +2,7 @@
 // Vercel's 12-function limit. Signed-in state is an HttpOnly session cookie (see _account.js).
 //   GET  me                      the account, its stamps, Kill Sheet report, Stay Alive monitor
 //   GET  link&t=...              a one-time email sign-in link: signs in, then opens the dashboard
-//   POST signup | login | sendlink | logout | password | delete
+//   POST signup | login | sendlink | sendcode | verify-code | logout | password | delete
 //   POST claim { jobs }          saves free stamps this browser made to the account
 //   POST verify-token { host }   the DNS TXT record for Stage 3 website verification
 //   POST verify-domain { host }  checks that TXT record and marks the site verified
@@ -25,7 +25,7 @@ import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, reconcile
 import { readReport, runScout } from "./_scout.js";
 import { forgetSite, readMonitors, runMonitor, seatsOf, sitesOf } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
-import { SAY, passwordSignIn, resendConfirmation, sendSignInLink, signUp, supaReady, verifyLink } from "./_supa.js";
+import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, verifyCode, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
@@ -83,7 +83,7 @@ async function me(email) {
 }
 
 function setup() {
-  return { ready: storeReady(), emailLinks: supaReady() || mailReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
+  return { ready: storeReady(), emailLinks: supaReady() || mailReady(), code: supaReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
 }
 
 async function sendLink(email, next) {
@@ -252,7 +252,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ ...(await me(email)), created: true, setup: setup() });
           }
           if (up.error) return res.status(400).json({ error: SAY[up.error] || up.msg || "That didn't work. Try again." });
-          if (up.sent) return res.status(202).json({ sent: true, confirm: true, note: `Almost there. We sent a confirmation link to ${email}. Open it on any device to finish.` });
+          if (up.sent) return res.status(202).json({ sent: true, confirm: true, code: true, note: `Almost there. We sent a 6-digit code to ${email}. Enter it below to finish, or click the link in the email.` });
           created = !u;
         }
         await clearFails(email);
@@ -298,6 +298,34 @@ export default async function handler(req, res) {
       }
       if (Array.isArray(b.jobs)) await claim(email, b.jobs);
       return res.status(200).json({ ...(await me(email)), setup: setup() });
+    }
+    if (op === "sendcode") {
+      const email = normEmail(b.email);
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Use a password, or email me a sign-in link." });
+      const r = await sendSignInCode(email);
+      if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again, or use a link." });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a 6-digit code to ${email}. Enter it below, or click the link in the email.` });
+    }
+    if (op === "verify-code") {
+      const email = normEmail(b.email);
+      const token = String(b.token || "").replace(/[\s-]/g, "");
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!/^\d{6}$/.test(token)) return res.status(400).json({ error: "Enter the 6-digit code from the email." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Use the link in the email instead." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, or use an email link." });
+      // A sign-up code first, then a sign-in code: both prove the same inbox.
+      const v = (await verifyCode(email, token, "signup").catch(() => ({ ok: false }))) || { ok: false };
+      const w = v.ok ? v : await verifyCode(email, token, "email").catch(() => ({ ok: false }));
+      if (!w.ok) {
+        await noteFail(email);
+        return res.status(400).json({ error: "That code didn't match or it expired. Try again, or click the link in the email.", code: "badcode" });
+      }
+      await clearFails(email);
+      await ensureUser(w.email);
+      await startSession(res, w.email);
+      if (Array.isArray(b.jobs)) await claim(w.email, b.jobs);
+      return res.status(200).json({ ...(await me(w.email)), verified: true, setup: setup() });
     }
     if (op === "sendlink") {
       const email = normEmail(b.email);
