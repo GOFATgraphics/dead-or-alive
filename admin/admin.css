@@ -19,12 +19,32 @@ body.ad-locked { overflow: hidden; }
 .ad-unlock > p { color: var(--body); font-size: 0.9375rem; }
 .ad-unlock .btn { width: 100%; }
 
-/* Layout */
-.ad .app { grid-template-columns: 13.5rem minmax(0, 1fr); gap: 2rem; padding-top: 1.75rem; }
-.ad .side { top: 1.25rem; }
-.ad .side-nav button:hover { background: var(--card); }
-.ad .side-nav button.on { background: var(--card); box-shadow: inset 2px 0 0 var(--ink), 0 0 0 1px var(--line); }
+/* Layout: the side panel is one bordered card, grouped so the daily work (stamps and
+   reviews) sits apart from people and money, and from system pages. The active item is
+   a solid ink pill, so it reads at a glance instead of a thin left bar. */
+.ad .app { grid-template-columns: 15rem minmax(0, 1fr); gap: 2rem; padding-top: 1.75rem; }
+.ad .side { top: 1.25rem; gap: 0; padding: 0.5rem; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow-1); }
+.ad .side-nav { gap: 0.15rem; }
+.ad .side-group { display: grid; gap: 0.15rem; }
+.ad .side-group + .side-group { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
+.ad .side-group-label { padding: 0 0.75rem 0.35rem; font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.ad .side-nav button { grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 0.65rem; min-height: 2.75rem; padding: 0 0.6rem; border-radius: 10px; }
+.ad .side-ic { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: 8px; background: var(--canvas); color: var(--body); }
+.ad .side-ic .ic { width: 1.05rem; height: 1.05rem; color: inherit; }
+.ad .side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad .side-nav button:hover { background: var(--canvas); }
+.ad .side-nav button:hover .side-ic { background: var(--card); }
+.ad .side-nav button.on { background: var(--ink); color: var(--page); }
+.ad .side-nav button.on .side-ic { background: transparent; color: var(--page); }
+.ad .side-nav button.on em { background: var(--page); color: var(--ink); }
+.ad .side-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ad .side-nav em.hot { background: var(--red); color: #fff; }
+.ad .side-nav button.on em.hot { background: var(--red); color: #fff; }
+.ad .side-foot { display: grid; gap: 0.45rem; margin-top: 0.9rem; padding: 0.9rem 0.75rem 0.4rem; border-top: 1px solid var(--line); font-size: 0.8125rem; font-weight: 600; }
+.ad .side-foot[hidden] { display: none; }
+.ad .side-foot-row { display: flex; align-items: center; gap: 0.55rem; }
+.ad .side-foot-link { justify-self: start; padding: 0; border: 0; background: none; color: var(--amber); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ad .side-foot-link:hover { color: var(--ink); }
 .ad .pane { display: grid; gap: 1rem; min-width: 0; }
 .ad .pane[hidden] { display: none; }
 .ad-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1rem; }
@@ -195,8 +215,13 @@ body.ad-locked { overflow: hidden; }
   .ad .app { grid-template-columns: minmax(0, 1fr); padding-top: 0.75rem; }
   .ad .grid2, .an-grid2 { grid-template-columns: minmax(0, 1fr); }
   .an-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ad .side-nav { margin: 0; padding: 0 0 0.5rem; }
-  .ad .side-nav button.on { box-shadow: inset 0 -2px 0 var(--ink); background: transparent; }
+  .ad .side { padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .ad .side-group { display: contents; }
+  .ad .side-group + .side-group { margin-top: 0; padding-top: 0; border-top: 0; }
+  .ad .side-group-label, .ad .side-foot { display: none; }
+  .ad .side-nav { display: flex; margin: 0; padding: 0 0 0.5rem; }
+  .ad .side-nav button { flex: none; width: auto; }
+  .ad .side-nav button.on { box-shadow: none; }
 }
 @media (max-width: 640px) {
   .hide-sm { display: none; }

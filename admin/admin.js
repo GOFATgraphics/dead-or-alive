@@ -118,24 +118,39 @@ import { barChart, renderAnalytics } from "./analytics.js";
   // Navigation
 
   const PANES = [
-    ["overview", "Overview", "layout-grid"],
-    ["stamps", "Stamps", "stamp"],
-    ["users", "Accounts", "users"],
-    ["members", "Members", "credit-card"],
-    ["payments", "Payments", "activity"],
-    ["reviews", "App reviews", "clipboard-list"],
-    ["analytics", "Analytics", "chart-column"],
-    ["setup", "Setup", "server"],
+    ["overview", "Overview", "layout-grid", "Work"],
+    ["stamps", "Stamps", "stamp", "Work"],
+    ["reviews", "App reviews", "clipboard-list", "Work"],
+    ["users", "Accounts", "users", "People and money"],
+    ["members", "Members", "credit-card", "People and money"],
+    ["payments", "Payments", "activity", "People and money"],
+    ["analytics", "Analytics", "chart-column", "System"],
+    ["setup", "Setup", "server", "System"],
   ];
   const counts = {};
   function renderNav() {
+    const groups = [];
+    for (const [id, label, ic, group] of PANES) {
+      let g = groups.find((x) => x.label === group);
+      if (!g) { g = { label: group, items: [] }; groups.push(g); }
+      const b = el("button", { type: "button", className: id === pane ? "on" : "" }, el("span", { className: "side-ic" }, icon(ic)), el("span", { className: "side-label", textContent: label }), counts[id] != null ? el("em", { className: id === "reviews" && counts[id] ? "hot" : "", textContent: num(counts[id]) }) : null);
+      if (id === pane) b.setAttribute("aria-current", "page");
+      b.onclick = () => go(id);
+      g.items.push(b);
+    }
     $("side-nav").replaceChildren(
-      ...PANES.map(([id, label, ic]) => {
-        const b = el("button", { type: "button", className: id === pane ? "on" : "" }, icon(ic), el("span", { textContent: label }), counts[id] != null ? el("em", { className: id === "reviews" && counts[id] ? "hot" : "", textContent: num(counts[id]) }) : null);
-        if (id === pane) b.setAttribute("aria-current", "page");
-        b.onclick = () => go(id);
-        return b;
-      })
+      ...groups.map((g) => el("div", { className: "side-group" }, el("p", { className: "side-group-label", textContent: g.label }), ...g.items))
+    );
+    const foot = $("side-foot");
+    const items = setup.items || [];
+    if (!items.length) { foot.hidden = true; return; }
+    const missing = items.filter(([, ok]) => !ok).length;
+    foot.hidden = false;
+    foot.replaceChildren(
+      el("span", { className: "side-foot-row" }, el("span", { className: `dot ${DESK.queueOpen ? "ok" : "run"}` }), el("span", { textContent: DESK.queueOpen ? "Stamping on" : "Stamping paused" })),
+      missing
+        ? el("button", { type: "button", className: "side-foot-link", textContent: `${num(missing)} to connect`, onclick: () => go("setup") })
+        : el("span", { className: "ad-muted", textContent: "All connected" })
     );
   }
   const count = (id, n) => { counts[id] = n; renderNav(); };
