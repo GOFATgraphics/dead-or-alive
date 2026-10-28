@@ -110,34 +110,83 @@ function audienceOf(texts) {
   return "";
 }
 
-function buttonFor(page, name) {
-  const t = page.lower;
-  if (/free trial/.test(t)) return "Start your free trial";
-  if (/waitlist|wait list|early access/.test(t)) return "Join the waitlist";
-  if (/book a (?:call|demo)|schedule a demo|get a demo/.test(t)) return "Book a 15-minute demo";
-  if (/app store|google play/.test(t)) return `Get ${name} on your phone`;
-  if (/\bfree\b|no card|no credit card/.test(t)) return `Try ${name} free`;
+// The button is the page's own main button, never a funnel step guessed from
+// words found anywhere on the page. Guessing from full text is how a free,
+// no-signup page ended up with "Join the waitlist": the word "waitlist"
+// appeared somewhere in the copy, but no button on the page said that.
+const SECONDARY_BUTTON = /^(try another|see how it works|learn more|read more|view|back|close|menu|sign in|log in|skip)\b/i;
+function buttonFor(ctas, name) {
+  const labels = (ctas || []).map((t) => String(t || "").trim()).filter((t) => t && t.length <= 60);
+  const main = labels.find((t) => !SECONDARY_BUTTON.test(t) && ACTION.test(t))
+    || labels.find((t) => !SECONDARY_BUTTON.test(t))
+    || labels[0];
+  if (main) return cap(main);
   return `Get started with ${name}`;
+}
+
+// Strip the audience out of "what it does": the templates add "for {who}"
+// themselves, so a "what" that already contains "for {who}" reads twice.
+// Also handles the case where whatItDoes truncated the audience mid-phrase.
+function stripAudience(what, who) {
+  let s = String(what || "");
+  if (!who) return s;
+  const esc = who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const first = who.split(/[\s,]+/).filter(Boolean)[0];
+  if (first) {
+    // Cut from the "for" that starts the audience, audience list and all.
+    // This must run before any partial removal, or it leaves an orphan tail
+    // like ", SaaS sites" behind. It also covers the case where "what" was
+    // truncated mid-list and who is only its first part.
+    const m = s.match(new RegExp(`\\bfor\\s+${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i"));
+    if (m && m.index !== undefined) s = s.slice(0, m.index).trim();
+  }
+  s = s.replace(new RegExp(`\\bfor\\s+${esc}\\b`, "i"), " ");
+  s = s.replace(new RegExp(`\\b${esc}\\b`, "i"), " ");
+  return s.replace(/\s{2,}/g, " ").replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/\s+(and|&)\s*$/, "").replace(/[,;:]$/, "").trim();
+}
+
+// A "what" that starts with a noun ("13 first-screen checks") needs a verb
+// before it can follow "helps ... to" or "helps ...". Verb-led phrases pass through.
+const VERB_START = /^(get|find|see|check|know|understand|fix|improve|turn|make|create|build|launch|grow|save|stop|start|discover|measure|score|run|try|use|book|join|buy|order|send|share|track|monitor|protect|audit|test|scan|verify|compare|calculate)\b/i;
+const verbWhat = (what) => (VERB_START.test(what) ? what : `get ${lowerFirst(what)}`);
+
+// Guard against a headline that repeats itself: any 3-word run appearing
+// twice, or "for" appearing twice, means the parts overlapped again.
+function repeatsItself(h) {
+  const words = String(h || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+  const seen = new Set();
+  for (let i = 0; i + 2 < words.length; i++) {
+    const gram = words.slice(i, i + 3).join(" ");
+    if (seen.has(gram)) return true;
+    seen.add(gram);
+  }
+  return (String(h).match(/\bfor\b/gi) || []).length > 1;
 }
 
 export function rewrites({ h1, subhead, description, title, host, ctas, fullText }) {
   const name = productName(title, host);
-  const what = whatItDoes(subhead || description || h1, name) || "[what it does, in plain words]";
-  const who = audienceOf([h1, subhead, description, title, fullText]) || "[who it's for]";
+  const rawWhat = whatItDoes(subhead || description || h1, name);
+  // Audience is a noun ("teams", "landing pages"), not a verb phrase: a
+  // "for teams to track work" capture must stop at "teams", or every
+  // template that adds "to" after it reads twice.
+  const whoRaw = audienceOf([h1, subhead, description, title, fullText]) || "[who it's for]";
+  const who = whoRaw.split(/\s+(?:to|that|which|who|when|where)\s+/)[0].replace(/[,;:]$/, "").trim() || whoRaw;
+  const what = stripAudience(rawWhat, who) || rawWhat || "[what it does, in plain words]";
+  const doing = verbWhat(what);
   const proof = (fullText.match(/\b\d[\d,.]*\s?(?:k|m)?\+?\s+(?:users|customers|teams|companies|founders|businesses|people|downloads|reviews|creators|stores|members|developers)\b/i) || [""])[0];
+  const fallback = `${cap(what)} for ${who}.`;
   const headlines = [
     `${cap(what)} for ${who}.`,
     `${cap(who)}: ${lowerFirst(what)}, without [the slow part].`,
-    `The simple way for ${who} to ${lowerFirst(what)}.`,
-  ].map((h) => h.replace(/\s{2,}/g, " "));
-  const page = { lower: String(fullText || "").toLowerCase() };
+    `The simple way for ${who} to ${lowerFirst(doing)}.`,
+  ].map((h) => h.replace(/\s{2,}/g, " ")).map((h) => (repeatsItself(h) ? fallback : h));
   return {
     product: name,
     found: { what, who, proof },
     before: { headline: h1 || "", subhead: subhead || description || "", buttons: (ctas || []).slice(0, 4) },
     headlines,
-    subhead: `${name} helps ${who} ${lowerFirst(what)}. ${proof ? `Trusted by ${proof}.` : "[One proof point: a number, a customer, or a result.]"}`,
-    button: buttonFor(page, name),
+    subhead: `${name} helps ${who} ${lowerFirst(doing)}. ${proof ? `Trusted by ${proof}.` : "[One proof point: a number, a customer, or a result.]"}`,
+    button: buttonFor(ctas, name),
     secondary: "See how it works",
     rules: ["Short enough to read in one glance", "No pitch-deck words", "Says who it's for", "One main button that says what happens next"],
   };

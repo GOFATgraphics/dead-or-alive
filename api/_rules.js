@@ -13,7 +13,7 @@ export const FOG = [
   "innovative", "world-class", "best-in-class", "all-in-one", "ai-native", "ai-powered", "future of", "transform",
   "the way you work", "what's next", "limitless", "frictionless", "holistic", "paradigm", "leverage", "disrupt",
 ];
-export const ACTION = /\b(try|start|get|sign ?up|join|book|buy|order|shop|download|install|request|subscribe|create|build|launch|claim|see pricing|pricing|demo|contact|talk to|apply|register)\b/i;
+export const ACTION = /\b(try|start|get|sign ?up|join|book|buy|order|shop|download|install|request|subscribe|create|build|launch|claim|see pricing|pricing|demo|contact|talk to|apply|register|stamp|check|scan|audit|test|analyse|analyze|verify|discover|find|see|watch|learn|explore|compare|calculate|measure|score|grade|run|free)\b/i;
 // Who it's for: "for <someone>" (not "for free", "for you", "for everyone"…), or a named audience anywhere in the
 // headline, subhead, description, or title. The words found are quoted back, so the result shows its evidence.
 export const FOR = /\b(?:made |built |designed |perfect |ideal |tools? |software |platform |app )?for\s+(?!free\b|you\b|your\s?self\b|yourself\b|everyone\b|anyone\b|everybody\b|all\b|good\b|example\b|more\b|less\b|life\b|now\b|today\b|real\b|years?\b|minutes?\b|seconds?\b|days?\b|the (?:first|best|price|win|future|rest)\b|a (?:fraction|few|while)\b|every(?:one|thing)?\b|whatever\b|instance\b)([a-z][\w'’-]*(?:\s+(?:and\s+|&\s+|on\s+|in\s+|of\s+|who\s+|at\s+)?[a-z][\w'’-]*){0,4})/i;
