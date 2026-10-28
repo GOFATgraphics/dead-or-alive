@@ -316,13 +316,32 @@ function chip(s) {
   return li;
 }
 
-// Once only: each stamp shows once, no loop clones. The strip is scrollable instead of
-// looping, so a page stamped more than once still appears a single time.
+// Once only, but moving again: each stamp shows once, no loop clones, and the strip
+// auto-scrolls like the old marquee. It scrolls to the end, pauses, then starts over,
+// instead of cloning the strip for a seamless loop, which is what made one page appear
+// several times. Pauses while you hover or focus it, and stays still for reduced motion.
+let mqTimer = null;
 function loopTrack() {
   const track = $("#mq-track");
   if (!track) return;
   [...track.querySelectorAll("[data-clone]")].forEach((n) => n.remove());
   track.style.animation = "none";
+  const win = track.closest(".mq-window");
+  if (!win || still) return;
+  if (mqTimer) clearInterval(mqTimer);
+  let paused = false, rest = 0;
+  win.addEventListener("mouseenter", () => { paused = true; });
+  win.addEventListener("mouseleave", () => { paused = false; });
+  win.addEventListener("focusin", () => { paused = true; });
+  win.addEventListener("focusout", () => { paused = false; });
+  mqTimer = setInterval(() => {
+    if (paused || document.hidden) return;
+    const max = win.scrollWidth - win.clientWidth;
+    if (max <= 0) return;
+    if (rest > 0) { rest--; return; }
+    if (win.scrollLeft >= max - 1) { win.scrollLeft = 0; rest = 50; return; }
+    win.scrollLeft += 1;
+  }, 30);
 }
 
 loopTrack();
