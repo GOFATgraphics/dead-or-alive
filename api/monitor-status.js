@@ -33,26 +33,22 @@ export default async function handler(req, res) {
   }
   const dots = last30.map((c) => `<span class="dot ${c.ok ? "up" : "down"}" title="${esc(new Date(c.at).toDateString())}: ${c.ok ? `${c.ms} ms` : "down"}"></span>`).join("");
   const monthRows = months.map((mo) => `<tr><td>${esc(mo.month)}</td><td>${mo.checks}</td><td>${mo.uptime != null ? `${mo.uptime}%` : "—"}</td><td>${mo.avgMs != null ? `${mo.avgMs} ms` : "—"}</td></tr>`).join("");
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.host)} status · StampMyPage</title><style>
-body{font:400 1rem/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#171717;background:#f7f7f5;margin:0;padding:2rem 1rem}
-main{max-width:40rem;margin:0 auto;background:#fff;border:1px solid #e5e5e0;border-radius:16px;padding:1.5rem 1.75rem}
-h1{font-size:1.5rem;letter-spacing:-.02em;margin:.25rem 0}.muted{color:#666;font-size:.9rem}
-.big{font-size:1.125rem;font-weight:700}.up{color:#15803d}.down{color:#b91c1c}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.25rem 0}.grid b{font-size:1.25rem;display:block}
-.dots{display:flex;flex-wrap:wrap;gap:4px;margin:.5rem 0}.dots .dot{width:12px;height:12px;border-radius:3px;background:#ddd}.dots .dot.up{background:#22c55e}.dots .dot.down{background:#ef4444}
-table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{text-align:left;padding:.4rem .5rem;border-bottom:1px solid #eee}
-a{color:#171717;font-weight:600}footer{max-width:40rem;margin:1rem auto;text-align:center;color:#666;font-size:.85rem}
-@media(max-width:520px){.grid{grid-template-columns:1fr}}
-</style></head><body><main>
-<p class="muted">Status, monitored by StampMyPage Stay Alive</p>
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.host)} status · StampMyPage</title><link rel="stylesheet" href="/status.css"></head><body>
+<header class="bar"><img src="/brand/smp-mark.svg" alt="" width="26" height="26"><span>StampMyPage</span><em>Status</em></header>
+<main><section class="card">
+<p class="eyebrow">Status, monitored by Stay Alive</p>
 <h1>${esc(s.host)}</h1>
-<p class="big ${s.currentUp ? "up" : "down"}">${s.currentUp == null ? "Checking…" : s.currentUp ? "● Up" : "● Down"}</p>
-<div class="grid"><div><b>${s.uptime != null ? `${s.uptime}%` : "—"}</b><span class="muted">uptime, last 30 days</span></div><div><b>${s.avgMs != null ? `${s.avgMs} ms` : "—"}</b><span class="muted">average answer</span></div><div><b>${s.verdictTo ? `${s.verdictTo} ${s.scoreTo != null ? `${s.scoreTo}/100` : ""}` : "—"}</b><span class="muted">latest stamp</span></div></div>
+<p><span class="pill ${s.currentUp ? "up" : s.currentUp === false ? "down" : "checking"}">${s.currentUp == null ? "Checking…" : s.currentUp ? "● Up" : "● Down"}</span></p>
+<div class="grid">
+<div class="kpi"><b>${s.uptime != null ? `${s.uptime}%` : "—"}</b><span>Uptime, last 30 days</span></div>
+<div class="kpi"><b>${s.avgMs != null ? `${s.avgMs} ms` : "—"}</b><span>Average answer</span></div>
+<div class="kpi"><b>${s.verdictTo ? `${s.verdictTo} ${s.scoreTo != null ? `${s.scoreTo}/100` : ""}` : "—"}</b><span>Latest stamp</span></div>
+</div>
 <p class="muted">Last check: ${s.lastCheckAt ? esc(new Date(s.lastCheckAt).toLocaleString()) : "not yet"}</p>
 <h2>Last 30 checks</h2><div class="dots">${dots || "<span class='muted'>No checks yet.</span>"}</div>
 <h2>By month</h2><table><tr><th>Month</th><th>Checks</th><th>Uptime</th><th>Avg answer</th></tr>${monthRows || "<tr><td colspan='4'>No checks yet.</td></tr>"}</table>
-${s.latestStampId ? `<p><a href="/v/${esc(s.latestStampId)}">See the latest stamp</a></p>` : ""}
-</main><footer>Monitored by <a href="/">StampMyPage</a> · Stay Alive</footer></body></html>`;
+${s.latestStampId ? `<a class="btn" href="/v/${esc(s.latestStampId)}">See the latest stamp</a>` : ""}
+</section></main><footer>Monitored by <a href="/">StampMyPage</a> · Stay Alive</footer></body></html>`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   return res.status(200).send(html);
 }

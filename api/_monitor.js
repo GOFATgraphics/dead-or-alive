@@ -167,20 +167,38 @@ export function reportSummary(m = {}, windowDays = 30) {
 function reportMail(email, m, s) {
   const inc = s.incidents.map((i) => i.ongoing ? `Down since ${new Date(i.start).toDateString()}, still down` : `Down ${new Date(i.start).toDateString()}${i.end ? `, back ${new Date(i.end).toDateString()}` : ""}`).join("\n");
   const scoreLine = s.scoreFrom != null && s.scoreTo != null ? `Score: ${s.scoreFrom} to ${s.scoreTo}${s.scoreTo > s.scoreFrom ? " (up)" : s.scoreTo < s.scoreFrom ? " (down)" : " (unchanged)"}.` : "No scored re-stamp in this period yet.";
+  const upColor = s.currentUp ? "#15803d" : "#b91c1c";
+  const upWord = s.currentUp == null ? "Checking" : s.currentUp ? "Up" : "Down";
+  const escH = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const text = `Your Stay Alive weekly report for ${s.host}\n\n` +
     `Uptime: ${s.uptime != null ? `${s.uptime}%` : "not yet"} over ${s.checks} check${s.checks === 1 ? "" : "s"}${s.windowDays ? " in the last 7 days" : " so far"}.\n` +
     `Average server answer: ${s.avgMs != null ? `${s.avgMs} ms` : "not yet"}.\n` +
-    `Right now: ${s.currentUp == null ? "checking" : s.currentUp ? "Up" : "Down"}.\n` +
+    `Right now: ${upWord}.\n` +
     `${scoreLine}\n` +
     `Changes spotted: ${s.changes}. Outages: ${s.incidents.length}.\n` +
     (inc ? `\nOutages:\n${inc}\n` : "") +
     `\nDetails in your dashboard: https://stampmypage.com/dashboard`;
-  const html = `<p>Your Stay Alive weekly report for <a href="${s.url}">${s.host}</a></p><ul>` +
-    `<li>Uptime: <b>${s.uptime != null ? `${s.uptime}%` : "not yet"}</b> over ${s.checks} checks${s.windowDays ? " in the last 7 days" : " so far"}</li>` +
-    `<li>Average server answer: <b>${s.avgMs != null ? `${s.avgMs} ms` : "not yet"}</b></li>` +
-    `<li>Right now: <b>${s.currentUp == null ? "checking" : s.currentUp ? "Up" : "Down"}</b></li>` +
-    `<li>${scoreLine}</li><li>Changes spotted: <b>${s.changes}</b>. Outages: <b>${s.incidents.length}</b>.</li></ul>` +
-    `<p><a href="https://stampmypage.com/dashboard">Details in your dashboard</a></p>`;
+  // Table layout with inline styles only, like the stamp verdict email: email clients
+  // ignore <style> blocks, so a plain <ul> renders as the generic list the user saw.
+  const html = `<!doctype html><html><body style="margin:0;background:#f6f5fc;color:#12132a;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" style="max-width:560px" cellpadding="0" cellspacing="0">
+<tr><td><img src="https://stampmypage.com/brand/smp-lockup.png" alt="StampMyPage" width="180" style="display:block;height:auto"></td></tr>
+<tr><td style="padding-top:24px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#5d6180">Stay Alive · Weekly report</td></tr>
+<tr><td style="padding-top:8px;font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1.1">${escH(s.host)}</td></tr>
+<tr><td style="padding-top:12px"><span style="display:inline-block;background:${s.currentUp ? "#dcfce7" : "#fee2e2"};color:${upColor};font-weight:700;font-size:15px;border-radius:999px;padding:6px 14px">● ${upWord}</span></td></tr>
+<tr><td style="padding-top:24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.uptime != null ? `${s.uptime}%` : "—"}</div><div style="font-size:13px;color:#5d6180">Uptime, last 7 days</div></td>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.avgMs != null ? `${s.avgMs} ms` : "—"}</div><div style="font-size:13px;color:#5d6180">Average answer</div></td>
+</tr><tr><td colspan="2" style="padding-top:12px"></td></tr><tr>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.scoreTo != null ? `${s.scoreTo}/100` : "—"}</div><div style="font-size:13px;color:#5d6180">Latest stamp score</div></td>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.incidents.length}</div><div style="font-size:13px;color:#5d6180">Outages this week</div></td>
+</tr></table></td></tr>
+<tr><td style="padding-top:24px;font-size:15px;line-height:1.6">${escH(scoreLine)}<br>Changes spotted: <b>${s.changes}</b> · Checks: <b>${s.checks}</b>${s.windowDays ? " in the last 7 days" : " so far"}.</td></tr>
+${s.incidents.length ? `<tr><td style="padding-top:16px;font-size:15px;line-height:1.6"><b>Outages:</b><br>${escH(inc).replace(/\n/g, "<br>")}</td></tr>` : ""}
+<tr><td style="padding-top:24px"><a href="https://stampmypage.com/dashboard" style="display:inline-block;background:#12132a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;border-radius:12px;padding:14px 22px">View dashboard</a></td></tr>
+<tr><td style="padding-top:32px;font-size:12px;color:#5d6180">Stamp My Page · Stay Alive. Your page, watched every day, reported every week.</td></tr>
+</table></td></tr></table></body></html>`;
   return mail(email, { subject: `Stay Alive weekly report: ${s.host} at ${s.uptime != null ? `${s.uptime}%` : "checking"} uptime`, text, html });
 }
 // One weekly report per watched site, at most every 7 days, only once a site has at
