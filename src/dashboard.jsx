@@ -266,7 +266,7 @@ function Auth({ setup, onIn }) {
         )}
       </div>
 
-      {!forgot && (<form className="auth-card" onSubmit={submit}>
+      {!forgot && !codeFor && (<form className="auth-card" onSubmit={submit}>
         <h2 className="auth-h">{plan ? "Continue to checkout" : "Sign up or sign in"}</h2>
         {setup?.x && (
           <>
@@ -306,6 +306,7 @@ function Auth({ setup, onIn }) {
           <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Verify code"}</button>
           {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
           <button type="button" className="link quiet-link" onClick={sendCode} disabled={busy}>Send a new code</button>
+          <button type="button" className="link quiet-link" onClick={() => { setCodeFor(""); setMsg(null); }} disabled={busy}>Use a different email</button>
         </form>
       )}
     </main>
