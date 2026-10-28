@@ -291,88 +291,20 @@ function OwnedBy({ owner }) {
 }
 
 function ClaimSite({ r }) {
-  const [state, setState] = useState({ status: "loading" });
-  const [claiming, setClaiming] = useState(false);
-  const [taken, setTaken] = useState(false);
-  const [claimedNoX, setClaimedNoX] = useState(false);
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/account", { cache: "no-store" });
-        if (!res.ok) return live && setState({ status: "off" });
-        const data = await res.json();
-        if (live) setState({ status: data.user ? "in" : "out" });
-      } catch (_) {
-        if (live) setState({ status: "off" });
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [r.id]);
-  async function claimThis() {
-    setClaiming(true);
-    try {
-      const c = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "claim-site", id: r.id }) }).then((x) => x.json()).catch(() => ({}));
-      if (c.taken) setTaken(true);
-      else if (c.claimed) {
-        if (c.hasX) location.reload();
-        else setClaimedNoX(true);
-      } else setTaken(true);
-    } catch (_) {
-      setTaken(true);
-    } finally {
-      setClaiming(false);
-    }
-  }
-  if (state.status === "loading" || state.status === "off") return null;
-  const next = `/dashboard?claim=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}`;
+  // Simplified claim: no account steps on this card. Connect with X is the claim itself, even
+  // if X was already used for sign-up. X connect sets the claim record and returns here, where
+  // the Owned by card then shows the X profile.
   return (
     <section className="wrap save-wrap" aria-labelledby="claim-h">
       <div className="save">
         <span className="ic-tile"><Icon name="shield-check" size={20} /></span>
-        {taken ? (
-          <>
-            <div>
-              <h2 id="claim-h">Already claimed.</h2>
-              <p>This site is already claimed by someone else. Refresh the page to see who claimed it.</p>
-            </div>
-            <div className="save-actions">
-              <button className="btn btn-line" type="button" onClick={() => location.reload()}>Refresh</button>
-            </div>
-          </>
-        ) : claimedNoX ? (
-          <>
-            <div>
-              <h2 id="claim-h">You claimed this site.</h2>
-              <p>Link X to show your Owned by card on this result page. Go to your dashboard and use Continue with X.</p>
-            </div>
-            <div className="save-actions">
-              <a className="btn btn-dark" href="/dashboard">Link X on dashboard</a>
-            </div>
-          </>
-        ) : state.status === "out" ? (
-          <>
-            <div>
-              <h2 id="claim-h">Claim this site.</h2>
-              <p>Claim it yourself, so anyone visiting this result page sees you as the owner. Sign in or create a free account to claim it.</p>
-            </div>
-            <div className="save-actions">
-              <a className="btn btn-dark" href={next} onClick={() => track("claim_click", { v: r.verdict })}>Claim this site</a>
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <h2 id="claim-h">Claim this site.</h2>
-              <p>Claim it yourself, so anyone visiting this result page sees you as the owner.</p>
-            </div>
-            <div className="save-actions">
-              <button className="btn btn-dark" type="button" onClick={claimThis} disabled={claiming}>{claiming ? "Claiming…" : "Claim this site"}</button>
-            </div>
-          </>
-        )}
+        <div>
+          <h2 id="claim-h">Claim this site.</h2>
+          <p>Connect with X to claim it yourself, so anyone visiting this result page sees you as the owner.</p>
+        </div>
+        <div className="save-actions">
+          <a className="btn btn-dark" href={`/auth/x?claim=${encodeURIComponent(r.id)}`} onClick={() => track("claim_click", { v: r.verdict })}>Connect with X</a>
+        </div>
       </div>
     </section>
   );
@@ -725,8 +657,8 @@ function Result({ r }) {
         <Checks r={r} />
         {r.ownerX ? <OwnedBy owner={r.ownerX} /> : (<><ClaimSite r={r} /><SavePrompt r={r} /></>)}
         <Share r={r} />
-        <Offers r={r} />
-        <Snapshot s={r.snapshot} r={r} />
+        {!r.ownerX && <Offers r={r} />}
+        {!r.ownerX && <Snapshot s={r.snapshot} r={r} />}
         <section className="final" aria-labelledby="final-h">
           <div className="final-in">
             <span className="app-tile"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>
