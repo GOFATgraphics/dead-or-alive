@@ -4,7 +4,7 @@
 // and never through a cached copy: the response varies by account, so it is never cached publicly.
 import { readResult } from "./_lib.js";
 import { getUser, sessionEmail } from "./_account.js";
-import { get } from "./_store.js";
+import { get, members, set } from "./_store.js";
 import { gatedSnapshot, migrateLegacy, publicChecks } from "./_gate.js";
 
 export default async function handler(req, res) {
@@ -23,7 +23,20 @@ export default async function handler(req, res) {
   // X link, or no owner yet, means no card, and the free-account card stays as before.
   let ownerX = null;
   try {
-    const ownerEmail = await get(`owner:${r.id}`).catch(() => null);
+    let ownerEmail = await get(`owner:${r.id}`).catch(() => null);
+    // Retroactive: old stamps saved to an account before an owner record was kept have no owner:<id>
+    // yet, even though an account is attached to them. Find that account from its saved stamps list,
+    // the same way the admin list does, and cache the owner so later reads and claims respect it.
+    if (!ownerEmail) {
+      for (const e of await members("idx:users").catch(() => [])) {
+        const u = await getUser(e).catch(() => null);
+        if (u && (u.stamps || []).some((s) => s.id === r.id)) {
+          ownerEmail = u.email;
+          await set(`owner:${r.id}`, ownerEmail).catch(() => {});
+          break;
+        }
+      }
+    }
     if (ownerEmail) {
       const owner = await getUser(ownerEmail);
       if (owner?.x?.username) ownerX = { username: owner.x.username, name: owner.x.name || "", avatar: owner.x.avatar || "", verified: owner.x.verified === true };
