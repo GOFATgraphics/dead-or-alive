@@ -112,7 +112,13 @@ export default async function handler(req, res) {
         // Admin-only: email is shown here, never on the public result page.
         let claimed = null;
         try {
-          const claimEmail = (await get(`claim:${id}`).catch(() => null)) || (r.host ? await get(`claimhost:${String(r.host).toLowerCase().trim()}`).catch(() => null) : null);
+          const hostKey = r.host ? String(r.host).toLowerCase().trim() : "";
+          let claimEmail = await get(`claim:${id}`).catch(() => null);
+          if (claimEmail && hostKey) {
+            const hostClaim = await get(`claimhost:${hostKey}`).catch(() => null);
+            if (!hostClaim) await set(`claimhost:${hostKey}`, claimEmail).catch(() => {});
+          }
+          if (!claimEmail && hostKey) claimEmail = await get(`claimhost:${hostKey}`).catch(() => null);
           if (claimEmail) {
             const cu = await getUser(claimEmail);
             claimed = { email: claimEmail, username: cu?.x?.username || "", name: cu?.x?.name || "" };
