@@ -264,8 +264,48 @@ function localJobs() {
   }
 }
 
+// A stamp whose owner linked X: who stamped it, with a link to their X profile. This replaces the
+// free-account card for that stamp, for every viewer, and there is no claim option on it: the stamp
+// already belongs to the first account that saved it.
+function OwnedBy({ owner }) {
+  const url = `https://x.com/${encodeURIComponent(owner.username)}`;
+  return (
+    <section className="wrap save-wrap" aria-labelledby="owned-h">
+      <div className="save">
+        {owner.avatar ? (
+          <a href={url} target="_blank" rel="noreferrer"><img src={owner.avatar} alt="" width="48" height="48" style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /></a>
+        ) : (
+          <span className="ic-tile"><Icon name="user" size={20} /></span>
+        )}
+        <div>
+          <p className="eyebrow">Owned by</p>
+          <h2 id="owned-h"><a href={url} target="_blank" rel="noreferrer">@{owner.username}</a>{owner.verified ? (<span> <Icon name="shield-check" size={16} /> Verified</span>) : null}</h2>
+          <p>{owner.name ? `${owner.name} · ` : ""}Owner of this stamp. Open their X profile to check who stamped it.</p>
+        </div>
+        <div className="save-actions">
+          <a className="btn btn-line" href={url} target="_blank" rel="noreferrer">View on X <Icon name="external-link" /></a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SavePrompt({ r }) {
   const [state, setState] = useState({ status: "loading" });
+  const [claiming, setClaiming] = useState(false);
+  const [taken, setTaken] = useState(false);
+  async function claimThis() {
+    setClaiming(true);
+    try {
+      const c = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "claim", ids: [r.id] }) }).then((x) => x.json()).catch(() => ({}));
+      if ((c.user?.stamps || []).some((x) => x.id === r.id)) setState({ status: "in", saved: true });
+      else setTaken(true);
+    } catch (_) {
+      setTaken(true);
+    } finally {
+      setClaiming(false);
+    }
+  }
   useEffect(() => {
     let live = true;
     (async () => {
@@ -303,21 +343,41 @@ function SavePrompt({ r }) {
         {state.status === "out" ? (
           <>
             <div>
-              <h2 id="save-h">Create a free account to save it and see the details.</h2>
-              <p>Keep this stamp, see all your stamps in one place, get a free re-stamp after you fix it, and see the full technical report under the hood. No card.</p>
+              <h2 id="save-h">Claim this stamp.</h2>
+              <p>Create a free account to claim it, see all your stamps in one place, get a free re-stamp after you fix it, and see the full technical report under the hood. No card.</p>
             </div>
             <div className="save-actions">
-              <a className="btn btn-dark" href={next} onClick={() => track("save_click", { v: r.verdict })}>Save it free</a>
+              <a className="btn btn-dark" href={next} onClick={() => track("save_click", { v: r.verdict })}>Claim it free</a>
+            </div>
+          </>
+        ) : state.saved ? (
+          <>
+            <div>
+              <h2 id="save-h">Saved to your dashboard.</h2>
+              <p>Every stamp you make while signed in lands there too.</p>
+            </div>
+            <div className="save-actions">
+              <a className="btn btn-line" href="/dashboard">Open dashboard <Icon name="arrow-right" /></a>
+            </div>
+          </>
+        ) : taken ? (
+          <>
+            <div>
+              <h2 id="save-h">Already claimed.</h2>
+              <p>This stamp is already claimed by another account, so it cannot be claimed again. Stamp the page again to make your own.</p>
+            </div>
+            <div className="save-actions">
+              <a className="btn btn-line" href="/dashboard">Open dashboard <Icon name="arrow-right" /></a>
             </div>
           </>
         ) : (
           <>
             <div>
-              <h2 id="save-h">{state.saved ? "Saved to your dashboard." : "You're signed in."}</h2>
-              <p>{state.saved ? "Every stamp you make while signed in lands there too." : "This stamp is saved to another account, or was made in another browser. Stamp the page again to add it to yours."}</p>
+              <h2 id="save-h">Claim this stamp.</h2>
+              <p>This stamp is not in your dashboard yet. Claim it to keep it, get a free re-stamp, and see the full report.</p>
             </div>
             <div className="save-actions">
-              <a className="btn btn-line" href="/dashboard">Open dashboard <Icon name="arrow-right" /></a>
+              <button className="btn btn-dark" type="button" onClick={claimThis} disabled={claiming}>{claiming ? "Claiming…" : "Claim this stamp"}</button>
             </div>
           </>
         )}
@@ -609,7 +669,7 @@ function Result({ r }) {
         <Hero r={r} />
         <Status r={r} />
         <Checks r={r} />
-        <SavePrompt r={r} />
+        {r.ownerX ? <OwnedBy owner={r.ownerX} /> : <SavePrompt r={r} />}
         <Share r={r} />
         <Offers r={r} />
         <Snapshot s={r.snapshot} r={r} />

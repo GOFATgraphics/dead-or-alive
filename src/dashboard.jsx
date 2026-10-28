@@ -1096,11 +1096,15 @@ function Dashboard({ data, setData, onOut }) {
   }, [running, data, banner, refresh]);
 
   // Free stamps from this browser: saved as soon as you're in. Came from a result page? Back to it.
+  // A ?save= stamp id is claimed too, so a visitor who opens the result in another browser can
+  // still claim it, not only the browser that made it. First saver still wins on the server.
   useEffect(() => {
     const j = jobs();
+    const saveId = params.get("save") || "";
+    const ids = /^[A-Za-z0-9_-]{6,40}$/.test(saveId) ? [saveId] : [];
     const back = params.get("back") || "";
     const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(`${back}?signedin=1`);
-    if (j.length) api("claim", { jobs: j }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
+    if (j.length || ids.length) api("claim", { jobs: j, ids }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
     else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

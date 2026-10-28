@@ -14,7 +14,7 @@
 //   POST review { ... }          submits an app review; POST revoke { id } deletes its test login
 import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
-import { readResult, resultId } from "./_lib.js";
+import { isResultId, readResult, resultId } from "./_lib.js";
 import { mail } from "./_publish.js";
 import { addTo, get, remove, seal, set, storeReady, unseal } from "./_store.js";
 import {
@@ -115,8 +115,14 @@ function afterConfirm(q) {
 const backTo = (next) => `${origin()}/dashboard${typeof next === "string" && /^\?[\w=&%.-]*$/.test(next) ? next : ""}`;
 
 // Free stamps the browser made: the job id is only known to the browser that started it, so it proves the stamp is theirs.
-async function claim(email, jobs) {
-  const ids = [...new Set((Array.isArray(jobs) ? jobs : []).filter((j) => UUID.test(String(j))).slice(0, 50))].map((j) => resultId(j));
+async function claim(email, jobs, directIds = []) {
+  // Two ways in: job ids from the browser that made the stamp (proof it is theirs), and stamp ids
+  // from a result page Claim button or a ?save= link (so a visitor who opens the result in another
+  // browser can still claim it). Either way, first saver wins, and an already-owned stamp is skipped,
+  // so claiming by link cannot take someone else's stamp.
+  const fromJobs = [...new Set((Array.isArray(jobs) ? jobs : []).filter((j) => UUID.test(String(j))).slice(0, 50))].map((j) => resultId(j));
+  const direct = [...new Set((Array.isArray(directIds) ? directIds : []).filter((id) => isResultId(id)).slice(0, 50))];
+  const ids = [...new Set([...fromJobs, ...direct])];
   const found = (await Promise.all(ids.map((id) => readResult(id)))).filter(Boolean);
   if (!found.length) return 0;
   // A stamp belongs to the first account that saves it. Another account signing in on the same browser later
@@ -425,7 +431,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
     if (op === "claim") {
-      const n = await claim(email, b.jobs);
+      const n = await claim(email, b.jobs, b.ids);
       return res.status(200).json({ saved: n, ...(await me(email)) });
     }
     // Stage 3, website verification: the DNS TXT record for this account and host, and the check that
