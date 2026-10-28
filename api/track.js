@@ -63,7 +63,9 @@ export default async function handler(req, res) {
     cmds.push(["PFADD", `${k}:uv`, visitor]);
     if (page) cmds.push(["PFADD", `${k}:uv:${page}`, visitor]);
     const ref = clean(b.r, 60).replace(/^www\./, "");
-    if (ref) cmds.push(["ZINCRBY", `${k}:ref:${page || "other"}`, 1, ref]);
+    // Direct is counted too, not left invisible: a view with no referrer recorded
+    // (typed URL, bookmark, app, or a browser that strips referrers) counts as "direct".
+    cmds.push(["ZINCRBY", `${k}:ref:${page || "other"}`, 1, ref || "direct"]);
     const country = clean(req.headers["x-vercel-ip-country"], 2).toUpperCase();
     if (country) cmds.push(["ZINCRBY", `${k}:country`, 1, country]);
     cmds.push(["ZINCRBY", `${k}:device`, 1, /Mobi|Android|iPhone|iPod/i.test(ua) ? "mobile" : /iPad|Tablet/i.test(ua) ? "tablet" : "desktop"]);

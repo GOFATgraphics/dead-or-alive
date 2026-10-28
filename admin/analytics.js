@@ -152,6 +152,25 @@ function table(headers, rows, empty) {
   return t;
 }
 
+
+// Traffic channels: a bar per channel, sized by its share of all recorded referrer visits.
+function channelBars(channels) {
+  if (!channels.length) return el("p", "an-empty", "No referrer data yet.");
+  const list = el("div", "an-channels");
+  for (const c of channels) {
+    const row = el("div", "an-channel");
+    const head = el("div", "an-channel-head");
+    head.append(el("span", "an-channel-label", c.channel), el("strong", "", `${num(c.visits)} · ${c.share}%`));
+    const track = el("div", "an-channel-track");
+    const fill = el("span", "an-channel-fill");
+    fill.style.width = `${Math.max(1.5, Math.min(100, c.share))}%`;
+    track.append(fill);
+    row.append(head, track);
+    list.append(row);
+  }
+  return list;
+}
+
 export function renderAnalytics(root, data) {
   const t = data.traffic;
   const b = data.business;
@@ -171,6 +190,20 @@ export function renderAnalytics(root, data) {
     tile("Sent to checkout", num(t?.totals.checkout_start), t ? `${num(t.totals.review_submit)} app reviews sent · ${num(t.totals["view:pricing"])} pricing views` : "Not connected")
   );
   out.push(tiles);
+
+  // Where visitors come from: channels first (Search, Social, Referral, Campaign, Direct),
+  // then the exact sites and links behind them, with each source's share.
+  if (t) {
+    const ts = section("Where visitors come from", "To the homepage. Direct means no referrer was recorded: typed URL, bookmark, app, or a browser that strips referrers. Direct is counted from this update onward, so older ranges understate it.");
+    ts.append(channelBars(t.channels || []));
+    if (t.referrers.length) ts.append(el("p", "an-hint", `Top source: ${t.referrers[0].name} (${num(t.referrers[0].count)} visits).`));
+    ts.append(table(["Source", "Visits", "Share"], t.referrers.map((r) => [r.name, num(r.count), pct(r.count, t.referrerTotal)]), "No outside sites yet."));
+    out.push(ts);
+    const rs = section("Where stamps get opened", "Sites people came from when opening a result page: where stamps are being posted.");
+    rs.append(channelBars(t.resultChannels || []));
+    rs.append(table(["Source", "Opens", "Share"], t.resultReferrers.map((r) => [r.name, num(r.count), pct(r.count, t.resultReferrerTotal)]), "No outside sites yet."));
+    out.push(rs);
+  }
 
   // Funnel
   const f = section("Funnel", "Visitors are counted once per day. Stamped counts published stamps.");
@@ -262,10 +295,6 @@ export function renderAnalytics(root, data) {
   // Where people come from, and what trips them up
   if (t) {
     const grid = el("div", "an-grid2");
-    const ref = section("Sites sending visitors", "To the homepage. Add ?ref=name to links you post to see them here.");
-    ref.append(table(["Source", "Visits"], t.referrers.map((r) => [r.name, num(r.count)]), "No outside sites yet."));
-    const posts = section("Where stamps get opened", "Sites people came from when opening a result page: where stamps are being posted.");
-    posts.append(table(["Source", "Opens"], t.resultReferrers.map((r) => [r.name, num(r.count)]), "No outside sites yet."));
     const countries = section("Countries");
     let regionName;
     try {
@@ -290,7 +319,7 @@ export function renderAnalytics(root, data) {
         ""
       )
     );
-    grid.append(ref, posts, countries, devices, errs, other);
+    grid.append(countries, devices, errs, other);
     out.push(grid);
   }
 

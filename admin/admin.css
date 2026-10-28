@@ -280,3 +280,11 @@ body.ad-locked { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .ad-sheet, .ad-scrim { animation: none; } .ad .app { transition: none; } }
 #members, #stamps, #users, #reviews { display: grid; gap: 1rem; min-width: 0; }
 .ad-sheet-body > * { flex: none; }
+
+/* Traffic channels: a labeled bar per channel, sized by share, like the funnel but by source. */
+.an-channels { display: grid; gap: 0.85rem; margin-top: 1rem; }
+.an-channel-head { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.875rem; }
+.an-channel-head strong { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.an-channel-track { margin-top: 0.3rem; height: 8px; border-radius: 4px; background: var(--canvas); overflow: hidden; }
+.an-channel-fill { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
+.an-card .an-table { margin-top: 1rem; }
