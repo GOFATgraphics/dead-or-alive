@@ -4,7 +4,8 @@
 // Env: BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY.
 import crypto from "node:crypto";
 import { head, put } from "@vercel/blob";
-import { readResult, resultId } from "./_lib.js";
+import { resultId } from "./_lib.js";
+import { readFullResult } from "./_gate.js";
 import { inspect } from "./_inspect.js";
 import { capture, isBusy } from "./_shot.js";
 import { scorePage } from "./_rules.js";
@@ -182,5 +183,5 @@ export async function stampNow(pageUrl) {
   const job = crypto.randomUUID();
   const out = await processStamp(job, pageUrl);
   if (out?.failed) return { failed: out.failed, reason: failReason(out.failed) };
-  return (await readResult(resultId(job))) || { failed: "The stamp didn't save.", reason: "other" };
+  return (await readFullResult(resultId(job))) || { failed: "The stamp didn't save.", reason: "other" };
 }

@@ -4,6 +4,8 @@
 //   GET  link&t=...              a one-time email sign-in link: signs in, then opens the dashboard
 //   POST signup | login | sendlink | logout | password | delete
 //   POST claim { jobs }          saves free stamps this browser made to the account
+//   POST verify-token { host }   the DNS TXT record for Stage 3 website verification
+//   POST verify-domain { host }  checks that TXT record and marks the site verified
 //   POST checkout { plan, url }  the Polar checkout link, with this account's email and id
 //   POST confirm { checkoutId }  back from Polar: confirm the payment now if the API token is set
 //   POST url { plan, url }       sets the page a plan works on and starts its run
@@ -27,6 +29,7 @@ import { SAY, passwordSignIn, resendConfirmation, sendSignInLink, signUp, supaRe
 import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
+import { checkDomain, ensureToken } from "./_gate.js";
 
 const mailReady = () => !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
 const origin = () => (process.env.SITE_URL || "https://stampmypage.com").replace(/\/$/, "");
@@ -326,6 +329,16 @@ export default async function handler(req, res) {
     if (op === "claim") {
       const n = await claim(email, b.jobs);
       return res.status(200).json({ saved: n, ...(await me(email)) });
+    }
+    // Stage 3, website verification: the DNS TXT record for this account and host, and the check that
+    // marks the site verified. Reading the technical report (Stage 2) does not need this.
+    if (op === "verify-token") {
+      return res.status(200).json(await ensureToken(email, b.host));
+    }
+    if (op === "verify-domain") {
+      const v = await checkDomain(email, b.host);
+      if (v.error && !v.pending) return res.status(400).json(v);
+      return res.status(200).json(v);
     }
     if (op === "checkout") {
       const plan = String(b.plan || "");

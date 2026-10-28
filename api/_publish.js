@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 import { escapeHtml, paths, readResult, resultId } from "./_lib.js";
 import { pipeline, redisReady } from "./_redis.js";
 import { list } from "@vercel/blob";
+import { set } from "./_store.js";
 import { snapshotRows } from "../src/snapshot.js";
 
 const COLOR = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
@@ -109,6 +110,11 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
   const opts = { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 60 };
   const v = Date.now();
   const imageUrl = (await put(p.image, image, { ...opts, contentType: "image/jpeg" })).url;
+  // The snapshot never goes into the public record: /api/verdict returns it only to a signed-in account
+  // (Stage 2), so it lives under a hashed store key instead, where it cannot be rebuilt from the record
+  // or the image URL. Older records are moved there on first read (api/_gate.js).
+  const { snapshot: snap, ...restExtra } = extra;
+  if (snap) await set(`snap:${id}`, snap).catch((err) => console.error("Snapshot store failed:", id, err));
   const record = {
     id,
     number: await stampNumber(id),
@@ -118,7 +124,7 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
     host: url.hostname.replace(/^www\./, ""),
     image: `${imageUrl}?v=${v}`,
     createdAt: new Date().toISOString(),
-    ...extra,
+    ...restExtra,
   };
   if (shot) {
     try {
@@ -137,7 +143,7 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
   await put(p.json, JSON.stringify(record), { ...opts, contentType: "application/json" });
   await noteRecent(record);
   const link = `${origin}/v/${id}`;
-  const mail = sendMail && email ? await sendEmail(email, { ...record, link }) : { emailed: false };
+  const mail = sendMail && email ? await sendEmail(email, { ...record, snapshot: snap, link }) : { emailed: false };
   return { url: link, ...mail };
 }
 

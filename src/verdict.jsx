@@ -460,7 +460,66 @@ function Stack({ stack }) {
   );
 }
 
-function Snapshot({ s }) {
+function Snapshot({ s, r }) {
+  // Locked, Stage 1: headings and stack categories only, never values. No DNS check here: a free account
+  // is all it takes to read the full report (Stage 2), and the server already withheld the values.
+  if (s?.locked) {
+    const next = r ? `/dashboard?save=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}` : "/dashboard";
+    return (
+      <section className="sect wrap" id="stack" aria-labelledby="stack-h">
+        <div className="sect-head">
+          <p className="eyebrow">Stack and speed</p>
+          <h2 id="stack-h">Under the hood</h2>
+          <p className="sect-sub">Measured once, when we stamped the page, in a real browser and from its HTML and headers. The details below need a free account. No DNS check just to read them.</p>
+        </div>
+        {s.hasStack && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="layers" /> Tech stack</h3>
+            <p className="hood-list">{s.stackCategories.join(", ")} detected. Tool names and evidence need a free account.</p>
+          </div>
+        )}
+        {s.hasSpeed && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="gauge" /> Real speed</h3>
+            <p className="hood-list">Load-time measurements need a free account.</p>
+          </div>
+        )}
+        {s.hasFacts && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="search" /> Search, security, delivery</h3>
+            <p className="hood-list">Header values and configuration details need a free account.</p>
+          </div>
+        )}
+        {(s.hasThirdParty || s.hasFonts) && (
+          <div className="hood-block hood-two">
+            {s.hasThirdParty && (
+              <div>
+                <h3 className="hood-h"><Icon name="globe" /> Other domains loaded</h3>
+                <p className="hood-list">Third-party domains need a free account.</p>
+              </div>
+            )}
+            {s.hasFonts && (
+              <div>
+                <h3 className="hood-h"><Icon name="type" /> Fonts in use</h3>
+                <p className="hood-list">Fonts in use need a free account.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {s.hasRequestRows && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="server" /> From our own request</h3>
+            <p className="hood-list">HTML size, script count, and load measurements need a free account.</p>
+          </div>
+        )}
+        <div className="hood-block">
+          <div className="save-actions">
+            <a className="btn btn-dark" href={next}>Create a free account to see the details</a>
+          </div>
+        </div>
+      </section>
+    );
+  }
   const rows = snapshotRows(s);
   if (!rows.length && !s?.stack?.length) return null;
   const speed = speedRows(s?.browser);
@@ -557,7 +616,7 @@ function Result({ r }) {
         <SavePrompt r={r} />
         <Offers r={r} />
         <Share r={r} />
-        <Snapshot s={r.snapshot} />
+        <Snapshot s={r.snapshot} r={r} />
         <section className="final" aria-labelledby="final-h">
           <div className="final-in">
             <span className="app-tile"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>

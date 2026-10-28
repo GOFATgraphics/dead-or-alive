@@ -13,7 +13,8 @@
 //   POST recards { cursor }        redraws published stamps' share cards in the current design, about 10 per call
 // Env: ADMIN_KEY.
 import { waitUntil } from "@vercel/functions";
-import { polarReady, readResult, requireAdmin } from "./_lib.js";
+import { polarReady, requireAdmin } from "./_lib.js";
+import { readFullResult } from "./_gate.js";
 import { redisReady } from "./_redis.js";
 import { get, members, remove, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
@@ -104,9 +105,10 @@ export default async function handler(req, res) {
         const r = await fetch(`${x.url}?t=${Date.parse(x.uploadedAt) || 0}`).then((y) => (y.ok ? y.json() : null)).catch(() => null);
         if (!r) return null;
         const checks = Array.isArray(r.checks) ? r.checks.filter((k) => !k.skip) : [];
+        const snap = r.snapshot || (await get(`snap:${id}`).catch(() => null));
         return {
           id, number: r.number, host: r.host, pageUrl: r.pageUrl, verdict: r.verdict, score: r.score ?? null, createdAt: r.createdAt, icon: r.icon || "",
-          failed: checks.filter((k) => !k.pass).map((k) => k.label), stack: (r.snapshot?.stack || []).length, lcp: r.snapshot?.browser?.lcp || null,
+          failed: checks.filter((k) => !k.pass).map((k) => k.label), stack: (snap?.stack || []).length, lcp: snap?.browser?.lcp || null,
           owner: owners.get(id) || "",
         };
       })
@@ -115,7 +117,7 @@ export default async function handler(req, res) {
   }
 
   if (op === "stamp") {
-    const r = await readResult(String(req.query.id || ""));
+    const r = await readFullResult(String(req.query.id || ""));
     return r ? res.status(200).json({ stamp: r }) : res.status(404).json({ error: "No such stamp." });
   }
 
