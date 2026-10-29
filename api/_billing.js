@@ -38,6 +38,29 @@ export function checkoutUrl(plan, user, pageUrl, yearly = false) {
   return u.toString();
 }
 
+// The Kill Sheet's Stay Alive offer: a checkout with the half-price first month already applied and no code box.
+// Made through the API when it can be; otherwise the preset link, with the same account details as any checkout.
+export async function offerCheckoutUrl(user) {
+  const o = CHECKOUT.stayAlive.offer;
+  if (polarApiReady()) {
+    try {
+      const site = (process.env.SITE_URL || "https://stampmypage.com").replace(/\/$/, "");
+      const c = await polar("/v1/checkouts/", { method: "POST", body: {
+        products: [CHECKOUT.stayAlive.productId], discount_id: o.discountId, allow_discount_codes: false, seats: 1,
+        customer_email: user.email, metadata: { reference_id: user.id },
+        success_url: `${site}/dashboard?paid=stay_alive&checkout_id={CHECKOUT_ID}`, return_url: `${site}/dashboard#kill-sheet`,
+      } });
+      if (c?.url) return c.url;
+    } catch (err) {
+      console.error("Offer checkout failed, using the preset link:", err.message);
+    }
+  }
+  const u = new URL(o.url);
+  u.searchParams.set("customer_email", user.email);
+  u.searchParams.set("reference_id", user.id);
+  return u.toString();
+}
+
 // HMAC-SHA256 over "id.timestamp.body". Polar has two keys, by when the endpoint's secret was made: since
 // 8 Sep 2026 it's Standard Webhooks (the base64 after "whsec_", decoded); before, the secret's own UTF-8 bytes.
 // Both are tried, as Polar's SDKs do.

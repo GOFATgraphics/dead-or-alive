@@ -54,3 +54,13 @@ button.btn { border: 0; cursor: pointer; font: inherit; font-weight: 700; }
   .actions, .months { display: none; }
   .kpi, table, .changes li { break-inside: avoid; }
 }
+
+/* Read-only Kill Sheet (/sheet/<token>). */
+.shot { display: block; width: 100%; height: auto; border: 1px solid #e6e3f1; border-radius: 12px; }
+.fixlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.fixlist li { padding: 0.85rem 1rem; border: 1px solid #e6e3f1; border-radius: 12px; font-size: 0.9375rem; }
+.fixlist li.done { background: #f0fdf4; border-color: #bbf7d0; }
+.fixlist li p { margin: 0.35rem 0 0; }
+.fx-top { display: flex; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.fx-top span { color: #15803d; font-weight: 700; font-size: 0.875rem; }
+th small { font-weight: 500; color: #8a8ca6; }

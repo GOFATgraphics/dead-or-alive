@@ -13,6 +13,12 @@ export const CHECKOUT = {
       productId: "4b215eba-4694-4919-b66b-8f99b2a52bd9",
       url: "https://buy.polar.sh/polar_cl_hos0tdCJCEJdKQAx8KACyEOC9noE2jy5z35Sy0tjnI0",
     },
+    // Kill Sheet owners who re-stamped: the first month at half price ($10), once. The discount has no code, so
+    // it can only come from here: a checkout made by the server, or this link with it preset as a fallback.
+    offer: {
+      discountId: "ff31f2ca-a789-4607-a996-8ec0ffa080fc",
+      url: "https://buy.polar.sh/polar_cl_9zex9oZIuDmR1WSP9p0NqPKx8rUKYM1gniK0O1X76dy",
+    },
   },
 };
 

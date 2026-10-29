@@ -48,6 +48,10 @@
     {
       "source": "/report/:token",
       "destination": "/api/monitor-status?report=:token"
+    },
+    {
+      "source": "/sheet/:token",
+      "destination": "/api/monitor-status?sheet=:token"
     }
   ],
   "headers": [
@@ -136,6 +140,15 @@
     },
     {
       "source": "/report(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/sheet(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

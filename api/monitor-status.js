@@ -3,9 +3,11 @@
 // no owner email, no stack, no change details. Off by default, and a site that never
 // opted in answers 404, so monitored sites cannot be enumerated by guessing.
 // GET /status/<site id> (rewrite in vercel.json) or ?id=<site id>&format=json.
-// The badge (?badge=1) and the client report (?report=<signed token>, /report/<token>) live here too, so this stays
+// The badge (?badge=1), the client report (?report=<signed token>, /report/<token>) and the read-only Kill Sheet
+// (?sheet=<signed token>, /sheet/<token>) live here too, so this stays
 // one function: Vercel Hobby allows 12.
 import { downMinutes, findPublicMonitor, findReport, incidentList, monthlyHistory, reportSummary, uptimeOver } from "./_monitor.js";
+import { findSheet } from "./_scout.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const mins = (n) => (n < 1 ? "None" : n < 60 ? `${Math.round(n)} min` : `${Math.floor(n / 60)} h ${Math.round(n % 60)} min`);
@@ -126,9 +128,45 @@ ${changes.length ? `<ul class="changes">${changes.map((c) => `<li><time>${esc(da
 </section></main><footer>Monitored with <a href="/">Stamp My Page</a> · Stay Alive</footer><script src="/report.js"></script>`);
 }
 
+// The Kill Sheet, read-only, for whoever makes the fixes: the fixes in order with points and time, the checklist
+// as the owner left it, and the rewrites. Nothing about the account.
+export function sheetPage(r) {
+  const host = (() => { try { return new URL(r.url).hostname; } catch (_) { return r.url; } })();
+  const done = new Set(r.done || []);
+  const rw = r.rewrites || {};
+  const subheads = rw.subheads || (rw.subhead ? [{ angle: "Subhead", text: rw.subhead }] : []);
+  const fixes = (r.fixes || []).map((f, i) => `<li class="${done.has(f.title) ? "done" : ""}"><div class="fx-top"><b>${done.has(f.title) ? "✓ " : ""}${i + 1}. ${esc(f.title)}</b><span>${f.points != null ? `+${f.points} points` : esc(f.impact)}${f.effort ? ` · about ${esc(f.effort)}` : ""}</span></div><p>${esc(f.problem)}</p><p><b>Fix:</b> ${esc(f.fix)}</p>${f.after ? `<p class="muted">Score after this one: ${f.after.score} (${esc(f.after.verdict)})</p>` : ""}</li>`).join("");
+  return page(`${host} · Kill Sheet`, `
+<header class="bar"><img src="/brand/smp-mark.svg" alt="" width="26" height="26"><span>Stamp My Page</span><em>Kill Sheet, read-only</em></header>
+<main><section class="card report">
+<p class="eyebrow">Fixes for ${esc(host)}</p>
+<h1>${esc(host)}</h1>
+<p class="muted">${esc(r.url)}${r.stamp ? ` · stamped ${esc(r.stamp.verdict)} ${r.stamp.score}/100` : ""} · ${done.size} of ${(r.fixes || []).length} fixes done</p>
+${r.stamp?.image ? `<p><a href="/v/${esc(r.stamp.id)}"><img class="shot" src="${esc(r.stamp.image)}" alt="The stamp, with the problems circled"></a></p>` : ""}
+<h2>Fixes, in order</h2>
+<ol class="fixlist">${fixes}</ol>
+<h2>Copy to use</h2>
+<table>
+<tr><th scope="row">Headline now</th><td>${esc(rw.before?.headline || "No headline found")}</td></tr>
+${(rw.headlines || []).map((h, i) => `<tr><th scope="row">Headline ${i + 1}${rw.angles?.[i] ? `<br><small>${esc(rw.angles[i])}</small>` : ""}</th><td>${esc(h)}</td></tr>`).join("")}
+${subheads.map((s) => `<tr><th scope="row">Subhead<br><small>${esc(s.angle)}</small></th><td>${esc(s.text)}</td></tr>`).join("")}
+${rw.button ? `<tr><th scope="row">Main button</th><td>${esc(rw.button)}</td></tr>` : ""}
+</table>
+<p class="muted">Words in [brackets] are for the owner to fill in.</p>
+${r.fullShot ? `<p><a class="btn" href="${esc(r.fullShot)}">Full-page screenshot</a></p>` : ""}
+<p class="actions"><button type="button" class="btn" data-print>Print or save as PDF</button></p>
+</section></main><footer>Made with <a href="/">Stamp My Page</a></footer><script src="/report.js"></script>`);
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Robots-Tag", "noindex");
+  if (req.query.sheet) {
+    const r = await findSheet(String(req.query.sheet)).catch(() => null);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    if (!r) return res.status(404).send(page("Kill Sheet not found", `<main><section class="card"><h1>No Kill Sheet here</h1><p class="muted">This link isn't valid any more. Ask whoever sent it for a new one.</p></section></main>`));
+    return res.status(200).send(sheetPage(r));
+  }
   if (req.query.report) {
     const found = await findReport(String(req.query.report)).catch(() => null);
     res.setHeader("Content-Type", "text/html; charset=utf-8");

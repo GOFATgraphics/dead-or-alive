@@ -518,9 +518,93 @@ function Working({ text }) {
   return <p className="working"><span className="spin" aria-hidden="true"></span>{text}</p>;
 }
 
-function KillSheet({ user, report, onChange }) {
+// Before and after the free re-stamp, side by side, with ways to share it.
+function BeforeAfter({ before, after }) {
+  const link = `${location.origin}/v/${after.id}`;
+  const host = (() => { try { return new URL(link).host; } catch (_) { return ""; } })();
+  const text = `My landing page went from ${before.verdict} ${before.score} to ${after.verdict} ${after.score}/100. Stamped by rules, not AI.`;
+  const up = after.score - before.score;
+  return (
+    <div className="ba">
+      <div className="ba-head">
+        <b className="ba-score">{before.score} <span aria-hidden="true">→</span> {after.score}</b>
+        <span>{up > 0 ? `+${up} points since you shipped the fixes` : up < 0 ? `${up} points since the first stamp` : "Same score as the first stamp"} · {before.verdict} to {after.verdict}</span>
+      </div>
+      <div className="ba-shots">
+        <figure><img src={before.image} alt={`Before: ${before.verdict} ${before.score}`} loading="lazy" /><figcaption>Before · {before.verdict} {before.score}</figcaption></figure>
+        <figure><img src={after.image} alt={`After: ${after.verdict} ${after.score}`} loading="lazy" /><figcaption>After · {after.verdict} {after.score}</figcaption></figure>
+      </div>
+      {up > 0 && (
+        <div className="row-actions">
+          <a className="btn btn-dark btn-sm" href={`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`} target="_blank" rel="noopener noreferrer">Share on X</a>
+          <a className="btn btn-line btn-sm" href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`} target="_blank" rel="noopener noreferrer">Share on LinkedIn</a>
+          <Copy text={`${text} ${link}`} label="Copy text and link" done="Copied" />
+          <span className="fine">{host}/v/{after.id.slice(0, 8)}… shows your new stamp.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One competitor stamped with the same rules, check by check next to the member's page.
+function KsRival({ report, onChange }) {
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const r = report.rival;
+  const mine = report.stamp;
+  const go = async (e) => {
+    e.preventDefault(); setBusy(true); setErr("");
+    try { onChange(await api("ks-rival", { url })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
+  };
+  const host = (u) => u.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return (
+    <>
+      <h3>You vs a competitor</h3>
+      {!r || r.failed ? (
+        <>
+          <p className="fine">Stamp one competitor's page with the same 13 checks and see where they beat you, check by check. One comparison is included.{r?.failed ? ` The last try couldn't stamp ${host(r.url)}: ${r.failed}` : ""}</p>
+          <form className="row-actions" onSubmit={go}>
+            <input className="inline-input" type="text" inputMode="url" value={url} maxLength={300} onChange={(e) => setUrl(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor's page" />
+            <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !url.trim()}>{busy ? "Checking…" : "Compare"}</button>
+          </form>
+          {err && <p className="alert" role="alert">{err}</p>}
+        </>
+      ) : r.running ? (
+        <Working text={`Stamping ${host(r.url)} with the same checks. About a minute.`} />
+      ) : (
+        <table className="hist-table vs" aria-label="Your page and the competitor's, check by check">
+          <thead><tr><th>Check</th><th>You</th><th>{host(r.url)}</th></tr></thead>
+          <tbody>
+            <tr className="vs-total"><td>Score</td><td><b>{mine ? `${mine.verdict} ${mine.score}` : "n/a"}</b></td><td><a href={`/v/${r.id}`}><b>{r.verdict} {r.score}</b></a></td></tr>
+            {(r.checks || []).filter((k) => !k.skip).map((k) => {
+              const m = (mine?.checks || []).find((x) => x.id === k.id);
+              const cell = (c) => (!c ? "n/a" : c.skip ? "n/a" : c.pass ? "✓ Passes" : "✗ Fails");
+              return <tr key={k.id} className={m && !m.pass && k.pass ? "vs-behind" : ""}><td>{k.label}</td><td>{cell(m)}</td><td>{cell(k)}</td></tr>;
+            })}
+          </tbody>
+          <caption className="fine">Red rows are where they pass and you don't: those are the fixes that close the gap.</caption>
+        </table>
+      )}
+    </>
+  );
+}
+
+function KillSheet({ user, report, sheet, offer, onChange }) {
   const ks = user.killSheet;
   const [err, setErr] = useState("");
+  const [ticking, setTicking] = useState("");
+  const [offerBusy, setOfferBusy] = useState(false);
+  const done = new Set(report?.done || []);
+  async function tick(title, on) {
+    setTicking(title);
+    try { onChange(await api("ks-done", { title, done: on })); } catch (e) { setErr(e.message); } finally { setTicking(""); }
+  }
+  async function takeOffer() {
+    setOfferBusy(true); setErr("");
+    try { const out = await api("checkout", { plan: "stayAlive", offer: "killSheet" }); track("checkout_start", { plan: "stayAlive", offer: "killSheet" }); location.assign(out.url); }
+    catch (e) { setErr(e.message); setOfferBusy(false); }
+  }
   async function restamp() {
     setErr("");
     try {
@@ -553,30 +637,62 @@ function KillSheet({ user, report, onChange }) {
             </a>
           )}
           {report.stampError && <p className="note">The first-screen stamp didn't run this time ({report.stampError}). The rest of the sheet is from the page's HTML.</p>}
+          {ks.before && report.stamp && ks.before.id !== report.stamp.id && ks.before.image && <BeforeAfter before={ks.before} after={report.stamp} />}
+          {offer && report.stamp && (
+            <div className="ks-offer">
+              <div>
+                <b>Keep it at {report.stamp.score}.</b>
+                <p>Pages break quietly. Stay Alive checks yours every 5 minutes, re-stamps it every week, and tells you the moment something slips. Your first month is $10, then $20 a month. Cancel anytime.</p>
+              </div>
+              <button type="button" className="btn btn-red" disabled={offerBusy} onClick={takeOffer}>{offerBusy ? "Opening…" : "Start Stay Alive for $10"}</button>
+            </div>
+          )}
 
-          <h3>Fixes, ranked by impact</h3>
+          <div className="fixes-head">
+            <h3>Fixes, worth the most first</h3>
+            {report.fixes.length > 0 && <span className="fine">{done.size} of {report.fixes.length} done</span>}
+          </div>
+          {report.stamp && report.fixes.some((f) => f.after) && (
+            <p className="score-path" aria-label="Your score as you make the fixes">
+              <b>{report.stamp.score}</b>
+              {report.fixes.filter((f) => f.after).map((f) => <span key={f.title}> → <b className={"v-" + f.after.verdict.toLowerCase()}>{f.after.score}</b></span>)}
+              <small> your score as you make the fixes below, in order</small>
+            </p>
+          )}
           <ol className="fixes">
             {report.fixes.map((f, i) => (
-              <li key={f.title}>
-                <span className={"imp " + f.impact.toLowerCase()}>{f.impact}</span>
+              <li key={f.title} className={done.has(f.title) ? "is-done" : ""}>
+                <span className={"imp " + f.impact.toLowerCase()}>{f.points != null ? `+${f.points} pts` : f.impact}</span>
                 <b>{i + 1}. {f.title}</b>
                 <p>{f.problem}</p>
                 <p className="fix"><b>Fix</b> {f.fix}</p>
-                <small>{f.from}</small>
+                <div className="fix-foot">
+                  <label className="check"><input type="checkbox" checked={done.has(f.title)} disabled={ticking === f.title} onChange={(e) => tick(f.title, e.target.checked)} /> Done</label>
+                  <small>{f.effort ? `About ${f.effort}` : ""}{f.effort ? " · " : ""}{f.from}{f.after ? ` · score ${f.after.score} after this` : f.points == null ? " · not in the score, still costs you visitors" : ""}</small>
+                </div>
               </li>
             ))}
           </ol>
+          {sheet && (
+            <div className="row-actions">
+              <Copy text={`${location.origin}/sheet/${sheet}`} label="Copy link for my developer" done="Link copied" />
+              <a className="btn btn-line btn-sm" href={`/sheet/${sheet}`} target="_blank" rel="noopener noreferrer">Open the read-only copy</a>
+              <span className="fine">A read-only page with these fixes and the rewrites. No sign-in, nothing about your account.</span>
+            </div>
+          )}
 
           <h3>Your copy, rewritten</h3>
           <p className="fine">Built from the words already on your page, shaped to pass every first-screen check. Brackets mark what only you know.</p>
           <div className="rewrite">
             <div><p className="rw-label">Headline now</p><p className="rw-old">{report.rewrites.before.headline || "No headline found"}</p></div>
-            <div><p className="rw-label">Headline options</p>{report.rewrites.headlines.map((h) => <p key={h} className="rw-new">{h}</p>)}</div>
+            <div><p className="rw-label">Headline options</p>{report.rewrites.headlines.map((h, i) => <div key={h} className="rw-opt"><p className="rw-new">{h}{report.rewrites.angles?.[i] && <small>{report.rewrites.angles[i]}</small>}</p><Copy text={h} label="Copy" done="Copied" className="btn btn-line btn-xs" /></div>)}</div>
             <div><p className="rw-label">Subhead now</p><p className="rw-old">{report.rewrites.before.subhead || "No subhead found"}</p></div>
-            <div><p className="rw-label">Subhead</p><p className="rw-new">{report.rewrites.subhead}</p></div>
+            <div><p className="rw-label">Subhead options</p>{(report.rewrites.subheads || [{ angle: "", text: report.rewrites.subhead }]).map((s) => <div key={s.text} className="rw-opt"><p className="rw-new">{s.text}{s.angle && <small>Leads with the {s.angle.toLowerCase()}</small>}</p><Copy text={s.text} label="Copy" done="Copied" className="btn btn-line btn-xs" /></div>)}</div>
             <div><p className="rw-label">Buttons now</p><p className="rw-old">{report.rewrites.before.buttons.join(", ") || "No buttons found"}</p></div>
-            <div><p className="rw-label">Button</p><p className="rw-new">{report.rewrites.button} <span className="rw-sec">Second: {report.rewrites.secondary}</span></p></div>
+            <div><p className="rw-label">Button</p><div className="rw-opt"><p className="rw-new">{report.rewrites.button} <span className="rw-sec">Second: {report.rewrites.secondary}</span></p><Copy text={report.rewrites.button} label="Copy" done="Copied" className="btn btn-line btn-xs" /></div></div>
           </div>
+
+          <KsRival report={report} onChange={onChange} />
 
           {report.scout && (
             <>
@@ -598,9 +714,9 @@ function KillSheet({ user, report, onChange }) {
           {report.scoutError && <p className="note">{report.scoutError}</p>}
           {report.fullShot && <p><a className="btn btn-line btn-sm" href={report.fullShot} target="_blank" rel="noopener noreferrer"><Icon name="image" /> Full-page screenshot</a></p>}
 
-          <div className="restamp">
+          <div className={"restamp" + (report.fixes.length && done.size === report.fixes.length && ks.restampsLeft > 0 ? " ready" : "")}>
             <div>
-              <b>Shipped the fixes?</b>
+              <b>{report.fixes.length && done.size === report.fixes.length ? "All fixes done." : "Shipped the fixes?"}</b>
               <p>{ks.restampsLeft > 0 ? "Use your free re-stamp: we run the whole sheet again and show the before and after." : "Your free re-stamp is used. You can still stamp the page free from the homepage any time."}</p>
             </div>
             {ks.restampsLeft > 0 && <button type="button" className="btn btn-dark" onClick={restamp}><Icon name="rotate-ccw" /> Re-stamp now</button>}
@@ -1591,7 +1707,7 @@ function Welcome({ plan, user, go, onClose }) {
 }
 
 function Dashboard({ data, setData, onOut }) {
-  const { user, report, monitor, monitors, rivals, setup } = data;
+  const { user, report, monitor, monitors, rivals, sheet, offer, setup } = data;
   const [banner, setBanner] = useState(PAID ? "confirming" : PLAN ? "checkout" : "");
   const [err, setErr] = useState("");
   const tries = useRef(0);
@@ -1634,7 +1750,7 @@ function Dashboard({ data, setData, onOut }) {
   }, [active, banner]);
 
   // Poll while anything is running: payment confirmation, the scout, a re-stamp, the first monitor run.
-  const running = banner === "confirming" || report?.status === "working" || (monitors || []).some((m) => m.restampRunning || (!m.checks && !m.paused)) || (user.stayAliveActive && user.stayAlive?.url && !monitor) || (rivals || []).some((x) => x.running);
+  const running = banner === "confirming" || report?.status === "working" || report?.rival?.running || (monitors || []).some((m) => m.restampRunning || (!m.checks && !m.paused)) || (user.stayAliveActive && user.stayAlive?.url && !monitor) || (rivals || []).some((x) => x.running);
   useEffect(() => {
     if (!running) return;
     const t = setTimeout(() => {
@@ -1740,7 +1856,7 @@ function Dashboard({ data, setData, onOut }) {
         {sect === "overview" && <Overview user={user} report={report} monitor={monitor} go={go} />}
         {sect === "stamps" && <Stamps user={user} />}
         {sect === "cards" && <MyCards user={user} />}
-        {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
+        {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} sheet={sheet} offer={offer} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "3 headlines and 3 subheads to pick from", "3 to 5 fixes, with the points each one adds", "Your page against a competitor's, check by check", "A free re-stamp, with your before and after", "One app review"]} />)}
         {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} rivals={rivals} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["Uptime checked every 5 minutes, for your page and up to 5 key pages", "Alerts by email, Slack, or Discord when it goes down and when it's back", "Warnings before your security certificate or domain runs out", "An alert if Google is told to skip your page, or a link breaks", "A fresh stamp every week, and why the score moved", "Competitors stamped next to you, and a monthly client report", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
         {sect === "account" && (

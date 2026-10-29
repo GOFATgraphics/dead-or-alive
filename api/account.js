@@ -11,6 +11,7 @@
 //   POST url { plan, url }       sets the page a plan works on and starts its run
 //   POST restamp                 uses the Kill Sheet's free re-stamp: re-runs the scout
 //   POST cancel | resume         Stay Alive at the end of the paid month
+//   POST ks-done { title, done } ticks a Kill Sheet fix; ks-rival { url } stamps one competitor next to it
 //   POST must-have { url, phrases } words a watched page must show; test-webhook { webhook } sends a test alert
 //   POST review { ... }          submits an app review; POST revoke { id } deletes its test login
 import crypto from "node:crypto";
@@ -22,8 +23,8 @@ import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
 } from "./_account.js";
-import { cancelStayAlive, checkoutUrl, confirmCheckout, logBilling, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
-import { readReport, runScout } from "./_scout.js";
+import { cancelStayAlive, checkoutUrl, confirmCheckout, logBilling, offerCheckoutUrl, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
+import { markFix, readReport, runScout, sheetToken, stampKsRival } from "./_scout.js";
 import { forgetSite, readMonitors, rivalsKey, runMonitor, seatsOf, setAlertSettings, setKeyPages, setMustHave, setPaused, setPublicStatus, setReportBrand, setRivals, sendReportNow, sitesOf, stampRival, testWebhook } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
 import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
@@ -31,6 +32,7 @@ import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
 import { checkDomain, ensureToken } from "./_gate.js";
+import { precheck } from "./_inspect.js";
 
 const mailReady = () => !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
 const origin = () => (process.env.SITE_URL || "https://stampmypage.com").replace(/\/$/, "");
@@ -80,7 +82,11 @@ async function me(email) {
   const [report, monitors, rivals] = await Promise.all([hasKillSheet(u) ? readReport(email) : null, u.stayAlive ? readMonitors(email, u) : null, u.stayAlive ? get(rivalsKey(email)).catch(() => null) : null]);
   // monitor: the first site, for the overview; monitors: every site on the account.
   const monitor = monitors?.[0]?.checks ? monitors[0] : null;
-  return { user: publicUser(u), report, monitor, monitors, rivals: rivals || [] };
+  // The read-only Kill Sheet link for a developer, and whether the Stay Alive offer applies: a Kill Sheet owner who
+  // used the free re-stamp and never had Stay Alive.
+  const sheet = report?.status === "ready" ? sheetToken(u) : null;
+  const offer = hasKillSheet(u) && !u.stayAlive && !!u.killSheet?.before;
+  return { user: publicUser(u), report, monitor, monitors, rivals: rivals || [], sheet, offer };
 }
 
 function setup() {
@@ -485,6 +491,10 @@ export default async function handler(req, res) {
       const page = String(b.url || "").trim() ? checkPageUrl(b.url) : { url: "" };
       const u = await updateUser(email, (x) => (x ? { ...x, pendingUrl: page.url || x.pendingUrl || "" } : undefined));
       if (plan === "stayAlive" && hasStayAlive(u)) return res.status(409).json({ error: "Stay Alive is already on for this account." });
+      if (plan === "stayAlive" && b.offer === "killSheet") {
+        if (!hasKillSheet(u) || u.stayAlive || !u.killSheet?.before) return res.status(403).json({ error: "This offer is for Kill Sheet owners after their re-stamp." });
+        return res.status(200).json({ url: await offerCheckoutUrl(u) });
+      }
       return res.status(200).json({ url: checkoutUrl(plan, u, page.url || u.pendingUrl || "", plan === "stayAlive" && b.billing === "yearly") });
     }
     if (op === "confirm") {
@@ -636,6 +646,29 @@ export default async function handler(req, res) {
       const before = await readReport(email);
       await updateUser(email, (x) => ({ ...x, killSheet: { ...x.killSheet, restampsLeft: x.killSheet.restampsLeft - 1, lastRestampAt: new Date().toISOString(), before: before?.stamp || null } }));
       waitUntil(runScout(email, u.killSheet.url).catch((e) => console.error("Re-stamp failed:", e)));
+      return res.status(202).json(await me(email));
+    }
+    // The Kill Sheet checklist: { title, done } ticks a fix on or off.
+    if (op === "ks-done") {
+      const u = await getUser(email);
+      if (!hasKillSheet(u)) return res.status(403).json({ error: "The Kill Sheet isn't on this account." });
+      await markFix(email, String(b.title || ""), !!b.done);
+      return res.status(200).json(await me(email));
+    }
+    // One competitor stamped next to the Kill Sheet page, once: { url }.
+    if (op === "ks-rival") {
+      const u = await getUser(email);
+      if (!hasKillSheet(u)) return res.status(403).json({ error: "The Kill Sheet isn't on this account." });
+      const report = await readReport(email);
+      if (report?.status !== "ready") return res.status(409).json({ error: "Your Kill Sheet is still being made. Try again in a minute." });
+      if (report.rival && !report.rival.failed) return res.status(409).json({ error: "Your competitor comparison is already done." });
+      const page = checkPageUrl(b.url);
+      if (!page.url) return res.status(400).json({ error: page.error });
+      if (new URL(page.url).hostname.replace(/^www\./, "") === new URL(report.url).hostname.replace(/^www\./, "")) return res.status(400).json({ error: "That's your own site. Pick a competitor's page." });
+      const p = await precheck(page.url);
+      if (!p.ok) return res.status(400).json({ error: p.error });
+      await set(`report:${email}`, { ...report, rival: { url: page.url, running: true } });
+      waitUntil(stampKsRival(email, page.url).catch((e) => console.error("Competitor stamp failed:", e)));
       return res.status(202).json(await me(email));
     }
     if (op === "cancel" || op === "resume") {
