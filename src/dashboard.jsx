@@ -701,11 +701,11 @@ function KillSheet({ user, report, sheet, offer, onChange }) {
                 <div><dt>Words</dt><dd>{report.scout.words}</dd></div>
                 <div><dt>Sections</dt><dd>{report.scout.sections.length}</dd></div>
                 <div><dt>Buttons asking for action</dt><dd>{report.scout.ctaCount}</dd></div>
-                <div><dt>Proof</dt><dd>{report.scout.proof || report.scout.stat || (report.scout.logos ? `${report.scout.logos} logos` : "None found")}</dd></div>
-                <div><dt>Risk reversal</dt><dd>{report.scout.riskReversal || "None found"}</dd></div>
+                <div><dt>Proof</dt><dd>{report.scout.proof || report.scout.stat ? <>Found <small>“{report.scout.proof || report.scout.stat}”</small></> : report.scout.logos ? `${report.scout.logos} logos` : "None found"}</dd></div>
+                <div><dt>Risk reversal</dt><dd>{report.scout.riskReversal ? <>Found <small>“{report.scout.riskReversal}”</small></> : "None found"}</dd></div>
                 <div><dt>Pricing shown</dt><dd>{report.scout.pricing ? "Yes" : "No"}</dd></div>
                 <div><dt>FAQ</dt><dd>{report.scout.faq ? "Yes" : "No"}</dd></div>
-                <div><dt>Longest form</dt><dd>{report.scout.forms ? `${report.scout.longestForm} fields` : "No form"}</dd></div>
+                <div><dt>Longest form</dt><dd>{report.scout.forms ? `${report.scout.longestForm} field${report.scout.longestForm === 1 ? "" : "s"}` : "No form"}</dd></div>
                 <div><dt>“You” vs “we”</dt><dd>{report.scout.you} / {report.scout.we}</dd></div>
               </dl>
               {report.scout.sections.length > 0 && <p className="fine">Sections found: {report.scout.sections.join(" · ")}</p>}

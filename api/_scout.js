@@ -91,7 +91,9 @@ export function scoutHtml(html) {
   const avgSentence = sentences.length ? Math.round(words.length / sentences.length) : 0;
   const you = (lower.match(/\b(you|your|you're|yours)\b/g) || []).length;
   const we = (lower.match(/\b(we|our|us|we're)\b/g) || []).length;
-  const fog = FOG.filter((w) => lower.includes(w));
+  // A word in quotation marks is being talked about, not used ("Reimagine" says nothing), so quotes don't count.
+  const unquoted = lower.replace(/“[^”]{0,80}”|"[^"]{0,80}"|‘[^’]{0,40}’/g, " ");
+  const fog = FOG.filter((w) => unquoted.includes(w));
   const stat = text.match(/\b\d[\d,.]*\s?(?:k|m)?\+?\s+(?:users|customers|teams|companies|founders|businesses|people|downloads|reviews|creators|stores|members|developers)\b/i);
   const testimonial = /testimonial|what (?:our )?(?:customers|users|people|clients) (?:say|are saying)|loved by|trusted by|used by|reviews?\b|★|rated \d|case stud/i.exec(text);
 
@@ -150,11 +152,28 @@ function whatItDoes(text, name) {
 // the first comma, so expand the list from the source text at that point,
 // stopping at the first segment that is not a short noun phrase.
 const AUDIENCE_STOP = new Set(["scored", "with", "without", "using", "based", "from", "that", "which", "who", "to", "for", "in", "on", "at", "by", "not", "free"]);
+// People come first: "for landing pages and SaaS sites" names things, so a named group of people anywhere (founders,
+// marketers, agencies) wins over it, and the "for ..." words are only the fallback.
 function audienceOf(texts) {
+  let fallback = "";
   for (const t of texts) {
     const s = String(t || "");
     const m = s.match(FOR);
     if (m) {
+      const found = forAudience(s, m);
+      if (found && WHO.test(found)) return found;
+      fallback ||= found;
+    }
+  }
+  for (const t of texts) {
+    const w = String(t || "").match(WHO);
+    if (w) return w[0];
+  }
+  return fallback;
+}
+function forAudience(s, m) {
+  {
+    {
       const off = m[0].search(/\bfor\s/i);
       const rest = s.slice(m.index + (off >= 0 ? off + 3 : 0)).trim();
       const segs = [];
@@ -171,10 +190,7 @@ function audienceOf(texts) {
       if (segs.length >= 3) return `${segs.slice(0, -1).join(", ")} and ${segs[segs.length - 1]}`;
       return m[1].trim().split(/\s+/).slice(0, 4).join(" ");
     }
-    const w = s.match(WHO);
-    if (w) return w[0];
   }
-  return "";
 }
 
 // The button is the page's own main button, never a funnel step guessed from
@@ -237,16 +253,17 @@ export function rewrites({ h1, subhead, description, title, host, ctas, fullText
   // "for teams to track work" capture must stop at "teams", or every
   // template that adds "to" after it reads twice.
   const whoRaw = audienceOf([h1, subhead, description, title, fullText]) || "[who it's for]";
-  const who = whoRaw.split(/\s+(?:to|that|which|who|when|where)\s+/)[0].replace(/[,;:]$/, "").trim() || whoRaw;
+  const who = whoRaw.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase()).split(/\s+(?:to|that|which|who|when|where)\s+/)[0].replace(/[,;:]$/, "").trim() || whoRaw;
   const what = stripAudience(rawWhat, who) || rawWhat || "[what it does, in plain words]";
   const doing = verbWhat(what);
   const proof = (fullText.match(/\b\d[\d,.]*\s?(?:k|m)?\+?\s+(?:users|customers|teams|companies|founders|businesses|people|downloads|reviews|creators|stores|members|developers)\b/i) || [""])[0];
-  const fallback = `${cap(what)} for ${who}.`;
+  // A "what" that already says "for something" gets the audience in its own short sentence, so "for" never repeats.
+  const fallback = /\bfor\b/i.test(what) ? `${cap(what)}. Made for ${who}.` : `${cap(what)} for ${who}.`;
   const headlines = [
-    `${cap(what)} for ${who}.`,
+    fallback,
     `${cap(who)}: ${lowerFirst(what)}, without [the slow part].`,
     `The simple way for ${who} to ${lowerFirst(doing)}.`,
-  ].map((h) => h.replace(/\s{2,}/g, " ")).map((h) => (repeatsItself(h) ? fallback : h));
+  ].map((h) => h.replace(/\s{2,}/g, " ")).map((h, i) => (repeatsItself(h) ? (i === 2 ? `${cap(doing)}, without [the slow part].` : fallback) : h));
   const proofLine = proof ? `Trusted by ${proof}.` : "[One proof point: a number, a customer, or a result.]";
   return {
     product: name,
@@ -320,7 +337,7 @@ export function rankFixes(stamp, scout) {
       // check, told twice. Merge into that entry instead of listing both.
       const buttons = out.find((f) => f.title === "Buttons don't fight each other");
       if (buttons) {
-        buttons.problem += ` ${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`;
+        if (!/button/i.test(buttons.problem)) buttons.problem += ` ${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`;
         buttons.fix = "Pick one main action and use the same words on every main button. Keep one main button on the first screen and one quiet second choice at most.";
       } else {
         out.push({ title: "Too many different asks", problem: `${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`, fix: "Pick one main action and use the same words on every main button.", impact: "Medium", from: "Page scout" });
