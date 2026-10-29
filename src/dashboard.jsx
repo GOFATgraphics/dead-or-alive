@@ -706,17 +706,41 @@ function TrendChart({ points }) {
     </svg>
   );
 }
+// Uptime by time, not by number of checks: the history keeps one check an hour plus every change between up
+// and down, and each check holds until the next one. Same rule as the server (api/_monitor.js).
+function downMs(checks, from, to) {
+  let down = 0;
+  for (let i = 0; i < checks.length; i++) {
+    if (checks[i].ok) continue;
+    const a = Math.max(from, Date.parse(checks[i].at));
+    const b = Math.min(to, i + 1 < checks.length ? Date.parse(checks[i + 1].at) : to);
+    if (b > a) down += b - a;
+  }
+  return down;
+}
+function uptimeFrom(checks, from, to = Date.now()) {
+  if (!checks.length) return null;
+  const start = Math.max(from, Date.parse(checks[0].at));
+  if (to <= start) return checks[checks.length - 1].ok ? 100 : 0;
+  return Math.round((1 - downMs(checks, start, to) / (to - start)) * 1000) / 10;
+}
+const minutes = (ms) => {
+  const n = Math.max(1, Math.round(ms / 60000));
+  return n < 60 ? `${n} min` : `${Math.floor(n / 60)} h ${n % 60} min`;
+};
 function monthRows(checks) {
   const by = {};
   for (const c of checks || []) {
     const d = new Date(c.at);
     if (Number.isNaN(d.getTime())) continue;
     const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    (by[k] ||= { month: k, checks: 0, up: 0, ms: 0, ok: 0 });
-    by[k].checks++;
-    if (c.ok) { by[k].up++; by[k].ms += c.ms || 0; by[k].ok++; }
+    (by[k] ||= { month: k, from: Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1), to: Math.min(Date.now(), Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)), ms: 0, ok: 0 });
+    if (c.ok) { by[k].ms += c.ms || 0; by[k].ok++; }
   }
-  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => ({ ...m, uptime: m.checks ? Math.round((m.up / m.checks) * 1000) / 10 : null, avgMs: m.ok ? Math.round(m.ms / m.ok) : null }));
+  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => {
+    const down = downMs(checks, m.from, m.to);
+    return { ...m, down, uptime: uptimeFrom(checks, m.from, m.to), avgMs: m.ok ? Math.round(m.ms / m.ok) : null };
+  });
 }
 function incidentRows(checks) {
   const out = []; let cur = null;
@@ -727,6 +751,7 @@ function incidentRows(checks) {
   if (cur) out.push({ ...cur, ongoing: true });
   return out.reverse();
 }
+const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 function SiteMonitor({ monitor, onChange }) {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
@@ -741,8 +766,8 @@ function SiteMonitor({ monitor, onChange }) {
     catch (x) { setNote(x.message); } finally { setBusy(""); }
   };
   const checks = monitor?.checks || [];
-  const last = checks[checks.length - 1];
-  const up = checks.length ? Math.round((checks.filter((c) => c.ok).length / checks.length) * 1000) / 10 : null;
+  const last = monitor?.lastCheck || checks[checks.length - 1];
+  const up = uptimeFrom(checks, Date.now() - 30 * 86400000);
   const avg = checks.filter((c) => c.ok).length ? Math.round(checks.filter((c) => c.ok).reduce((a, c) => a + c.ms, 0) / checks.filter((c) => c.ok).length) : null;
   const restamps = [...(monitor?.restamps || [])].reverse();
   const next = monitor?.lastRestampAt ? new Date(new Date(monitor.lastRestampAt).getTime() + 7 * 86400000).toISOString() : "";
@@ -762,7 +787,7 @@ function SiteMonitor({ monitor, onChange }) {
         <>
           <dl className="scout">
             <div><dt>Right now</dt><dd className={last?.ok ? "ok" : "bad"}>{last ? (last.ok ? `Up · ${last.status}` : `Down · ${last.status || last.error}`) : "Checking…"}</dd></div>
-            <div><dt>Uptime</dt><dd>{up != null ? `${up}%` : "Not yet"} <small>last {checks.length} checks</small></dd></div>
+            <div><dt>Uptime</dt><dd>{up != null ? `${up}%` : "Not yet"} <small>last 30 days</small></dd></div>
             <div><dt>Server answers in</dt><dd>{avg != null ? `${avg} ms` : "Not yet"} <small>average</small></dd></div>
             <div><dt>Last check</dt><dd>{fmtTime(monitor.lastCheckAt)}</dd></div>
             <div><dt>Next re-stamp</dt><dd>{monitor.restampRunning ? "Running now" : next ? fmtDate(next) : "Soon"}</dd></div>
@@ -784,12 +809,12 @@ function SiteMonitor({ monitor, onChange }) {
                 {scores.length > 1 && (<><p className="muted">Score trend: {scores[0].v} to {scores[scores.length - 1].v} across {scores.length} re-stamps.</p><TrendChart points={scores} /></>)}
                 {speeds.length > 1 && (<><p className="muted">Server answer, last {speeds.length} good checks.</p><TrendChart points={speeds} /></>)}
                 {months.length > 0 && (
-                  <table className="hist-table" aria-label="Uptime by month"><thead><tr><th>Month</th><th>Checks</th><th>Uptime</th><th>Avg answer</th></tr></thead><tbody>
-                    {months.map((mo) => (<tr key={mo.month}><td>{mo.month}</td><td>{mo.checks}</td><td>{mo.uptime != null ? `${mo.uptime}%` : "—"}</td><td>{mo.avgMs != null ? `${mo.avgMs} ms` : "—"}</td></tr>))}
+                  <table className="hist-table" aria-label="Uptime by month"><thead><tr><th>Month</th><th>Uptime</th><th>Downtime</th><th>Avg answer</th></tr></thead><tbody>
+                    {months.map((mo) => (<tr key={mo.month}><td>{mo.month}</td><td>{mo.uptime != null ? `${mo.uptime}%` : "n/a"}</td><td>{mo.down ? minutes(mo.down) : "None"}</td><td>{mo.avgMs != null ? `${mo.avgMs} ms` : "n/a"}</td></tr>))}
                   </tbody></table>
                 )}
                 <p className="muted">Outages in this history: {incs.length ? "" : "none."}</p>
-                {incs.length > 0 && (<ul className="history">{incs.map((i, idx) => (<li key={idx}><span className="v-chip">{i.ongoing ? "ONGOING" : "DOWN"}</span><span>{fmtDate(i.start)}{i.end ? ` to ${fmtDate(i.end)}` : ", still down"}</span></li>))}</ul>)}
+                {incs.length > 0 && (<ul className="history">{incs.map((i, idx) => (<li key={idx}><span className="v-chip">{i.ongoing ? "ONGOING" : "DOWN"}</span><span>{fmtDate(i.start)}, {clock(i.start)}{i.end ? ` to ${fmtDate(i.end) === fmtDate(i.start) ? "" : `${fmtDate(i.end)}, `}${clock(i.end)} · ${minutes(Date.parse(i.end) - Date.parse(i.start))}` : ` · still down, ${minutes(Date.now() - Date.parse(i.start))} so far`}</span></li>))}</ul>)}
                 <div className="row-actions">
                   <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("report", () => api("report-now", { url: monitor.url }))}>{busy === "report" ? "Sending…" : "Email me this week's report now"}</button>
                   {note && <span className="muted">{note}</span>}
