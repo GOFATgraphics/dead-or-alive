@@ -131,7 +131,7 @@ export function failReason(msg) {
   return "other";
 }
 
-export async function processStamp(jobId, pageUrl, email = "") {
+export async function processStamp(jobId, pageUrl, email = "", { keepShot = false } = {}) {
   const id = resultId(jobId);
   let shot, snapshot;
   try {
@@ -154,9 +154,10 @@ export async function processStamp(jobId, pageUrl, email = "") {
     const { renderStamp } = await import("./_render.js");
     // The result page frames the first screen itself, so the circled screenshot (no stamp, no strip) is the image.
     const boxes = circlesFor(shot.rendered?.layout, verdict, checks);
-    const [{ shot: clean }, icon] = await Promise.all([
+    const [{ shot: clean }, icon, visual] = await Promise.all([
       renderStamp({ jpg: shot.jpg, boxes, verdict, sentence }),
       saveIcon(id, pageUrl, [snapshot.icon, shot.rendered?.icon]).catch(() => ""),
+      keepShot ? keepVisual(id, shot.jpg).catch((e) => (console.error("Visual print failed:", e), null)) : null,
     ]);
     return await publishStamp({
       orderId: jobId,
@@ -169,7 +170,7 @@ export async function processStamp(jobId, pageUrl, email = "") {
       focus: boxes.length ? { top: Math.min(...boxes.map((b) => b.y)) / 1000, bottom: Math.max(...boxes.map((b) => b.y + b.h)) / 1000 } : null,
       sendMail: !!email,
       origin: publicOrigin(),
-      extra: { snapshot, score, checks, icon },
+      extra: { snapshot, score, checks, icon, ...(visual ? { visual } : {}) },
     });
   } catch (err) {
     console.error("Publish failed:", jobId, err);
@@ -177,11 +178,19 @@ export async function processStamp(jobId, pageUrl, email = "") {
   }
 }
 
+// Stay Alive's re-stamps keep a plain copy of the first screen and its grey grid, for the weekly look comparison.
+async function keepVisual(id, jpg) {
+  const { visualPrint } = await import("./_render.js");
+  const v = await visualPrint(jpg);
+  const thumb = (await put(`shots/${id}.jpg`, v.thumb, { access: "public", addRandomSuffix: true, contentType: "image/jpeg" })).url;
+  return { grid: v.grid, thumb };
+}
+
 // Stamps a page right now and waits for it: the published record, or { failed } with the reason.
 // For the dashboard's automated runs (the Kill Sheet scout, Stay Alive's weekly re-stamp).
-export async function stampNow(pageUrl) {
+export async function stampNow(pageUrl, opts = {}) {
   const job = crypto.randomUUID();
-  const out = await processStamp(job, pageUrl);
+  const out = await processStamp(job, pageUrl, "", opts);
   if (out?.failed) return { failed: out.failed, reason: failReason(out.failed) };
   return (await readFullResult(resultId(job))) || { failed: "The stamp didn't save.", reason: "other" };
 }

@@ -136,11 +136,11 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   if (due && check.ok) {
     m.restampRunning = true;
     await set(monitorKey(email, pageUrl), m);
-    const r = await stampNow(pageUrl).catch((e) => ({ failed: e.message }));
+    const r = await stampNow(pageUrl, { keepShot: true }).catch((e) => ({ failed: e.message }));
     const prev = [...(m.restamps || [])].reverse().find((x) => !x.failed && x.score != null);
     m.restampRunning = false;
     m.lastRestampAt = new Date().toISOString();
-    m.restamps = [...m.restamps, r.failed ? { at: m.lastRestampAt, failed: String(r.failed).slice(0, 200) } : { at: m.lastRestampAt, id: r.id, verdict: r.verdict, score: r.score, lcp: r.snapshot?.browser?.lcp || null }].slice(-30);
+    m.restamps = [...m.restamps, r.failed ? { at: m.lastRestampAt, failed: String(r.failed).slice(0, 200) } : { at: m.lastRestampAt, id: r.id, verdict: r.verdict, score: r.score, lcp: r.snapshot?.browser?.lcp || null, thumb: r.visual?.thumb || null }].slice(-30);
     if (!r.failed) {
       const now = seen(r);
       let change = diff(m.lastSeen, now);
@@ -301,7 +301,23 @@ export async function pulseAll() {
 function seen(r) {
   const stack = (r.snapshot?.stack || []).map((t) => `${t.category}: ${t.name}`);
   const failing = (r.checks || []).filter((k) => !k.pass && !k.skip).map((k) => ({ id: k.id, label: k.label, detail: String(k.detail || "").slice(0, 200), fix: String(k.fix || "").slice(0, 200) }));
-  return { stack, lcp: r.snapshot?.browser?.lcp || null, score: r.score ?? null, verdict: r.verdict, failing };
+  return { stack, lcp: r.snapshot?.browser?.lcp || null, score: r.score ?? null, verdict: r.verdict, failing, visual: r.visual || null };
+}
+
+// How different the first screen looks from last week: the share of grid cells whose colour moved by more than
+// 40 of 255 on any channel. Small moves (a date, a counter, a logo) stay under the bar; a new hero, a missing
+// section, an error page, or a blank screen don't. Null below the bar or without both pictures.
+export const LOOK_BAR = 0.2;
+export function lookChange(before, now) {
+  if (!before?.grid || !now?.grid) return null;
+  const a = Buffer.from(before.grid, "base64");
+  const b = Buffer.from(now.grid, "base64");
+  if (a.length !== b.length || !a.length) return null;
+  let moved = 0;
+  const cells = a.length / 3;
+  for (let i = 0; i < cells; i++) if ([0, 1, 2].some((c) => Math.abs(a[i * 3 + c] - b[i * 3 + c]) > 40)) moved++;
+  const share = moved / cells;
+  return share >= LOOK_BAR ? { share: Math.round(share * 100), from: before.thumb || null, to: now.thumb || null } : null;
 }
 
 // A lower score than the last re-stamp, and why: the checks that fail now and passed last time. An older record
@@ -320,8 +336,9 @@ function diff(before, now) {
   const removed = before.stack.filter((t) => !now.stack.includes(t));
   const lcp = before.lcp && now.lcp && Math.abs(now.lcp - before.lcp) / before.lcp > 0.33 ? { from: before.lcp, to: now.lcp } : null;
   const verdict = before.verdict !== now.verdict ? { from: before.verdict, to: now.verdict } : null;
-  if (!added.length && !removed.length && !lcp && !verdict) return null;
-  return { added, removed, lcp, verdict, pixels: [...added, ...removed].some((t) => /^(Ads & pixels|Analytics):/.test(t)) };
+  const look = lookChange(before.visual, now.visual);
+  if (!added.length && !removed.length && !lcp && !verdict && !look) return null;
+  return { added, removed, lcp, verdict, look, pixels: [...added, ...removed].some((t) => /^(Ads & pixels|Analytics):/.test(t)) };
 }
 
 async function alertChange(email, pageUrl, c, m = {}) {
@@ -333,6 +350,7 @@ async function alertChange(email, pageUrl, c, m = {}) {
   const lines = [
     ...(d ? [`Score dropped from ${d.from} to ${d.to}.`, ...d.fails.map((f) => `${d.newOnly ? "Newly failing" : "Failing"}: ${f.label}. ${f.detail}${f.fix ? ` Fix: ${f.fix}` : ""}`)] : []),
     ...google.map((g) => g.text),
+    ...(c.look ? [`The first screen looks different from last week: about ${c.look.share}% of it changed.`] : []),
     ...(c.added || []).map((t) => `Added: ${t}`),
     ...(c.removed || []).map((t) => `Removed: ${t}`),
     c.lcp ? `Main content now shows in ${(c.lcp.to / 1000).toFixed(1)}s (was ${(c.lcp.from / 1000).toFixed(1)}s)` : "",
@@ -340,12 +358,12 @@ async function alertChange(email, pageUrl, c, m = {}) {
   ].filter(Boolean);
   const hidden = google.some((g) => g.tone === "bad" && /noindex|robots|another site/.test(g.text));
   const onlyGoogle = google.length && !c.added?.length && !c.removed?.length && !c.lcp && !c.verdict;
-  const subject = d ? `${host}: score dropped from ${d.from} to ${d.to}` : hidden ? `${host}: Google may drop this page` : onlyGoogle ? `${host}: what Google sees changed` : `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`;
+  const subject = d ? `${host}: score dropped from ${d.from} to ${d.to}` : c.look && !c.verdict ? `${host}: the first screen changed` : hidden ? `${host}: Google may drop this page` : onlyGoogle ? `${host}: what Google sees changed` : `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`;
   const how = c.stampId ? "re-stamped" : "checked";
   await mail(email, {
     subject,
     text: `Stay Alive ${how} ${pageUrl} and noticed:\n\n${lines.join("\n")}\n\nDetails in your dashboard: https://stampmypage.com/dashboard#monitoring`,
-    html: `<p>Stay Alive ${how} <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard#monitoring">Details in your dashboard</a></p>`,
+    html: `<p>Stay Alive ${how} <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul>${c.look?.from && c.look?.to ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td width="50%" style="padding-right:6px"><div style="font-size:12px;color:#5d6180">Last week</div><img src="${c.look.from}" width="270" style="width:100%;height:auto;border:1px solid #e6e3f1;border-radius:8px" alt="Last week"></td><td width="50%" style="padding-left:6px"><div style="font-size:12px;color:#5d6180">Now</div><img src="${c.look.to}" width="270" style="width:100%;height:auto;border:1px solid #e6e3f1;border-radius:8px" alt="Now"></td></tr></table>` : ""}<p><a href="https://stampmypage.com/dashboard#monitoring">Details in your dashboard</a></p>`,
   }).catch(() => {});
   await postWebhook(a.webhook, { event: "change", url: pageUrl, host, at: new Date().toISOString(), added: c.added || [], removed: c.removed || [], lcp: c.lcp || null, verdict: c.verdict || null, google, scoreDrop: d || null }, `🟡 ${subject}\n${lines.map((l) => `• ${l}`).join("\n")}`);
 }

@@ -1243,6 +1243,7 @@ function SiteMonitor({ user, monitor, onChange }) {
                   <time>{fmtDate(c.at)}</time>
                   <div>
                     {c.drop && (<><p className="rem"><b>Score:</b> dropped from {c.drop.from} to {c.drop.to}</p>{c.drop.fails.map((f) => <p key={"f" + f.id} className="drop-why"><b>{c.drop.newOnly ? "Newly failing" : "Failing"}:</b> {f.label}. {f.detail}{f.fix ? <> <i>Fix:</i> {f.fix}</> : null}</p>)}</>)}
+                    {c.look && (<><p><b>Look:</b> the first screen changed, about {c.look.share}% of it</p>{c.look.from && c.look.to && <div className="look"><figure><img src={c.look.from} alt="The first screen last week" loading="lazy" /><figcaption>Last week</figcaption></figure><figure><img src={c.look.to} alt="The first screen now" loading="lazy" /><figcaption>Now</figcaption></figure></div>}</>)}
                     {(c.google || []).map((g) => <p key={"g" + g.text} className={g.tone === "bad" ? "rem" : g.tone === "good" ? "add" : ""}><b>Google:</b> {g.text}</p>)}
                     {c.verdict && <p><b>Stamp:</b> {c.verdict.from} to {c.verdict.to}</p>}
                     {c.lcp && <p><b>Speed:</b> main content in {(c.lcp.to / 1000).toFixed(1)}s, was {(c.lcp.from / 1000).toFixed(1)}s</p>}
@@ -1254,7 +1255,7 @@ function SiteMonitor({ user, monitor, onChange }) {
               ))}
             </ul>
           ) : (
-            <p className="fine">Nothing changed yet. Each weekly re-stamp is compared with the last one: tools and tracking pixels added or removed, speed, and the verdict. What Google is told is compared every day. You get an email when something changes.</p>
+            <p className="fine">Nothing changed yet. Each weekly re-stamp is compared with the last one: tools and tracking pixels added or removed, speed, and the verdict. How the first screen looks is compared too, side by side. What Google is told is compared every day. You get an email when something changes.</p>
           )}
           <h3>Weekly re-stamps</h3>
           {restamps.length ? (

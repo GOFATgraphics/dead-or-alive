@@ -25,3 +25,20 @@ export async function renderStamp({ jpg, boxes, verdict, sentence }) {
   drawShot(shotCanvas, { image, imageW: image.width, imageH: image.height, marks, verdict });
   return { image: await canvas.encode("jpeg", 88), shot: await shotCanvas.encode("jpeg", 88) };
 }
+
+// What the first screen looks like, kept small for Stay Alive's weekly comparison: a 48 × 30 grid of colours
+// (base64, three bytes a cell) and a plain 720-pixel-wide copy of the screenshot, without circles.
+export const GRID = { w: 48, h: 30 };
+export async function visualPrint(jpg) {
+  const image = await loadImage(jpg);
+  const g = createCanvas(GRID.w, GRID.h);
+  const gx = g.getContext("2d");
+  gx.drawImage(image, 0, 0, GRID.w, GRID.h);
+  const px = gx.getImageData(0, 0, GRID.w, GRID.h).data;
+  const rgb = Buffer.alloc(GRID.w * GRID.h * 3);
+  for (let i = 0; i < GRID.w * GRID.h; i++) for (let c = 0; c < 3; c++) rgb[i * 3 + c] = px[i * 4 + c];
+  const w = Math.min(720, image.width);
+  const t = createCanvas(w, Math.round((image.height * w) / image.width));
+  t.getContext("2d").drawImage(image, 0, 0, t.width, t.height);
+  return { grid: rgb.toString("base64"), thumb: await t.encode("jpeg", 80) };
+}

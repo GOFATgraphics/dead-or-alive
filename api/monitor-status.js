@@ -86,6 +86,7 @@ export function reportPage(m, brand, token, monthWanted) {
   const changeLines = (c) => [
     ...(c.drop ? [`Score dropped from ${c.drop.from} to ${c.drop.to}`] : []),
     ...(c.google || []).map((g) => g.text),
+    ...(c.look ? [`The first screen looks different: about ${c.look.share}% of it changed`] : []),
     ...(c.verdict ? [`Stamp went from ${c.verdict.from} to ${c.verdict.to}`] : []),
     ...(c.lcp ? [`Main content in ${(c.lcp.to / 1000).toFixed(1)}s, was ${(c.lcp.from / 1000).toFixed(1)}s`] : []),
     ...(c.added || []).map((t) => `Added: ${t}`),

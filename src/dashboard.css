@@ -421,3 +421,7 @@ select { width: 100%; min-height: 2.9rem; padding: 0.6rem 0.9rem; border: 1px so
 .vs .vs-behind td:first-child { font-weight: 700; }
 @media (max-width: 560px) { .ba-shots { grid-template-columns: 1fr; } }
 .vs caption { caption-side: bottom; text-align: left; padding-top: 0.5rem; }
+.look { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.4rem 0; max-width: 40rem; }
+.look figure { margin: 0; }
+.look img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+.look figcaption { margin-top: 0.2rem; font: 500 0.7rem var(--mono); color: var(--soft); }
