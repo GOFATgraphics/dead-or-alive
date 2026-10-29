@@ -5,7 +5,6 @@ import "./plans.css";
 import "./dashboard.css";
 import { Icon } from "./icons.jsx";
 import { Toast } from "./toast.jsx";
-import { Checks, Hero, Share, Snapshot, Status as TierStatus } from "./stamp-parts.jsx";
 import { DESK, PLANS } from "./config.js";
 import { REVIEW_STEPS, planHref, point } from "./plans.js";
 import { track, trackView } from "./track.js";
@@ -761,8 +760,8 @@ function StampTable({ stamps }) {
   );
 }
 
-// One stamp, inside the dashboard: the same parts as the public result page (verdict and screenshot, tier and
-// badge embed codes, every check, share card and buttons, stack and speed), under a bar back to the list.
+// One stamp, inside the dashboard: verdict, screenshot, every check with its fix, then the stack, speed, SEO and
+// security. The public page stays one click away, for sharing.
 function StampView({ id, user, back }) {
   const [r, setR] = useState(null);
   const [err, setErr] = useState("");
@@ -778,36 +777,99 @@ function StampView({ id, user, back }) {
       live = false;
     };
   }, [id]);
-  if (err) return <><button type="button" className="link quiet sv-back" onClick={back}>← All stamps</button><p className="alert">{err}</p></>;
+  if (err) return <><button type="button" className="link quiet" onClick={back}>← All stamps</button><p className="alert">{err}</p></>;
   if (!r) return <Working text="Opening the stamp…" />;
+  const checks = (r.checks || []).filter((k) => !k.skip);
+  const failed = checks.filter((k) => !k.pass);
+  const passed = checks.filter((k) => k.pass);
+  const s = r.snapshot || {};
+  const b = s.browser || {};
+  const v = r.verdict.toLowerCase();
+  const sec = (ms) => (ms == null ? "n/a" : `${(ms / 1000).toFixed(1)}s`);
+  const kb = b.kb ? Object.values(b.kb).reduce((a, x) => a + (x || 0), 0) : null;
   const saved = (user.stamps || []).some((x) => x.id === r.id);
   return (
     <>
-      <div className="sv-bar">
-        <button type="button" className="link quiet sv-back" onClick={back}>← All stamps</button>
-        <div className="row-actions sv-actions">
-          {saved && <span className="sv-saved"><Icon name="check" size={14} /> Saved</span>}
-          <a className="btn btn-line btn-sm" href={`/?url=${encodeURIComponent(r.pageUrl)}#top`}><Icon name="rotate-ccw" size={14} /> Stamp it again</a>
-          <a className="btn btn-dark btn-sm" href={`/v/${r.id}`} target="_blank" rel="noopener">Public page <Icon name="external-link" size={14} /></a>
+      <button type="button" className="link quiet sv-back" onClick={back}>← All stamps</button>
+      <section className={"panel sv-head v-" + v}>
+        <div className="sv-top">
+          <div>
+            <p className="sv-host">{r.icon && <img src={r.icon} alt="" width="18" height="18" />}{r.host}</p>
+            <h1 className="sv-verdict">{r.verdict}<span>{r.score ?? "n/a"}/100</span></h1>
+            <p className="sv-meta">#{String(r.number || 0).padStart(4, "0")} · {fmtDate(r.createdAt)} · {passed.length} of {checks.length} checks passed{saved ? " · saved" : ""}</p>
+          </div>
+          <div className="row-actions sv-actions">
+            <a className="btn btn-dark btn-sm" href={`/v/${r.id}`} target="_blank" rel="noopener">Share or open public page <Icon name="external-link" size={14} /></a>
+            <a className="btn btn-line btn-sm" href={`/?url=${encodeURIComponent(r.pageUrl)}#top`}><Icon name="rotate-ccw" size={14} /> Stamp it again</a>
+          </div>
         </div>
-      </div>
-      <div
-        className="sv-full"
-        onClick={(e) => {
-          // In-page links (See your status, Share) scroll here instead of changing the address.
-          const to = e.target.closest?.('a[href^="#"]')?.getAttribute("href");
-          if (to && !to.startsWith("#stamp/")) {
-            e.preventDefault();
-            document.querySelector(to)?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        }}
-      >
-        <Hero r={r} />
-        <TierStatus r={r} />
-        <Checks r={r} />
-        <Share r={r} />
-        <Snapshot s={r.snapshot} />
-      </div>
+        {r.sentence && <p className="sv-quote">“{r.sentence}”</p>}
+        {r.image && <a className="sv-shot" href={r.image} target="_blank" rel="noopener noreferrer"><img src={r.image} alt={`First screen of ${r.host}, stamped ${r.verdict}.`} /></a>}
+      </section>
+
+      <Panel title={failed.length ? `${failed.length} ${failed.length === 1 ? "thing" : "things"} holding it back` : "Every check passed"} desc="Scored by rules, not AI. Each fail says what we found and how to fix it.">
+        {failed.length > 0 && (
+          <ol className="fixes">
+            {failed.map((k) => (
+              <li key={k.id || k.label}>
+                <b>{k.label}</b>
+                <p>{k.detail}</p>
+                {k.fix && <p className="fix"><b>Fix</b>{k.fix}</p>}
+              </li>
+            ))}
+          </ol>
+        )}
+        {passed.length > 0 && (
+          <>
+            <h3>Passed</h3>
+            <ul className="sv-passed">{passed.map((k) => <li key={k.id || k.label}><Icon name="check" size={14} />{k.label}<small>{k.detail}</small></li>)}</ul>
+          </>
+        )}
+      </Panel>
+
+      {(s.stack?.length > 0 || s.browser || s.seo) && (
+        <Panel title="Under the hood" desc="Measured in a real browser and from the page's HTML and headers.">
+          {s.browser && (
+            <>
+              <h3>Speed</h3>
+              <dl className="scout">
+                <div><dt>Main content</dt><dd className={b.lcp > 2500 ? "bad" : "ok"}>{sec(b.lcp)}</dd></div>
+                <div><dt>Server answered</dt><dd>{sec(b.ttfb)}</dd></div>
+                <div><dt>Layout shift</dt><dd className={b.cls > 0.1 ? "bad" : ""}>{b.cls ?? "n/a"}</dd></div>
+                <div><dt>Fully loaded</dt><dd>{sec(b.load)}</dd></div>
+                <div><dt>Requests</dt><dd>{b.requests ?? "n/a"}</dd></div>
+                {kb != null && <div><dt>Page weight</dt><dd>{kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`}</dd></div>}
+              </dl>
+            </>
+          )}
+          {s.stack?.length > 0 && (
+            <>
+              <h3>Stack · {s.stack.length}</h3>
+              <ul className="sv-stack">{s.stack.map((t) => <li key={t.name}><b>{t.name}</b><span>{t.category}</span><small>{t.evidence}</small></li>)}</ul>
+            </>
+          )}
+          {s.seo && (
+            <>
+              <h3>Search</h3>
+              <dl className="scout">
+                <div><dt>Search engines</dt><dd className={s.seo.noindex ? "bad" : "ok"}>{s.seo.noindex ? "Blocked" : "Allowed"}</dd></div>
+                <div><dt>Headlines (h1)</dt><dd className={s.seo.h1Count === 1 ? "" : "bad"}>{s.seo.h1Count}</dd></div>
+                <div><dt>Title</dt><dd>{s.seo.titleLength} <small>chars</small></dd></div>
+                <div><dt>Description</dt><dd>{s.seo.descriptionLength} <small>chars</small></dd></div>
+                <div><dt>Images without alt</dt><dd className={s.seo.imagesWithoutAlt ? "bad" : ""}>{s.seo.imagesWithoutAlt} <small>of {s.seo.images}</small></dd></div>
+              </dl>
+            </>
+          )}
+          {s.security && (
+            <>
+              <h3>Security headers</h3>
+              <dl className="scout">
+                {Object.entries({ hsts: "HSTS", csp: "Content policy", frameOptions: "Frame options", noSniff: "No sniff", referrerPolicy: "Referrer policy" }).map(([k, label]) => (s.security[k] == null ? null : <div key={k}><dt>{label}</dt><dd className={s.security[k] ? "ok" : "bad"}>{s.security[k] ? "Yes" : "No"}</dd></div>))}
+              </dl>
+            </>
+          )}
+        </Panel>
+      )}
     </>
   );
 }
