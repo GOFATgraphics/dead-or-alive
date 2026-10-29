@@ -44,6 +44,10 @@
     {
       "source": "/status-badge/:id",
       "destination": "/api/monitor-status?id=:id&badge=1"
+    },
+    {
+      "source": "/report/:token",
+      "destination": "/api/monitor-status?report=:token"
     }
   ],
   "headers": [
@@ -123,6 +127,15 @@
     },
     {
       "source": "/status(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/report(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

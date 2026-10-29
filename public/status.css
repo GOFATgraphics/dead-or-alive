@@ -34,3 +34,23 @@ footer a { color: #12132a; font-weight: 700; }
   .card { padding: 1.25rem; }
   .grid { grid-template-columns: 1fr; }
 }
+
+/* Client report (/report/<token>): the status page's look, plus month links, a change list and print. */
+.report .grid { grid-template-columns: repeat(3, 1fr); }
+.months { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; font-size: 0.8125rem; }
+.months a, .months b { padding: 0.25rem 0.6rem; border: 1px solid #e6e3f1; border-radius: 999px; color: #5d6180; text-decoration: none; }
+.months b { background: #12132a; border-color: #12132a; color: #fff; }
+table a { color: #12132a; font-weight: 700; }
+th[scope="row"] { width: 38%; font-size: 0.8125rem; letter-spacing: 0; text-transform: none; color: #5d6180; font-weight: 600; }
+.changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.changes li { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.75rem; padding: 0.7rem 0.85rem; border-radius: 10px; background: #f6f5fc; font-size: 0.875rem; overflow-wrap: anywhere; }
+.changes time { color: #5d6180; font-size: 0.8125rem; }
+button.btn { border: 0; cursor: pointer; font: inherit; font-weight: 700; }
+.actions { margin-top: 1.5rem; }
+@media (max-width: 560px) { .report .grid { grid-template-columns: 1fr 1fr; } .changes li { grid-template-columns: 1fr; gap: 0.2rem; } }
+@media print {
+  body { background: #fff; }
+  .card { border: 0; padding: 0; }
+  .actions, .months { display: none; }
+  .kpi, table, .changes li { break-inside: avoid; }
+}

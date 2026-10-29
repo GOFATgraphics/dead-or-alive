@@ -108,7 +108,7 @@ export const isMember = (u) => hasKillSheet(u) || hasStayAlive(u);
 
 // The start of the current month of a membership, counted from its billing day (a yearly plan still gets a
 // fresh month every month). Without a billing day, the last 30 days.
-function monthStart(anchor, now = new Date()) {
+export function monthStart(anchor, now = new Date()) {
   if (!anchor) return new Date(now - 30 * 86400000);
   const a = new Date(anchor);
   const at = (n) => new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth() + n, a.getUTCDate(), a.getUTCHours(), a.getUTCMinutes()));

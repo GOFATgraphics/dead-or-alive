@@ -370,12 +370,15 @@ function Billing({ user, setup, onChange }) {
   const sa = user.stayAlive, ks = user.killSheet;
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
-  async function billing(op) {
-    if (op === "cancel" && !confirm("Cancel Stay Alive? It stays on until the end of the month you paid for, then stops.")) return;
+  const [leaving, setLeaving] = useState(false);
+  const [why, setWhy] = useState("");
+  const [note, setNote] = useState("");
+  async function billing(op, extra = {}) {
     setBusy(op);
     setErr("");
     try {
-      const out = await api(op);
+      const out = await api(op, extra);
+      setLeaving(false);
       if (out.portal) location.assign(out.portal);
       else onChange(out);
     } catch (e) {
@@ -406,10 +409,34 @@ function Billing({ user, setup, onChange }) {
           {sa.cancelAtPeriodEnd ? (
             <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => billing("resume")}>{busy === "resume" ? "Resuming…" : "Keep Stay Alive"}</button>
           ) : (
-            <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => billing("cancel")}>{busy === "cancel" ? "Cancelling…" : "Cancel Stay Alive"}</button>
+            !leaving && <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => setLeaving(true)}>Cancel Stay Alive</button>
           )}
           <a className="btn btn-line btn-sm" href={setup?.portal} target="_blank" rel="noopener noreferrer">Receipts and card</a>
         </div>
+      )}
+      {leaving && user.stayAliveActive && !sa.cancelAtPeriodEnd && (
+        <form className="leave" onSubmit={(e) => { e.preventDefault(); billing("cancel", { reason: why, note }); }}>
+          <h3>Before you go</h3>
+          <p>Stay Alive stays on until <b>{fmtDate(sa.renews)}</b>, then stops: no more checks, alerts, re-stamps, or reports. Nothing is charged after that.</p>
+          {(sa.seats || 1) > 1 && (
+            <div className="leave-offer">
+              <b>Paying for more sites than you need?</b>
+              <p>You pay for {sa.seats} sites. Remove the extra ones in Monitoring instead and pay {planPrice("stayAlive", sa.interval === "year")} for one.</p>
+              <a className="btn btn-line btn-sm" href="#monitoring" onClick={() => setLeaving(false)}>Go to my sites</a>
+            </div>
+          )}
+          <fieldset>
+            <legend>What made you cancel? <span className="opt">optional</span></legend>
+            {["Too expensive", "Not using it enough", "Missing something I need", "My site shut down", "Something else"].map((r) => (
+              <label key={r} className="check"><input type="radio" name="why" value={r} checked={why === r} onChange={() => setWhy(r)} /> {r}</label>
+            ))}
+          </fieldset>
+          <label>Anything we could have done better? <span className="opt">optional</span><textarea rows={3} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What would have made you stay?" /></label>
+          <div className="row-actions">
+            <button type="button" className="btn btn-dark btn-sm" onClick={() => setLeaving(false)}>Keep Stay Alive</button>
+            <button type="submit" className="btn btn-line btn-sm" disabled={!!busy}>{busy === "cancel" ? "Cancelling…" : `Cancel at the end of the ${sa.interval === "year" ? "year" : "month"}`}</button>
+          </div>
+        </form>
       )}
       {err && <p className="alert" role="alert">{err}</p>}
       <PlanRows user={user} />
@@ -593,14 +620,59 @@ function siteMath(n, yearly) {
 }
 
 // Stay Alive: the sites on the account, then the monitoring of the one picked.
-function StayAlive({ user, monitors, onChange }) {
+// Competitors, stamped weekly, next to the member's own sites.
+function Rivals({ rivals, monitors, onChange }) {
+  const list = rivals || [];
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const save = async (urls) => {
+    setBusy(true); setErr("");
+    try { onChange(await api("rivals", { urls })); setDraft(""); }
+    catch (x) { setErr(x.message); } finally { setBusy(false); }
+  };
+  const last = (rs) => [...(rs || [])].reverse().find((r) => !r.failed && r.score != null);
+  const rows = [
+    ...(monitors || []).map((m) => ({ url: m.url, mine: true, r: last(m.restamps), prev: (m.restamps || []).filter((r) => !r.failed && r.score != null).slice(-2, -1)[0] })),
+    ...list.map((x) => ({ url: x.url, running: x.running, failed: x.restamps?.at(-1)?.failed, r: last(x.restamps), prev: (x.restamps || []).filter((r) => !r.failed && r.score != null).slice(-2, -1)[0] })),
+  ];
+  const best = Math.max(...rows.map((x) => x.r?.score ?? -1));
+  return (
+    <Panel title="Competitors" desc="Up to 2 competitor sites, stamped once a week with the same checks, next to yours.">
+      <table className="hist-table rivals" aria-label="You and your competitors">
+        <thead><tr><th>Site</th><th>Verdict</th><th>Score</th><th>Main content</th><th>Last stamp</th></tr></thead>
+        <tbody>
+          {rows.map((x) => (
+            <tr key={x.url} className={x.mine ? "mine" : ""}>
+              <td><b>{x.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</b>{x.mine ? <span className="you">You</span> : <button type="button" className="link" disabled={busy} onClick={() => save(list.filter((y) => y.url !== x.url).map((y) => y.url))}>Remove</button>}</td>
+              <td>{x.r ? <span className={"v-chip v-" + x.r.verdict.toLowerCase()}>{x.r.verdict}</span> : x.running ? "Stamping…" : x.failed ? "Couldn't stamp" : "Soon"}</td>
+              <td>{x.r ? <>{x.r.score}/100{x.r.score === best && rows.length > 1 ? " · top" : ""}{x.prev ? <small> ({x.r.score - x.prev.score >= 0 ? "+" : ""}{x.r.score - x.prev.score})</small> : null}</> : "n/a"}</td>
+              <td>{x.r?.lcp ? `${(x.r.lcp / 1000).toFixed(1)}s` : "n/a"}</td>
+              <td>{x.r ? <a href={`/v/${x.r.id}`}>{fmtDate(x.r.at)}</a> : "n/a"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {list.length < 2 && (
+        <form className="row-actions" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) save([...list.map((y) => y.url), draft.trim()]); }}>
+          <input className="inline-input" type="text" inputMode="url" value={draft} maxLength={300} onChange={(e) => setDraft(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor site" />
+          <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !draft.trim()}>{busy ? "Checking…" : "Add competitor"}</button>
+        </form>
+      )}
+      {err && <p className="alert" role="alert">{err}</p>}
+    </Panel>
+  );
+}
+
+function StayAlive({ user, monitors, rivals, onChange }) {
   const sites = monitors || [];
   const [pick, setPick] = useState(0);
   const m = sites[Math.min(pick, sites.length - 1)];
   return (
     <>
       <Sites user={user} sites={sites} pick={pick} setPick={setPick} onChange={onChange} />
-      {m && <SiteMonitor key={m.url} monitor={m} onChange={onChange} />}
+      {m && <SiteMonitor key={m.url} user={user} monitor={m} onChange={onChange} />}
+      <Rivals user={user} rivals={rivals} monitors={sites} onChange={onChange} />
     </>
   );
 }
@@ -818,6 +890,77 @@ function SiteHealth({ monitor }) {
   );
 }
 
+// More pages of the same site, checked every 5 minutes like the main one.
+function KeyPages({ monitor, onChange }) {
+  const list = monitor.keyPages || [];
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const save = async (next) => {
+    setBusy(true); setNote("");
+    try { onChange && onChange(await api("key-pages", { url: monitor.url, pages: next })); setDraft(""); }
+    catch (x) { setNote(x.message); } finally { setBusy(false); }
+  };
+  const origin = (() => { try { return new URL(monitor.url).origin; } catch (_) { return ""; } })();
+  return (
+    <>
+      <h3>Key pages</h3>
+      <p className="muted">Up to 5 more pages of this site that must stay up, like pricing, sign up, or checkout. Each one is checked every 5 minutes with the same down and back-up alerts.</p>
+      {list.length > 0 && (
+        <ul className="history">
+          {list.map((k) => {
+            const c = k.lastCheck;
+            const up7 = uptimeFrom(k.checks || [], Date.now() - 7 * 86400000);
+            return (
+              <li key={k.url}>
+                <span className={"v-chip " + (c ? (c.ok ? "v-alive" : "v-dead") : "")}>{c ? (c.ok ? "UP" : "DOWN") : "SOON"}</span>
+                <a href={k.url} target="_blank" rel="noopener noreferrer">{new URL(k.url).pathname}</a>
+                <span className="kp-end"><time>{c ? (c.ok ? `${c.ms} ms` : c.missing ? `"${c.missing}" missing` : c.status ? `answers ${c.status}` : c.error) : "first check soon"}{up7 != null ? ` · ${up7}% this week` : ""}</time><button type="button" className="link" disabled={busy} onClick={() => save(list.filter((x) => x.url !== k.url).map((x) => x.url))}>Remove</button></span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {list.length < 5 && (
+        <form className="row-actions" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) save([...list.map((x) => x.url), draft.trim()]); }}>
+          <input className="inline-input" type="text" value={draft} maxLength={300} onChange={(e) => setDraft(e.target.value)} placeholder={`/pricing or ${origin}/signup`} aria-label="Page to watch" />
+          <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !draft.trim()}>{busy ? "Checking the page…" : "Add page"}</button>
+        </form>
+      )}
+      {note && <p className="alert" role="alert">{note}</p>}
+    </>
+  );
+}
+
+// A monthly page to send to a client or a team, with the member's name on top.
+function ClientReport({ user, monitor, onChange }) {
+  const [brand, setBrand] = useState(user.reportBrand || "");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  if (!monitor.reportId) return null;
+  const link = `${location.origin}/report/${monitor.reportId}`;
+  const save = async (e) => {
+    e.preventDefault(); setBusy(true); setNote("");
+    try { onChange && onChange(await api("report-brand", { name: brand })); setNote(brand.trim() ? "Saved. It shows on every report." : "Removed."); }
+    catch (x) { setNote(x.message); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <h3>Client report</h3>
+      <p className="muted">A monthly report for this site you can send to a client or your team: uptime, outages, stamps, health, and changes. It opens without an account and prints to PDF. Only people you give the link to can open it.</p>
+      <div className="row-actions">
+        <a className="btn btn-dark btn-sm" href={link} target="_blank" rel="noopener noreferrer">Open this month's report</a>
+        <Copy text={link} label="Copy report link" done="Report link copied" />
+      </div>
+      <form className="row-actions" onSubmit={save}>
+        <input className="inline-input" type="text" value={brand} maxLength={60} onChange={(e) => setBrand(e.target.value)} placeholder="Your name or studio, optional" aria-label="Prepared by" />
+        <button type="submit" className="btn btn-line btn-sm" disabled={busy}>{busy ? "Saving…" : "Save name"}</button>
+        {note && <span className="muted">{note}</span>}
+      </form>
+    </>
+  );
+}
+
 // Words the page must show. Saved and checked against the page in one step; the server refuses words it can't see.
 function MustHave({ monitor, onChange }) {
   const [list, setList] = useState(monitor.mustHave || []);
@@ -848,7 +991,7 @@ function MustHave({ monitor, onChange }) {
     </>
   );
 }
-function SiteMonitor({ monitor, onChange }) {
+function SiteMonitor({ user, monitor, onChange }) {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [alertDown, setAlertDown] = useState(monitor.alerts?.down !== false);
@@ -896,6 +1039,7 @@ function SiteMonitor({ monitor, onChange }) {
           )}
           {monitor.restampRunning && <Working text="Re-stamping your page now." />}
           <SiteHealth monitor={monitor} />
+          <KeyPages monitor={monitor} onChange={onChange} />
           <MustHave monitor={monitor} onChange={onChange} />
           <h3>History</h3>
           {(() => {
@@ -922,19 +1066,26 @@ function SiteMonitor({ monitor, onChange }) {
             );
           })()}
           <h3>Public status page</h3>
-          <p className="muted">Optional, off by default. When on, anyone with the link sees only uptime, speed, and the latest stamp for this site, never your email, your stack, or your changes.</p>
+          <p className="muted">Optional, off by default. When on, anyone with the link sees only uptime, speed, and the latest stamp for this site, never your email, your stack, or your changes. It also switches on your uptime badge.</p>
           {monitor.publicId ? (
+            <>
             <div className="row-actions">
               <a className="btn btn-line btn-sm" href={`/status/${monitor.publicId}`} target="_blank" rel="noopener noreferrer">Open public status page</a>
               <Copy text={`${location.origin}/status/${monitor.publicId}`} label="Copy status link" done="Status link copied" />
-              <Copy text={`<a href="${location.origin}/status/${monitor.publicId}"><img src="${location.origin}/status-badge/${monitor.publicId}" alt="${monitor.url} status, monitored by StampMyPage"></a>`} label="Copy status badge" done="Badge copied" />
+              <Copy text={`<a href="${location.origin}/status/${monitor.publicId}"><img src="${location.origin}/status-badge/${monitor.publicId}" alt="${monitor.url} uptime, monitored by Stamp My Page"></a>`} label="Copy uptime badge" done="Badge copied" />
               <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("public-off", () => api("public-status", { url: monitor.url, on: false }))}>{busy === "public-off" ? "Saving…" : "Turn public status off"}</button>
             </div>
+            <div className="badge-preview">
+              <img src={`/status-badge/${monitor.publicId}`} alt="Your uptime badge" height="28" />
+              <p className="fine">Your uptime badge, live. Put it in your site's footer: it shows visitors you're up and links to this status page.</p>
+            </div>
+            </>
           ) : (
             <div className="row-actions">
               <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("public-on", () => api("public-status", { url: monitor.url, on: true }))}>{busy === "public-on" ? "Saving…" : "Make status public"}</button>
             </div>
           )}
+          <ClientReport user={user} monitor={monitor} onChange={onChange} />
           {monitor.pausedManual && <p className="note">Paused by you: no checks or alerts run for this site until you resume it.</p>}
           <h3>Alerts</h3>
           <p className="muted">Per site, not per account. Turning an alert off never stops the checks or the history, it only stops that notification.</p>
@@ -975,6 +1126,7 @@ function SiteMonitor({ monitor, onChange }) {
                 <li key={c.at}>
                   <time>{fmtDate(c.at)}</time>
                   <div>
+                    {c.drop && (<><p className="rem"><b>Score:</b> dropped from {c.drop.from} to {c.drop.to}</p>{c.drop.fails.map((f) => <p key={"f" + f.id} className="drop-why"><b>{c.drop.newOnly ? "Newly failing" : "Failing"}:</b> {f.label}. {f.detail}{f.fix ? <> <i>Fix:</i> {f.fix}</> : null}</p>)}</>)}
                     {(c.google || []).map((g) => <p key={"g" + g.text} className={g.tone === "bad" ? "rem" : g.tone === "good" ? "add" : ""}><b>Google:</b> {g.text}</p>)}
                     {c.verdict && <p><b>Stamp:</b> {c.verdict.from} to {c.verdict.to}</p>}
                     {c.lcp && <p><b>Speed:</b> main content in {(c.lcp.to / 1000).toFixed(1)}s, was {(c.lcp.from / 1000).toFixed(1)}s</p>}
@@ -1439,7 +1591,7 @@ function Welcome({ plan, user, go, onClose }) {
 }
 
 function Dashboard({ data, setData, onOut }) {
-  const { user, report, monitor, monitors, setup } = data;
+  const { user, report, monitor, monitors, rivals, setup } = data;
   const [banner, setBanner] = useState(PAID ? "confirming" : PLAN ? "checkout" : "");
   const [err, setErr] = useState("");
   const tries = useRef(0);
@@ -1482,7 +1634,7 @@ function Dashboard({ data, setData, onOut }) {
   }, [active, banner]);
 
   // Poll while anything is running: payment confirmation, the scout, a re-stamp, the first monitor run.
-  const running = banner === "confirming" || report?.status === "working" || (monitors || []).some((m) => m.restampRunning || (!m.checks && !m.paused)) || (user.stayAliveActive && user.stayAlive?.url && !monitor);
+  const running = banner === "confirming" || report?.status === "working" || (monitors || []).some((m) => m.restampRunning || (!m.checks && !m.paused)) || (user.stayAliveActive && user.stayAlive?.url && !monitor) || (rivals || []).some((x) => x.running);
   useEffect(() => {
     if (!running) return;
     const t = setTimeout(() => {
@@ -1589,7 +1741,7 @@ function Dashboard({ data, setData, onOut }) {
         {sect === "stamps" && <Stamps user={user} />}
         {sect === "cards" && <MyCards user={user} />}
         {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
-        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Uptime checked every 5 minutes, with an alert when it goes down and when it's back", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
+        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} rivals={rivals} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["Uptime checked every 5 minutes, for your page and up to 5 key pages", "Alerts by email, Slack, or Discord when it goes down and when it's back", "Warnings before your security certificate or domain runs out", "An alert if Google is told to skip your page, or a link breaks", "A fresh stamp every week, and why the score moved", "Competitors stamped next to you, and a monthly client report", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
         {sect === "account" && (
           <>

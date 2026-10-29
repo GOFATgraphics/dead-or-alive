@@ -4,7 +4,9 @@
 // monitor:<email>:<site id> and show in the dashboard. A page that goes down gets an email, when email is set up.
 import crypto from "node:crypto";
 import { get, remove, set, members } from "./_store.js";
-import { getUser, hasStayAlive } from "./_account.js";
+import { getUser, hasStayAlive, monthStart, reviewAllowance, updateUser } from "./_account.js";
+import { precheck } from "./_inspect.js";
+import { checkPageUrl } from "../src/url.js";
 import { stampNow } from "./_stamp.js";
 import { mail } from "./_publish.js";
 import { brokenLinks, certificate, cleanPhrases, daysLeft, domainExpiry, googleDiff, missingWord, pageFacts, stepFor } from "./_watch.js";
@@ -127,19 +129,24 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   if (!pageUrl || !hasStayAlive(u)) return null;
   const m = (await get(monitorKey(email, pageUrl))) || { url: pageUrl, checks: [], restamps: [] };
   if (m.pausedManual) return m;
-  const check = await confirmedCheck(pageUrl, m.mustHave);
+  const [check, keys] = await Promise.all([confirmedCheck(pageUrl, m.mustHave), checkKeys(m)]);
   const alert = record(m, check);
+  const keyAlerts = recordKeys(m, keys);
   const due = restamp || !m.lastRestampAt || Date.now() - new Date(m.lastRestampAt).getTime() > WEEK;
   if (due && check.ok) {
     m.restampRunning = true;
     await set(monitorKey(email, pageUrl), m);
     const r = await stampNow(pageUrl).catch((e) => ({ failed: e.message }));
+    const prev = [...(m.restamps || [])].reverse().find((x) => !x.failed && x.score != null);
     m.restampRunning = false;
     m.lastRestampAt = new Date().toISOString();
     m.restamps = [...m.restamps, r.failed ? { at: m.lastRestampAt, failed: String(r.failed).slice(0, 200) } : { at: m.lastRestampAt, id: r.id, verdict: r.verdict, score: r.score, lcp: r.snapshot?.browser?.lcp || null }].slice(-30);
     if (!r.failed) {
-      const change = diff(m.lastSeen, seen(r));
-      m.lastSeen = seen(r);
+      const now = seen(r);
+      let change = diff(m.lastSeen, now);
+      const drop = scoreDrop(prev, m.lastSeen, now);
+      if (drop) change = { ...(change || { added: [], removed: [], lcp: null, verdict: null, pixels: false }), drop };
+      m.lastSeen = now;
       if (change) {
         m.changes = [{ at: m.lastRestampAt, stampId: r.id, ...change }, ...(m.changes || [])].slice(0, 30);
         await alertChange(email, pageUrl, change, m);
@@ -149,6 +156,48 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   await dailyExtras(email, pageUrl, m).catch((e) => console.error("Extra checks failed:", pageUrl, e));
   await set(monitorKey(email, pageUrl), m);
   await sendUptimeAlert(email, pageUrl, m, alert);
+  for (const k of keyAlerts) await sendUptimeAlert(email, k.url, m, k.alert);
+  return m;
+}
+
+// --- Key pages: up to 5 more pages of the same site (pricing, signup, checkout), checked every 5 minutes with the
+// same confirmed down and recovery alerts. Each keeps about a week of hourly samples. ---
+const bareHost = (u) => new URL(u).hostname.replace(/^www\./, "");
+const checkKeys = (m) => Promise.all((m.keyPages || []).map(async (k) => ({ url: k.url, check: await confirmedCheck(k.url) })));
+function recordKeys(m, results) {
+  const out = [];
+  for (const { url, check } of results) {
+    const k = (m.keyPages || []).find((x) => x.url === url);
+    if (!k) continue;
+    const alert = record(k, check);
+    k.checks = k.checks.slice(-200);
+    if (alert.kind) out.push({ url, alert });
+  }
+  return out;
+}
+export async function setKeyPages(email, url, pages) {
+  const u = await getUser(email);
+  const page = sitesOf(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const list = [];
+  for (const raw of Array.isArray(pages) ? pages : []) {
+    let s = String(raw || "").trim();
+    if (!s) continue;
+    if (s.startsWith("/")) s = new URL(s, page).toString();
+    const c = checkPageUrl(s);
+    if (!c.url) throw new Error(`${s}: ${c.error}`);
+    if (bareHost(c.url) !== bareHost(page)) throw new Error(`Key pages must be on ${bareHost(page)}. Add another site for ${bareHost(c.url)}.`);
+    if (c.url !== page && !list.includes(c.url)) list.push(c.url);
+  }
+  if (list.length > 5) throw new Error("Up to 5 key pages per site.");
+  const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
+  const known = new Set((m.keyPages || []).map((k) => k.url));
+  for (const k of list.filter((x) => !known.has(x))) {
+    const c = await checkOnce(k);
+    if (!c.ok) throw new Error(`${new URL(k).pathname} ${c.status ? `answers ${c.status}` : String(c.error || "doesn't answer").toLowerCase()}, so it can't be watched yet.`);
+  }
+  m.keyPages = list.map((k) => (m.keyPages || []).find((x) => x.url === k) || { url: k, checks: [] });
+  await set(monitorKey(email, page), m);
   return m;
 }
 
@@ -197,7 +246,7 @@ const span = (n) => (n == null ? "a while" : n < 60 ? `${n} minute${n === 1 ? ""
 // those only hold back change alerts.
 export async function sendUptimeAlert(email, pageUrl, m, alert) {
   if (!alert?.kind || !alertSettings(m).down) return;
-  const host = new URL(pageUrl).hostname;
+  const host = new URL(pageUrl).hostname + new URL(pageUrl).pathname.replace(/\/$/, "");
   const c = alert.check;
   const dash = "https://stampmypage.com/dashboard#monitoring";
   if (alert.kind === "down") {
@@ -233,11 +282,13 @@ export async function pulseAll() {
         const key = monitorKey(email, url);
         const before = await get(key);
         if (!before || before.pausedManual) return;
-        const check = await confirmedCheck(url, before.mustHave);
+        const [check, keys] = await Promise.all([confirmedCheck(url, before.mustHave), checkKeys(before)]);
         const m = (await get(key)) || before; // the daily run may have written meanwhile
         const alert = record(m, check);
+        const keyAlerts = recordKeys(m, keys);
         await set(key, m);
         await sendUptimeAlert(email, url, m, alert);
+        for (const k of keyAlerts) await sendUptimeAlert(email, k.url, m, k.alert);
         out.checked++;
         if (alert.kind) out[alert.kind]++;
       })
@@ -249,7 +300,16 @@ export async function pulseAll() {
 // What a re-stamp saw that's worth watching: every tool by category, main-content time, score, verdict.
 function seen(r) {
   const stack = (r.snapshot?.stack || []).map((t) => `${t.category}: ${t.name}`);
-  return { stack, lcp: r.snapshot?.browser?.lcp || null, score: r.score ?? null, verdict: r.verdict };
+  const failing = (r.checks || []).filter((k) => !k.pass && !k.skip).map((k) => ({ id: k.id, label: k.label, detail: String(k.detail || "").slice(0, 200), fix: String(k.fix || "").slice(0, 200) }));
+  return { stack, lcp: r.snapshot?.browser?.lcp || null, score: r.score ?? null, verdict: r.verdict, failing };
+}
+
+// A lower score than the last re-stamp, and why: the checks that fail now and passed last time. An older record
+// without the list of failing checks gives every check that fails now.
+export function scoreDrop(prev, before, now) {
+  if (!prev || prev.score == null || now.score == null || now.score >= prev.score) return null;
+  const was = before?.failing ? new Set(before.failing.map((f) => f.id)) : null;
+  return { from: prev.score, to: now.score, newOnly: !!was, fails: (now.failing || []).filter((f) => !was || !was.has(f.id)).slice(0, 8) };
 }
 
 // What changed since the last re-stamp: tools added or removed (pixels and analytics included), speed that moved
@@ -269,7 +329,9 @@ async function alertChange(email, pageUrl, c, m = {}) {
   if (!a.changes || inQuietHours(a)) return;
   const host = new URL(pageUrl).hostname;
   const google = c.google || [];
+  const d = c.drop;
   const lines = [
+    ...(d ? [`Score dropped from ${d.from} to ${d.to}.`, ...d.fails.map((f) => `${d.newOnly ? "Newly failing" : "Failing"}: ${f.label}. ${f.detail}${f.fix ? ` Fix: ${f.fix}` : ""}`)] : []),
     ...google.map((g) => g.text),
     ...(c.added || []).map((t) => `Added: ${t}`),
     ...(c.removed || []).map((t) => `Removed: ${t}`),
@@ -278,14 +340,14 @@ async function alertChange(email, pageUrl, c, m = {}) {
   ].filter(Boolean);
   const hidden = google.some((g) => g.tone === "bad" && /noindex|robots|another site/.test(g.text));
   const onlyGoogle = google.length && !c.added?.length && !c.removed?.length && !c.lcp && !c.verdict;
-  const subject = hidden ? `${host}: Google may drop this page` : onlyGoogle ? `${host}: what Google sees changed` : `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`;
+  const subject = d ? `${host}: score dropped from ${d.from} to ${d.to}` : hidden ? `${host}: Google may drop this page` : onlyGoogle ? `${host}: what Google sees changed` : `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`;
   const how = c.stampId ? "re-stamped" : "checked";
   await mail(email, {
     subject,
     text: `Stay Alive ${how} ${pageUrl} and noticed:\n\n${lines.join("\n")}\n\nDetails in your dashboard: https://stampmypage.com/dashboard#monitoring`,
     html: `<p>Stay Alive ${how} <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard#monitoring">Details in your dashboard</a></p>`,
   }).catch(() => {});
-  await postWebhook(a.webhook, { event: "change", url: pageUrl, host, at: new Date().toISOString(), added: c.added || [], removed: c.removed || [], lcp: c.lcp || null, verdict: c.verdict || null, google }, `🟡 ${subject}\n${lines.map((l) => `• ${l}`).join("\n")}`);
+  await postWebhook(a.webhook, { event: "change", url: pageUrl, host, at: new Date().toISOString(), added: c.added || [], removed: c.removed || [], lcp: c.lcp || null, verdict: c.verdict || null, google, scoreDrop: d || null }, `🟡 ${subject}\n${lines.map((l) => `• ${l}`).join("\n")}`);
 }
 
 // --- The daily extras: security certificate and domain renewal dates, what Google is told, and once a week the
@@ -427,7 +489,7 @@ export function downMinutes(checks = [], from = 0, to = Date.now()) {
   return down;
 }
 // Uptime percent over a window, by time rather than by number of checks.
-function uptimeOver(checks, from, to = Date.now()) {
+export function uptimeOver(checks, from, to = Date.now()) {
   const first = checks.length ? Math.max(from, Date.parse(checks[0].at)) : to;
   const total = (to - first) / 60000;
   if (total <= 0) return checks.length ? (checks[checks.length - 1].ok ? 100 : 0) : null;
@@ -444,11 +506,11 @@ export function monthlyHistory(checks = []) {
     by[k].checks++;
     if (c.ok) { by[k].up++; by[k].ms += c.ms || 0; by[k].okMs++; }
   }
-  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => ({
-    ...m,
-    uptime: m.checks ? uptimeOver(checks, Date.UTC(+m.month.slice(0, 4), +m.month.slice(5) - 1, 1), Math.min(Date.now(), Date.UTC(+m.month.slice(0, 4), +m.month.slice(5), 1))) : null,
-    avgMs: m.okMs ? Math.round(m.ms / m.okMs) : null,
-  }));
+  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => {
+    const from = Date.UTC(+m.month.slice(0, 4), +m.month.slice(5) - 1, 1);
+    const to = Math.min(Date.now(), Date.UTC(+m.month.slice(0, 4), +m.month.slice(5), 1));
+    return { ...m, uptime: m.checks ? uptimeOver(checks, from, to) : null, downMinutes: Math.round(downMinutes(checks, from, to)), avgMs: m.okMs ? Math.round(m.ms / m.okMs) : null };
+  });
 }
 // Outages as incidents, not a list of failed checks: consecutive failed checks form one
 // incident, from the first failed check to the first good check after it (or "still down").
@@ -456,7 +518,7 @@ export function incidentList(checks = []) {
   const out = [];
   let cur = null;
   for (const c of checks) {
-    if (!c.ok && !cur) cur = { start: c.at, status: c.status || 0 };
+    if (!c.ok && !cur) cur = { start: c.at, status: c.status || 0, why: c.missing ? `"${c.missing}" missing` : c.status ? `answered ${c.status}` : c.error || "" };
     if (c.ok && cur) { cur.end = c.at; out.push(cur); cur = null; }
   }
   if (cur) out.push({ ...cur, ongoing: true });
@@ -602,13 +664,115 @@ export async function monitorAll() {
     }
   }
   try { out.reports = await sendWeeklyReports(); } catch (e) { console.error("Weekly reports failed:", e); }
+  try { out.rivals = await rivalsAll(); } catch (e) { console.error("Competitor stamps failed:", e); }
+  try { out.reminders = await reviewReminders(); } catch (e) { console.error("Review reminders failed:", e); }
   return out;
+}
+
+// --- Competitors: up to 2 other sites per account, stamped once a week, shown next to the member's own. ---
+export const rivalsKey = (email) => `rivals:${email}`;
+export async function setRivals(email, urls) {
+  const u = await getUser(email);
+  if (!hasStayAlive(u)) return null;
+  const own = new Set(sitesOf(u).map(bareHost));
+  const list = [];
+  for (const raw of Array.isArray(urls) ? urls : []) {
+    const s = String(raw || "").trim();
+    if (!s) continue;
+    const c = checkPageUrl(s);
+    if (!c.url) throw new Error(`${s}: ${c.error}`);
+    if (own.has(bareHost(c.url))) throw new Error(`${bareHost(c.url)} is your own site. Competitors are other people's sites.`);
+    if (!list.includes(c.url)) list.push(c.url);
+  }
+  if (list.length > 2) throw new Error("Up to 2 competitors.");
+  const before = (await get(rivalsKey(email))) || [];
+  const fresh = list.filter((x) => !before.some((r) => r.url === x));
+  for (const x of fresh) {
+    const p = await precheck(x);
+    if (!p.ok) throw new Error(`${bareHost(x)}: ${p.error}`);
+  }
+  await set(rivalsKey(email), list.map((x) => before.find((r) => r.url === x) || { url: x, restamps: [], running: true }));
+  return fresh;
+}
+export async function stampRival(email, url) {
+  const r = await stampNow(url).catch((e) => ({ failed: e.message }));
+  const at = new Date().toISOString();
+  const entry = r.failed ? { at, failed: String(r.failed).slice(0, 200) } : { at, id: r.id, verdict: r.verdict, score: r.score, lcp: r.snapshot?.browser?.lcp || null };
+  const list = (await get(rivalsKey(email))) || [];
+  const x = list.find((y) => y.url === url);
+  if (!x) return;
+  x.restamps = [...(x.restamps || []), entry].slice(-12);
+  x.lastAt = at;
+  x.running = false;
+  await set(rivalsKey(email), list);
+}
+async function rivalsAll() {
+  let n = 0;
+  for (const email of await members("idx:members")) {
+    const u = await getUser(email).catch(() => null);
+    if (!hasStayAlive(u)) continue;
+    for (const x of (await get(rivalsKey(email))) || []) {
+      if (x.lastAt && Date.now() - Date.parse(x.lastAt) < WEEK) continue;
+      await stampRival(email, x.url).catch((e) => console.error("Competitor stamp failed:", x.url, e));
+      n++;
+    }
+  }
+  return n;
+}
+
+// --- App review reminder: one email when a Stay Alive member's monthly review is still unused a week before it
+// resets. ---
+async function reviewReminders() {
+  let sent = 0;
+  for (const email of await members("idx:members")) {
+    const u = await getUser(email).catch(() => null);
+    if (!hasStayAlive(u) || !u.stayAlive.periodStart || reviewAllowance(u).stayAlive < 1) continue;
+    const from = monthStart(u.stayAlive.periodStart);
+    const resets = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, from.getUTCDate(), from.getUTCHours(), from.getUTCMinutes()));
+    const days = Math.ceil((resets - Date.now()) / 86400000);
+    if (days > 7 || days < 1 || u.reviewReminded === from.toISOString()) continue;
+    await updateUser(email, (x) => ({ ...x, reviewReminded: from.toISOString() }));
+    const when = longDate(resets.toISOString());
+    await mail(email, {
+      subject: "Your app review for this month is still unused",
+      text: `Stay Alive includes one app review a month: a person tests your app end to end and tells you what breaks and where people get stuck.\n\nThis month's is still unused, and it resets on ${when}. Send it from your dashboard:\nhttps://stampmypage.com/dashboard#reviews`,
+      html: `<p>Stay Alive includes one app review a month: a person tests your app end to end and tells you what breaks and where people get stuck.</p><p>This month's is still unused, and it resets on <b>${when}</b>.</p><p><a href="https://stampmypage.com/dashboard#reviews">Send it from your dashboard</a></p>`,
+    }).catch(() => {});
+    sent++;
+  }
+  return sent;
+}
+
+// --- Client report: a monthly page a member can send to a client or their team. The link is signed, so only
+// someone given it can open it; it shows nothing about the account. ---
+const reportSecret = () => process.env.RESULT_SECRET || process.env.ADMIN_KEY || "";
+const reportSig = (email, id) => crypto.createHmac("sha256", reportSecret()).update(`report:${email}:${id}`).digest("base64url").slice(0, 16);
+export const reportToken = (email, url) => (reportSecret() ? `${siteId(url)}${reportSig(email, siteId(url))}` : null);
+export async function findReport(token) {
+  const t = String(token || "");
+  if (!reportSecret() || !/^[A-Za-z0-9_-]{28}$/.test(t)) return null;
+  const id = t.slice(0, 12);
+  for (const email of await members("idx:members")) {
+    const u = await getUser(email).catch(() => null);
+    if (!u?.stayAlive) continue;
+    for (const url of sitesOf(u)) {
+      if (siteId(url) !== id || !crypto.timingSafeEqual(Buffer.from(reportSig(email, id)), Buffer.from(t.slice(12)))) continue;
+      const m = await get(monitorKey(email, url)).catch(() => null);
+      return m ? { m: { ...m, url }, brand: u.reportBrand || "" } : null;
+    }
+  }
+  return null;
+}
+export async function setReportBrand(email, name) {
+  const brand = String(name || "").replace(/\s+/g, " ").trim().slice(0, 60);
+  await updateUser(email, (x) => ({ ...x, reportBrand: brand }));
+  return brand;
 }
 
 // The history of every site on the account, for the dashboard. A site with no history yet comes back as { url }.
 export async function readMonitors(email, u) {
   const watched = watchedSites(u);
-  return Promise.all(sitesOf(u).map(async (url) => { const m = (await get(monitorKey(email, url))) || {}; return { ...m, url, paused: !watched.includes(url), publicId: m.publicStatus ? siteId(url) : null }; }));
+  return Promise.all(sitesOf(u).map(async (url) => { const m = (await get(monitorKey(email, url))) || {}; return { ...m, url, paused: !watched.includes(url), publicId: m.publicStatus ? siteId(url) : null, reportId: reportToken(email, url) }; }));
 }
 
 export const forgetSite = (email, url) => remove(monitorKey(email, url));

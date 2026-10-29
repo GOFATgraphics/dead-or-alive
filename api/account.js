@@ -22,9 +22,9 @@ import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
 } from "./_account.js";
-import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
+import { cancelStayAlive, checkoutUrl, confirmCheckout, logBilling, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
-import { forgetSite, readMonitors, runMonitor, seatsOf, setAlertSettings, setMustHave, setPaused, setPublicStatus, sendReportNow, sitesOf, testWebhook } from "./_monitor.js";
+import { forgetSite, readMonitors, rivalsKey, runMonitor, seatsOf, setAlertSettings, setKeyPages, setMustHave, setPaused, setPublicStatus, setReportBrand, setRivals, sendReportNow, sitesOf, stampRival, testWebhook } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
 import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
@@ -77,10 +77,10 @@ async function heal(email) {
 async function me(email) {
   const u = await getUser(email);
   if (!u) return { user: null };
-  const [report, monitors] = await Promise.all([hasKillSheet(u) ? readReport(email) : null, u.stayAlive ? readMonitors(email, u) : null]);
+  const [report, monitors, rivals] = await Promise.all([hasKillSheet(u) ? readReport(email) : null, u.stayAlive ? readMonitors(email, u) : null, u.stayAlive ? get(rivalsKey(email)).catch(() => null) : null]);
   // monitor: the first site, for the overview; monitors: every site on the account.
   const monitor = monitors?.[0]?.checks ? monitors[0] : null;
-  return { user: publicUser(u), report, monitor, monitors };
+  return { user: publicUser(u), report, monitor, monitors, rivals: rivals || [] };
 }
 
 function setup() {
@@ -569,6 +569,34 @@ export default async function handler(req, res) {
       } catch (e) { return res.status(400).json({ error: e.message }); }
       return res.status(200).json(await me(email));
     }
+    // More pages of a watched site to check for uptime: { url, pages: [] }, paths or full URLs on the same site.
+    if (op === "key-pages") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      try {
+        await setKeyPages(email, page.url, b.pages);
+      } catch (e) { return res.status(400).json({ error: e.message }); }
+      return res.status(200).json(await me(email));
+    }
+    // Competitors stamped weekly next to the member's own sites: { urls: [] }, up to 2. New ones are stamped now.
+    if (op === "rivals") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      try {
+        const fresh = await setRivals(email, b.urls);
+        if (fresh?.length) waitUntil(Promise.all(fresh.map((x) => stampRival(email, x).catch((e) => console.error("Competitor stamp failed:", e)))));
+      } catch (e) { return res.status(400).json({ error: e.message }); }
+      return res.status(200).json(await me(email));
+    }
+    // The name on top of client reports ("Prepared by ..."). Empty removes it.
+    if (op === "report-brand") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      await setReportBrand(email, b.name);
+      return res.status(200).json(await me(email));
+    }
     // Sends one test message to a webhook (Slack, Discord, or any URL), without saving it.
     if (op === "test-webhook") {
       const u = await getUser(email);
@@ -611,6 +639,12 @@ export default async function handler(req, res) {
       return res.status(202).json(await me(email));
     }
     if (op === "cancel" || op === "resume") {
+      // Why people leave, for the admin: kept on the account and in the payment log.
+      if (op === "cancel" && (b.reason || b.note)) {
+        const why = { reason: String(b.reason || "").slice(0, 40), note: String(b.note || "").slice(0, 500), at: new Date().toISOString() };
+        await updateUser(email, (x) => ({ ...x, cancelFeedback: why }));
+        await logBilling({ type: "cancel", action: `Cancel asked: ${why.reason || "no reason"}${why.note ? `. "${why.note}"` : ""}`, plan: "stayAlive", email });
+      }
       if (!polarApiReady()) return res.status(200).json({ portal: PORTAL });
       await (op === "cancel" ? cancelStayAlive(email) : resumeStayAlive(email));
       return res.status(200).json(await me(email));
