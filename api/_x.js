@@ -85,10 +85,10 @@ export async function xCallback(req, res) {
       console.error("X token exchange failed:", t.status, tok.error || "");
       return fail("failed");
     }
-    const m = await fetch("https://api.x.com/2/users/me?user.fields=confirmed_email,username,profile_image_url,verified,name", { headers: { Authorization: `Bearer ${tok.access_token}` } });
+    const m = await fetch("https://api.x.com/2/users/me?user.fields=confirmed_email,username,profile_image_url,verified,verified_type,name,description,public_metrics", { headers: { Authorization: `Bearer ${tok.access_token}` } });
     const me = (await m.json().catch(() => ({})))?.data;
     if (!me?.id) return fail("failed");
-    return finish(res, { id: me.id, username: me.username || "", avatar: me.profile_image_url || "", name: me.name || "", verified: me.verified === true, email: me.confirmed_email }, saved.next, fail, saved.claim || "");
+    return finish(res, { id: me.id, username: me.username || "", avatar: me.profile_image_url || "", name: me.name || "", verified: me.verified === true, verifiedType: me.verified_type || "", bio: String(me.description || "").slice(0, 280), followers: Number.isFinite(me.public_metrics?.followers_count) ? me.public_metrics.followers_count : null, email: me.confirmed_email }, saved.next, fail, saved.claim || "");
   } catch (err) {
     console.error("X sign-in failed:", err);
     return fail("failed");
@@ -107,7 +107,7 @@ async function finish(res, x, next, fail, claimId = "") {
   const email = linked || normEmail(x.email);
   if (!validEmail(email)) return fail("noemail");
   await ensureUser(email);
-  await updateUser(email, (u) => (u ? { ...u, x: { id: x.id, username: x.username, avatar: biggerAvatar(x.avatar), name: x.name || "", verified: x.verified === true } } : undefined));
+  await updateUser(email, (u) => (u ? { ...u, x: { id: x.id, username: x.username, avatar: biggerAvatar(x.avatar), name: x.name || "", verified: x.verified === true, verifiedType: x.verifiedType || "", bio: x.bio || "", followers: x.followers ?? null, at: new Date().toISOString() } } : undefined));
   await set(`xid:${x.id}`, email);
   // A claim from the result page: connecting X here is the claim itself, even if X was already
   // used for sign-up. First claimer wins; a later claimer keeps the existing card, never takes it.

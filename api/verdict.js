@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     if (claimEmail) {
       if (email && String(email).toLowerCase().trim() === String(claimEmail).toLowerCase().trim()) isOwner = true;
       const owner = await getUser(claimEmail);
-      if (owner?.x?.username) ownerX = { username: owner.x.username, name: owner.x.name || "", avatar: owner.x.avatar || "", verified: owner.x.verified === true };
+      if (owner?.x?.username) ownerX = { username: owner.x.username, name: owner.x.name || "", avatar: owner.x.avatar || "", verified: owner.x.verified === true, verifiedType: owner.x.verifiedType || "", bio: owner.x.bio || "", followers: owner.x.followers ?? null };
     }
   } catch (_) {}
   if (email && snapshot) return res.status(200).json({ ...r, snapshot, locked: false, ownerX, isOwner });

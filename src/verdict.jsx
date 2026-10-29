@@ -269,25 +269,55 @@ function localJobs() {
 // A stamp claimed by hand, whose claimer linked X: who claimed it, with a link to their X profile.
 // This replaces the claim card for that stamp, for every viewer, and there is no claim option on it:
 // the site is already claimed. Saving a stamp never creates this card on its own.
-function OwnedBy({ owner }) {
-  const url = `https://x.com/${encodeURIComponent(owner.username)}`;
+const X_PATH = "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z";
+const XLogo = ({ size = 16 }) => (<svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" fill="currentColor"><path d={X_PATH} /></svg>);
+// X's own check, in X's colours: blue for paid, gold for businesses, grey for government.
+const XCheck = ({ type }) => (
+  <svg className="owned-check" viewBox="0 0 22 22" width="20" height="20" role="img" aria-label="Verified on X">
+    <path fill={type === "business" ? "#e2b719" : type === "government" ? "#829aab" : "#1d9bf0"} d="M20.4 11c0-1.3-.8-2.5-2-3 .5-1.2.3-2.6-.6-3.6-.9-.9-2.3-1.2-3.6-.7-.5-1.2-1.7-2-3-2s-2.6.8-3.1 2c-1.2-.5-2.6-.2-3.6.7-.9.9-1.1 2.3-.6 3.6-1.2.5-2 1.7-2 3s.8 2.5 2 3c-.5 1.2-.3 2.6.6 3.6.9.9 2.3 1.2 3.6.7.5 1.2 1.7 2 3.1 2 1.3 0 2.5-.8 3-2 1.2.5 2.6.2 3.6-.7.9-.9 1.2-2.3.7-3.6 1.1-.5 1.9-1.7 1.9-3z" />
+    <path fill="#fff" d="M9.6 14.9 6.3 11.6l1.3-1.3 2 2 4.8-4.9 1.3 1.3z" />
+  </svg>
+);
+const compact = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e5 ? `${Math.round(n / 1e3)}K` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n)).replace(".0", "");
+
+// The owner's card: their X profile on the stamp they claimed, styled to the verdict and status.
+function OwnedBy({ owner, r }) {
+  const handle = encodeURIComponent(owner.username);
+  const url = `https://x.com/${handle}`;
+  const tier = tierFor(r.verdict, r.score);
+  const [imgOk, setImgOk] = useState(!!owner.avatar);
+  const pageUrl = `${location.origin}/v/${r.id}`;
+  const shareText = `${r.host} is stamped ${r.verdict}${r.score != null ? ` ${r.score}/100` : ""}, owned by @${owner.username}.`;
+  const v = String(r.verdict || "").toLowerCase();
   return (
-    <section className="wrap save-wrap" aria-labelledby="owned-h">
-      <div className="save">
-        {owner.avatar ? (
-          <a href={url} target="_blank" rel="noreferrer"><img src={owner.avatar} alt="" width="48" height="48" style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = "none"; }} /></a>
-        ) : (
-          <span className="ic-tile"><Icon name="user" size={20} /></span>
-        )}
-        <div>
-          <p className="eyebrow">Owned by</p>
-          <h2 id="owned-h"><a href={url} target="_blank" rel="noreferrer">@{owner.username}</a>{owner.verified ? (<span> <Icon name="shield-check" size={16} /> Verified</span>) : null}</h2>
-          <p>{owner.name ? `${owner.name} · ` : ""}Owner of this stamp.</p>
+    <section className="wrap owned-wrap" aria-labelledby="owned-h">
+      <article className={`owned v-${v}${tier ? ` tier-${tier.key}` : ""}`}>
+        <div className="owned-glow" aria-hidden="true"></div>
+        <header className="owned-top">
+          <span className="owned-eyebrow"><XLogo size={12} /> Owned by</span>
+          <span className="owned-chip"><b>{r.verdict}</b>{r.score != null ? ` ${r.score}/100` : ""}{tier ? ` · ${tier.name}` : ""}</span>
+        </header>
+        <div className="owned-main">
+          <a className="owned-avatar" href={url} target="_blank" rel="noreferrer" aria-label={`@${owner.username} on X`}>
+            {imgOk ? <img src={owner.avatar} alt="" width="96" height="96" onError={() => setImgOk(false)} /> : <span>{(owner.name || owner.username || "?").slice(0, 1).toUpperCase()}</span>}
+            <i aria-hidden="true"><XLogo size={11} /></i>
+          </a>
+          <div className="owned-id">
+            <h2 id="owned-h"><a href={url} target="_blank" rel="noreferrer">{owner.name || `@${owner.username}`}</a>{owner.verified && <XCheck type={owner.verifiedType} />}</h2>
+            <p className="owned-handle"><a href={url} target="_blank" rel="noreferrer">@{owner.username}</a>{owner.followers != null && <> · <b>{compact(owner.followers)}</b> follower{owner.followers === 1 ? "" : "s"}</>}</p>
+            {owner.bio && <p className="owned-bio">{owner.bio}</p>}
+          </div>
+          <div className="owned-actions">
+            <a className="btn owned-follow" href={`https://x.com/intent/follow?screen_name=${handle}`} target="_blank" rel="noreferrer" onClick={() => track("owner_follow")}><XLogo size={14} /> Follow</a>
+            <a className="btn btn-line" href={`https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`} target="_blank" rel="noreferrer" onClick={() => track("owner_share")}>Share</a>
+          </div>
         </div>
-        <div className="save-actions">
-          <a className="btn btn-line" href={url} target="_blank" rel="noreferrer">View on X <Icon name="external-link" /></a>
-        </div>
-      </div>
+        <footer className="owned-foot">
+          <span><Icon name="shield-check" size={14} /> Claimed with X</span>
+          <span>{r.host}</span>
+          {r.number ? <span>Stamp No. {String(r.number).padStart(4, "0")}</span> : null}
+        </footer>
+      </article>
     </section>
   );
 }
@@ -655,7 +685,7 @@ function Result({ r }) {
       <main>
         {justSignedIn && <Toast text="Signed in. This stamp is saved to your dashboard." href="/dashboard" action="Dashboard" />}
         <Hero r={r} />
-        {r.ownerX && <OwnedBy owner={r.ownerX} />}
+        {r.ownerX && <OwnedBy owner={r.ownerX} r={r} />}
         <Status r={r} />
         <Checks r={r} />
         {!r.ownerX && (<><ClaimSite r={r} /><SavePrompt r={r} /></>)}
