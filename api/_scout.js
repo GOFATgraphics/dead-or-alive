@@ -19,11 +19,55 @@ const decode = (s) =>
 const textOf = (html) => decode(String(html || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 
+// Copy that is not live copy must not be scouted as if it were: struck-through
+// or deleted text is explicitly no longer accurate, and blocks marked as an
+// example, sample, mock, or showcase card are illustrative, not the page's
+// own claims. A tag-stack walk handles nested blocks, which a single regex
+// cannot, since an example card contains nested divs of its own.
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+const EXAMPLE_ATTR = /(?:class|id)\s*=\s*["'][^"']*(?:example|sample|mock|scard|r-ex)[^"']*["']/i;
+export function stripNonLive(html) {
+  const src = String(html || "");
+  let out = "";
+  let last = 0;
+  let skipDepth = 0;
+  const tagRe = /<\/?([a-z][a-z0-9]*)\b([^>]*)\/?>/gi;
+  let m;
+  while ((m = tagRe.exec(src)) !== null) {
+    const [tag, name, attrs] = [m[0], m[1].toLowerCase(), m[2] || ""];
+    const isEnd = tag.startsWith("</");
+    const selfClosing = tag.endsWith("/>") || VOID_TAGS.has(name);
+    if (skipDepth > 0) {
+      if (!isEnd && !selfClosing) skipDepth++;
+      if (isEnd) skipDepth--;
+      if (skipDepth === 0) {
+        out += " ";
+        last = tagRe.lastIndex;
+      }
+      continue;
+    }
+    if (!isEnd) {
+      const struck = name === "s" || name === "del" || name === "strike";
+      const example = (name === "section" || name === "div" || name === "figure" || name === "article" || name === "aside") && EXAMPLE_ATTR.test(attrs);
+      if ((struck || example) && !selfClosing) {
+        out += src.slice(last, m.index) + " ";
+        skipDepth = 1;
+        last = tagRe.lastIndex;
+        continue;
+      }
+    }
+    out += src.slice(last, m.index) + tag;
+    last = tagRe.lastIndex;
+  }
+  out += src.slice(last);
+  return out;
+}
+
 // What the whole page says and does, read from its HTML.
 export function scoutHtml(html) {
-  const body = String(html || "")
+  const body = stripNonLive(String(html || "")
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, " ");
+    .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, " "));
   const text = textOf(body);
   const lower = text.toLowerCase();
   const words = text.split(/\s+/).filter(Boolean);
@@ -100,11 +144,33 @@ function whatItDoes(text, name) {
   return w.length ? w.slice(0, 8).join(" ").replace(/[,;:]$/, "") : "";
 }
 
+// Audience, including a comma/and list: "for landing pages, SaaS sites
+// and indie launches" is three audiences, not one. The FOR regex stops at
+// the first comma, so expand the list from the source text at that point,
+// stopping at the first segment that is not a short noun phrase.
+const AUDIENCE_STOP = new Set(["scored", "with", "without", "using", "based", "from", "that", "which", "who", "to", "for", "in", "on", "at", "by", "not", "free"]);
 function audienceOf(texts) {
   for (const t of texts) {
-    const m = String(t || "").match(FOR);
-    if (m) return m[1].trim().split(/\s+/).slice(0, 4).join(" ");
-    const w = String(t || "").match(WHO);
+    const s = String(t || "");
+    const m = s.match(FOR);
+    if (m) {
+      const off = m[0].search(/\bfor\s/i);
+      const rest = s.slice(m.index + (off >= 0 ? off + 3 : 0)).trim();
+      const segs = [];
+      for (const part of rest.split(/,\s*|\s+and\s+/)) {
+        const seg = part.trim().replace(/[.;:]+$/, "").split(/\s+to\s+/)[0].trim();
+        if (!seg) continue;
+        const first = seg.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+        if (AUDIENCE_STOP.has(first) || seg.split(/\s+/).length > 3) break;
+        segs.push(seg);
+        if (segs.length >= 3) break;
+      }
+      if (segs.length === 1) return segs[0];
+      if (segs.length === 2) return `${segs[0]}, ${segs[1]}`;
+      if (segs.length >= 3) return `${segs.slice(0, -1).join(", ")} and ${segs[segs.length - 1]}`;
+      return m[1].trim().split(/\s+/).slice(0, 4).join(" ");
+    }
+    const w = s.match(WHO);
     if (w) return w[0];
   }
   return "";
@@ -204,7 +270,17 @@ export function rankFixes(stamp, scout) {
     if (!s.proof && !s.logos && !s.stat) out.push({ title: "Nobody vouches for it", problem: "No testimonials, customer logos, ratings, or usage numbers anywhere on the page.", fix: "Add 2 or 3 short quotes with a real name and face, or the logos of who uses it, right under the first screen.", impact: "High", from: "Page scout" });
     if (s.longestForm > 5) out.push({ title: "The form asks too much", problem: `The longest form has ${s.longestForm} fields.`, fix: "Ask for an email only. Get the rest after they're in.", impact: "High", from: "Page scout" });
     if (!s.closingCta) out.push({ title: "No ask at the end", problem: "Someone who reads to the bottom finds no button to act on.", fix: "Repeat the main button in a closing section with one line on what happens next.", impact: "Medium", from: "Page scout" });
-    if (s.ctaLabels.length > 4) out.push({ title: "Too many different asks", problem: `${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`, fix: "Pick one main action and use the same words on every main button.", impact: "Medium", from: "Page scout" });
+    if (s.ctaLabels.length > 4) {
+      // Same problem as the first-screen "Buttons don't fight each other"
+      // check, told twice. Merge into that entry instead of listing both.
+      const buttons = out.find((f) => f.title === "Buttons don't fight each other");
+      if (buttons) {
+        buttons.problem += ` ${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`;
+        buttons.fix = "Pick one main action and use the same words on every main button. Keep one main button on the first screen and one quiet second choice at most.";
+      } else {
+        out.push({ title: "Too many different asks", problem: `${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`, fix: "Pick one main action and use the same words on every main button.", impact: "Medium", from: "Page scout" });
+      }
+    }
     if (!s.riskReversal) out.push({ title: "Nothing lowers the risk", problem: "No free trial, guarantee, 'no card', or 'cancel anytime' anywhere.", fix: "Say what it costs to try: free, no card, or cancel anytime. Put it under the main button.", impact: "Medium", from: "Page scout" });
     if (s.we > s.you && s.we > 8) out.push({ title: "It talks about itself", problem: `“We/our/us” ${s.we} times, “you/your” ${s.you} times.`, fix: "Rewrite the top sections around what the visitor gets, in 'you' words.", impact: "Medium", from: "Page scout" });
     if (s.fog.length >= 3) out.push({ title: "Pitch-deck words across the page", problem: `Found: ${s.fog.join(", ")}.`, fix: "Swap each for what it actually does, in words a stranger can picture.", impact: "Medium", from: "Page scout" });
