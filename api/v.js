@@ -31,6 +31,6 @@ export default async function handler(req, res) {
     html = html.replace("<!--result-meta-->", tags).replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)} | Stamp My Page</title>`);
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Cache-Control", r ? "public, s-maxage=60, stale-while-revalidate=60" : "no-store");
+  res.setHeader("Cache-Control", r ? "public, s-maxage=60, stale-while-revalidate=600" : "no-store");
   res.status(r ? 200 : 404).send(html);
 }

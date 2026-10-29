@@ -264,53 +264,36 @@ function localJobs() {
   }
 }
 
-// Who's looking: signed out, a free account, or a member. Signed in, this browser's free stamps are saved to the
-// account on the spot. A stamp of one of a member's own pages (a Stay Alive or Kill Sheet re-stamp) counts as theirs.
-function useAccount(r) {
-  const [acct, setAcct] = useState({ status: "loading" });
+function SavePrompt({ r }) {
+  const [state, setState] = useState({ status: "loading" });
   useEffect(() => {
     let live = true;
     (async () => {
       try {
         const res = await fetch("/api/account", { cache: "no-store" });
-        if (!res.ok) return live && setAcct({ status: "off" });
+        if (!res.ok) return live && setState({ status: "off" });
         const data = await res.json();
-        if (!data.user) return live && setAcct({ status: "out" });
-        let user = data.user;
+        if (!data.user) return live && setState({ status: "out" });
         const jobs = localJobs();
-        if (!(user.stamps || []).some((x) => x.id === r.id) && jobs.length) {
+        let saved = (data.user.stamps || []).some((x) => x.id === r.id);
+        if (!saved && jobs.length) {
           const c = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "claim", jobs }) }).then((x) => x.json()).catch(() => ({}));
           if (c.user) {
-            user = c.user;
             try {
               localStorage.removeItem("smp.jobs");
             } catch (_) {}
           }
+          saved = (c.user?.stamps || []).some((x) => x.id === r.id);
         }
-        const host = (u) => {
-          try {
-            return new URL(u).hostname.replace(/^www\./, "");
-          } catch (_) {
-            return "";
-          }
-        };
-        const own = [...(user.stayAlive?.sites || []), user.stayAlive?.url, user.killSheet?.url].filter(Boolean).map(host);
-        const saved = (user.stamps || []).some((x) => x.id === r.id);
-        const mine = saved || (user.member && own.includes(host(r.pageUrl)));
-        if (live) setAcct({ status: "in", user, saved, mine });
+        if (live) setState({ status: "in", saved });
       } catch (_) {
-        if (live) setAcct({ status: "off" });
+        if (live) setState({ status: "off" });
       }
     })();
     return () => {
       live = false;
     };
   }, [r.id]);
-  return acct;
-}
-
-function SavePrompt({ r, acct }) {
-  const state = acct;
   if (state.status === "loading" || state.status === "off") return null;
   const next = `/dashboard?save=${encodeURIComponent(r.id)}&back=${encodeURIComponent(`/v/${r.id}`)}`;
   return (
@@ -330,8 +313,8 @@ function SavePrompt({ r, acct }) {
         ) : (
           <>
             <div>
-              <h2 id="save-h">{state.mine ? (state.saved ? "Saved to your dashboard." : "One of your pages.") : "You're signed in."}</h2>
-              <p>{state.mine ? (state.saved ? "Every stamp you make while signed in lands there too." : "This stamp is part of your plan's history in your dashboard.") : "This stamp is saved to another account, or was made in another browser. Stamp the page again to add it to yours."}</p>
+              <h2 id="save-h">{state.saved ? "Saved to your dashboard." : "You're signed in."}</h2>
+              <p>{state.saved ? "Every stamp you make while signed in lands there too." : "This stamp is saved to another account, or was made in another browser. Stamp the page again to add it to yours."}</p>
             </div>
             <div className="save-actions">
               <a className="btn btn-line" href="/dashboard">Open dashboard <Icon name="arrow-right" /></a>
@@ -343,11 +326,8 @@ function SavePrompt({ r, acct }) {
   );
 }
 
-// The plans, for anyone who isn't a member yet. Members get their plan and the way back to the dashboard instead.
-function Offers({ r, acct }) {
+function Offers({ r }) {
   const v = r.verdict;
-  if (acct.status === "loading") return null;
-  if (acct.user?.member) return <MemberStrip user={acct.user} />;
   // A page in trouble needs fixing first; a page that works needs watching.
   const order = v === "ALIVE" ? ["stayAlive", "killSheet"] : ["killSheet", "stayAlive"];
   const failed = (r.checks || []).filter((k) => !k.pass).length;
@@ -366,24 +346,6 @@ function Offers({ r, acct }) {
         }}
         dangerouslySetInnerHTML={{ __html: plansHtml({ order, pageUrl: r.pageUrl }) + reviewHtml() }}
       />
-    </section>
-  );
-}
-
-function MemberStrip({ user }) {
-  const plans = [user.killSheetActive && "Kill Sheet", user.stayAliveActive && "Stay Alive"].filter(Boolean).join(" and ");
-  return (
-    <section className="wrap save-wrap" aria-labelledby="member-h">
-      <div className="save">
-        <span className="ic-tile"><Icon name="check" size={20} /></span>
-        <div>
-          <h2 id="member-h">You're on {plans}.</h2>
-          <p>{user.stayAliveActive ? "Your sites are watched every day and re-stamped every week. The history, alerts, and your app review are in your dashboard." : "Your Kill Sheet, the rewrite, and your app review are in your dashboard."}</p>
-        </div>
-        <div className="save-actions">
-          <a className="btn btn-dark" href={user.stayAliveActive ? "/dashboard#monitoring" : "/dashboard#kill-sheet"}>Open dashboard <Icon name="arrow-right" /></a>
-        </div>
-      </div>
     </section>
   );
 }
@@ -584,7 +546,6 @@ function Snapshot({ s }) {
 
 function Result({ r }) {
   const v = r.verdict;
-  const acct = useAccount(r);
   return (
     <div className="page">
       <Bar />
@@ -593,8 +554,8 @@ function Result({ r }) {
         <Hero r={r} />
         <Status r={r} />
         <Checks r={r} />
-        {!acct.user?.member && <SavePrompt r={r} acct={acct} />}
-        <Offers r={r} acct={acct} />
+        <SavePrompt r={r} />
+        <Offers r={r} />
         <Share r={r} />
         <Snapshot s={r.snapshot} />
         <section className="final" aria-labelledby="final-h">
