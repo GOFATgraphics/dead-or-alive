@@ -27,7 +27,7 @@ function isPrivate(address, family) {
   return blocked.check(address, family === 6 ? "ipv6" : "ipv4");
 }
 
-async function assertPublic(url) {
+export async function assertPublic(url) {
   const checked = checkPageUrl(url);
   if (!checked.url) throw new Error(checked.error);
   const host = new URL(url).hostname;
@@ -36,7 +36,7 @@ async function assertPublic(url) {
 }
 
 // Follows redirects by hand so each new address is checked too.
-async function safeFetch(start) {
+export async function safeFetch(start) {
   let url = start;
   const t0 = Date.now();
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
@@ -188,11 +188,11 @@ const FRAMEWORKS = [
   ["Vite", /\/assets\/index-[\w-]+\.js|\/@vite\/client/i],
 ];
 
-function attr(html, re) {
+export function attr(html, re) {
   const m = re.exec(html);
   return m ? m[1].trim() : "";
 }
-function meta(html, key) {
+export function meta(html, key) {
   const k = key.replace(/[.:]/g, "\\$&");
   return (
     attr(html, new RegExp(`<meta[^>]+(?:name|property)=["']${k}["'][^>]*content=["']([^"']*)["']`, "i")) ||
@@ -201,7 +201,7 @@ function meta(html, key) {
 }
 
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", mdash: "—", ndash: "–", hellip: "…" };
-function text(fragment) {
+export function text(fragment) {
   return String(fragment || "")
     .replace(/<(script|style|svg)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<[^>]+>/g, " ")

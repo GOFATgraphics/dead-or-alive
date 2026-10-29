@@ -745,18 +745,115 @@ function monthRows(checks) {
 function incidentRows(checks) {
   const out = []; let cur = null;
   for (const c of checks || []) {
-    if (!c.ok && !cur) cur = { start: c.at };
+    if (!c.ok && !cur) cur = { start: c.at, why: c.missing ? `"${c.missing}" missing` : c.status ? `answered ${c.status}` : c.error || "" };
     if (c.ok && cur) { cur.end = c.at; out.push(cur); cur = null; }
   }
   if (cur) out.push({ ...cur, ongoing: true });
   return out.reverse();
 }
 const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const hookKind = (url) => {
+  try {
+    const u = new URL(url);
+    if (u.hostname === "hooks.slack.com") return "slack";
+    if (/^(ptb\.|canary\.)?(discord|discordapp)\.com$/.test(u.hostname) && u.pathname.startsWith("/api/webhooks/")) return "discord";
+    return "json";
+  } catch (_) { return ""; }
+};
+const daysTo = (iso) => (iso ? Math.floor((Date.parse(iso) - Date.now()) / 86400000) : null);
+const inDaysText = (n) => (n < 0 ? "Ran out" : n === 0 ? "Runs out today" : n === 1 ? "1 day left" : `${n} days left`);
+
+// The daily extra checks for one site: certificate, domain, what Google is told, and the weekly link check.
+function SiteHealth({ monitor }) {
+  const { cert, domain, google, links } = monitor;
+  if (!cert && !domain && !google && !links) {
+    return (<><h3>Health checks</h3><p className="fine">Security certificate, domain renewal, what Google sees, and broken links are checked once a day. The first results show here after the next daily run.</p></>);
+  }
+  const certDays = daysTo(cert?.validTo);
+  const domDays = daysTo(domain?.expires);
+  const hidden = google && (google.noindex || google.robotsBlocked);
+  return (
+    <>
+      <h3>Health checks</h3>
+      <dl className="scout health">
+        <div><dt>Security certificate</dt>{
+          !cert ? <dd>Not on https</dd>
+          : cert.trusted === false && cert.problem && !/EXPIRED/i.test(cert.problem) ? <dd className="bad">Not trusted <small>browsers warn</small></dd>
+          : certDays != null ? <dd className={certDays <= 7 ? "bad" : "ok"}>{inDaysText(certDays)} <small>until {fmtDate(cert.validTo)}</small></dd>
+          : <dd>Couldn't read <small>{cert.error || "retrying daily"}</small></dd>}
+        </div>
+        <div><dt>Domain</dt>{
+          !domain ? <dd>Not yet</dd>
+          : domain.shared ? <dd>Nothing to renew <small>shared address on {domain.shared}</small></dd>
+          : domDays != null ? <dd className={domDays <= 30 ? "bad" : "ok"}>{domDays < 0 ? "Expired" : `Renews in ${domDays} days`} <small>{fmtDate(domain.expires)}</small></dd>
+          : <dd>Date not public <small>{domain.domain}'s registry doesn't share it</small></dd>}
+        </div>
+        <div><dt>Google</dt>{
+          !google ? <dd>Not yet</dd>
+          : google.error ? <dd>Couldn't read <small>{google.error}</small></dd>
+          : hidden ? <dd className="bad">Hidden from Google <small>{google.noindex ? "noindex tag" : "robots.txt blocks it"}</small></dd>
+          : google.canonicalElsewhere ? <dd className="bad">Points elsewhere <small>canonical is another site</small></dd>
+          : <dd className="ok">Can list this page <small>no blocks found</small></dd>}
+        </div>
+        <div><dt>Links on the page</dt>{
+          !links ? <dd>Not yet <small>checked weekly</small></dd>
+          : links.broken.length ? <dd className="bad">{links.broken.length} broken <small>of {links.checked}, {fmtDate(links.at)}</small></dd>
+          : <dd className={links.checked ? "ok" : ""}>{links.checked ? `All ${links.checked} work` : "None in the HTML"} <small>checked {fmtDate(links.at)}</small></dd>}
+        </div>
+      </dl>
+      {google && !google.error && (
+        <dl className="facts">
+          <div><dt>Title</dt><dd>{google.title || <em>No title</em>}</dd></div>
+          <div><dt>Description</dt><dd>{google.description || <em>No description</em>}</dd></div>
+          <div><dt>Share image</dt><dd>{google.image ? <a href={google.image} target="_blank" rel="noopener noreferrer">{google.image.replace(/^https?:\/\//, "")}</a> : <em>None, so shared links show no picture</em>}</dd></div>
+          {google.canonical && <div><dt>Canonical</dt><dd>{google.canonical.replace(/^https?:\/\//, "")}</dd></div>}
+        </dl>
+      )}
+      {links?.broken?.length > 0 && (
+        <ul className="history">
+          {links.broken.map((b) => (<li key={b.url}><span className="v-chip v-dead">{b.status || "DEAD"}</span><a href={b.url} target="_blank" rel="noopener noreferrer">{b.label ? `${b.label} · ` : ""}{b.url.replace(/^https?:\/\//, "")}</a><time>{b.status ? `answers ${b.status}` : b.why}</time></li>))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+// Words the page must show. Saved and checked against the page in one step; the server refuses words it can't see.
+function MustHave({ monitor, onChange }) {
+  const [list, setList] = useState(monitor.mustHave || []);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const save = async (next) => {
+    setBusy(true); setNote("");
+    try { onChange && onChange(await api("must-have", { url: monitor.url, phrases: next })); setList(next); setDraft(""); setNote(next.length ? "Saved. Checked every 5 minutes." : "Removed."); }
+    catch (x) { setNote(x.message); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <h3>Page must say</h3>
+      <p className="muted">Up to 5 words or phrases this page should always show, like your headline or "Start free trial". If one disappears (a blank page, an error screen, a lost button), it counts as down and you get the down alert.</p>
+      {list.length > 0 && (
+        <ul className="chips">
+          {list.map((p) => (<li key={p}><span>{p}</span><button type="button" aria-label={`Remove ${p}`} disabled={busy} onClick={() => save(list.filter((x) => x !== p))}>×</button></li>))}
+        </ul>
+      )}
+      {list.length < 5 && (
+        <form className="row-actions" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) save([...list, draft.trim()]); }}>
+          <input className="inline-input" type="text" value={draft} maxLength={80} onChange={(e) => setDraft(e.target.value)} placeholder="Start free trial" aria-label="Word or phrase the page must show" />
+          <button type="submit" className="btn btn-dark btn-sm" disabled={busy || draft.trim().length < 2}>{busy ? "Checking the page…" : "Add"}</button>
+        </form>
+      )}
+      {note && <p className="muted" role="status">{note}</p>}
+    </>
+  );
+}
 function SiteMonitor({ monitor, onChange }) {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [alertDown, setAlertDown] = useState(monitor.alerts?.down !== false);
   const [alertChanges, setAlertChanges] = useState(monitor.alerts?.changes !== false);
+  const [alertExpiry, setAlertExpiry] = useState(monitor.alerts?.expiry !== false);
   const [quietStart, setQuietStart] = useState(monitor.alerts?.quietStart ?? "");
   const [quietEnd, setQuietEnd] = useState(monitor.alerts?.quietEnd ?? "");
   const [webhook, setWebhook] = useState(monitor.webhookUrl || "");
@@ -798,6 +895,8 @@ function SiteMonitor({ monitor, onChange }) {
             </div>
           )}
           {monitor.restampRunning && <Working text="Re-stamping your page now." />}
+          <SiteHealth monitor={monitor} />
+          <MustHave monitor={monitor} onChange={onChange} />
           <h3>History</h3>
           {(() => {
             const months = monthRows(checks);
@@ -814,7 +913,7 @@ function SiteMonitor({ monitor, onChange }) {
                   </tbody></table>
                 )}
                 <p className="muted">Outages in this history: {incs.length ? "" : "none."}</p>
-                {incs.length > 0 && (<ul className="history">{incs.map((i, idx) => (<li key={idx}><span className="v-chip">{i.ongoing ? "ONGOING" : "DOWN"}</span><span>{fmtDate(i.start)}, {clock(i.start)}{i.end ? ` to ${fmtDate(i.end) === fmtDate(i.start) ? "" : `${fmtDate(i.end)}, `}${clock(i.end)} · ${minutes(Date.parse(i.end) - Date.parse(i.start))}` : ` · still down, ${minutes(Date.now() - Date.parse(i.start))} so far`}</span></li>))}</ul>)}
+                {incs.length > 0 && (<ul className="history">{incs.map((i, idx) => (<li key={idx}><span className="v-chip">{i.ongoing ? "ONGOING" : "DOWN"}</span><span>{fmtDate(i.start)}, {clock(i.start)}{i.end ? ` to ${fmtDate(i.end) === fmtDate(i.start) ? "" : `${fmtDate(i.end)}, `}${clock(i.end)} · ${minutes(Date.parse(i.end) - Date.parse(i.start))}` : ` · still down, ${minutes(Date.now() - Date.parse(i.start))} so far`}{i.why ? ` · ${i.why}` : ""}</span></li>))}</ul>)}
                 <div className="row-actions">
                   <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("report", () => api("report-now", { url: monitor.url }))}>{busy === "report" ? "Sending…" : "Email me this week's report now"}</button>
                   {note && <span className="muted">{note}</span>}
@@ -848,17 +947,24 @@ function SiteMonitor({ monitor, onChange }) {
           )}
           <div className="alert-form">
             <label className="check"><input type="checkbox" checked={alertDown} onChange={(e) => setAlertDown(e.target.checked)} /> Down alerts by email</label>
-            <label className="check"><input type="checkbox" checked={alertChanges} onChange={(e) => setAlertChanges(e.target.checked)} /> Change alerts by email</label>
+            <label className="check"><input type="checkbox" checked={alertChanges} onChange={(e) => setAlertChanges(e.target.checked)} /> Change alerts by email (stack, speed, Google, broken links)</label>
+            <label className="check"><input type="checkbox" checked={alertExpiry} onChange={(e) => setAlertExpiry(e.target.checked)} /> Expiry warnings by email (security certificate and domain)</label>
             <div className="quiet-row">
               <label>Quiet hours (UTC)<select value={quietStart} onChange={(e) => setQuietStart(e.target.value)}><option value="">Off</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
               <span>to</span>
               <label><span className="sr-only">Quiet hours end</span><select value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)}><option value="">Off</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
             </div>
             <p className="muted">Quiet hours silence change alerts only, never down alerts. A down page at night is still urgent, a stack change can wait until morning. Times are UTC.</p>
-            <label>Webhook URL (optional)<input type="url" value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://example.com/hooks/stampmypage" /></label>
-            <p className="muted">When set, down and change alerts also POST as JSON to this URL. Email stays on unless you turn it off above. Leave it blank to remove it.</p>
+            <label>Slack, Discord, or webhook URL (optional)<input type="url" value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://hooks.slack.com/services/…" /></label>
+            <p className="muted">{hookKind(webhook) === "slack" ? "Slack link: every alert arrives as a message in that channel." : hookKind(webhook) === "discord" ? "Discord link: every alert arrives as a message in that channel." : webhook ? "Any other link gets every alert as JSON, with a readable message in it." : "Get every alert in a chat channel too. Email stays on unless you turn it off above."}</p>
+            <details className="how-to">
+              <summary>Where do I get this link?</summary>
+              <p><b>Slack:</b> open <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener noreferrer">Slack's incoming webhooks</a>, create an app for your workspace, turn on Incoming Webhooks, add one for the channel, and copy the link that starts with https://hooks.slack.com.</p>
+              <p><b>Discord:</b> in the channel, open Edit Channel, then Integrations, then Webhooks, New Webhook, and Copy Webhook URL.</p>
+            </details>
             <div className="row-actions">
-              <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("alerts", () => api("alerts", { url: monitor.url, down: alertDown, changes: alertChanges, quietStart: quietStart === "" ? null : Number(quietStart), quietEnd: quietEnd === "" ? null : Number(quietEnd), webhook }))}>{busy === "alerts" ? "Saving…" : "Save alert settings"}</button>
+              <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("alerts", () => api("alerts", { url: monitor.url, down: alertDown, changes: alertChanges, expiry: alertExpiry, quietStart: quietStart === "" ? null : Number(quietStart), quietEnd: quietEnd === "" ? null : Number(quietEnd), webhook }))}>{busy === "alerts" ? "Saving…" : "Save alert settings"}</button>
+              <button type="button" className="btn btn-line btn-sm" disabled={!!busy || !webhook} onClick={async () => { setBusy("hook"); setNote(""); try { await api("test-webhook", { webhook }); setNote("Test sent. Check the channel."); } catch (x) { setNote(x.message); } finally { setBusy(""); } }}>{busy === "hook" ? "Sending…" : "Send a test"}</button>
               {note && <span className="muted">{note}</span>}
             </div>
           </div>
@@ -869,17 +975,18 @@ function SiteMonitor({ monitor, onChange }) {
                 <li key={c.at}>
                   <time>{fmtDate(c.at)}</time>
                   <div>
+                    {(c.google || []).map((g) => <p key={"g" + g.text} className={g.tone === "bad" ? "rem" : g.tone === "good" ? "add" : ""}><b>Google:</b> {g.text}</p>)}
                     {c.verdict && <p><b>Stamp:</b> {c.verdict.from} to {c.verdict.to}</p>}
                     {c.lcp && <p><b>Speed:</b> main content in {(c.lcp.to / 1000).toFixed(1)}s, was {(c.lcp.from / 1000).toFixed(1)}s</p>}
-                    {c.added.map((t) => <p key={"a" + t} className="add">+ {t}</p>)}
-                    {c.removed.map((t) => <p key={"r" + t} className="rem">− {t}</p>)}
+                    {(c.added || []).map((t) => <p key={"a" + t} className="add">+ {t}</p>)}
+                    {(c.removed || []).map((t) => <p key={"r" + t} className="rem">− {t}</p>)}
                     {c.stampId && <a href={`/v/${c.stampId}`}>See that stamp</a>}
                   </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="fine">Nothing changed yet. Each weekly re-stamp is compared with the last one: tools and tracking pixels added or removed, speed, and the verdict. You get an email when something changes.</p>
+            <p className="fine">Nothing changed yet. Each weekly re-stamp is compared with the last one: tools and tracking pixels added or removed, speed, and the verdict. What Google is told is compared every day. You get an email when something changes.</p>
           )}
           <h3>Weekly re-stamps</h3>
           {restamps.length ? (

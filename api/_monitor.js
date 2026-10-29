@@ -7,6 +7,7 @@ import { get, remove, set, members } from "./_store.js";
 import { getUser, hasStayAlive } from "./_account.js";
 import { stampNow } from "./_stamp.js";
 import { mail } from "./_publish.js";
+import { brokenLinks, certificate, cleanPhrases, daysLeft, domainExpiry, googleDiff, missingWord, pageFacts, stepFor } from "./_watch.js";
 
 // Every site on the account, in the order they were added (the first came with the plan).
 export function sitesOf(u) {
@@ -23,13 +24,17 @@ export const siteId = (url) => crypto.createHash("sha256").update(url).digest("b
 export const monitorKey = (email, url) => `monitor:${email}:${siteId(url)}`;
 const WEEK = 6.5 * 86400000; // a little under a week, so a daily cron never skips one
 
-// One uptime and speed check: did it answer, with what status, how fast.
-export async function checkOnce(pageUrl) {
+// One uptime and speed check: did it answer, with what status, how fast. With must-have words set, a page that
+// answers but no longer shows one of them counts as down.
+export async function checkOnce(pageUrl, mustHave = []) {
   const t0 = Date.now();
   try {
     const r = await fetch(pageUrl, { redirect: "follow", signal: AbortSignal.timeout(15000), headers: { "User-Agent": "Mozilla/5.0 (compatible; StampMyPage-Monitor/1.0; +https://stampmypage.com)" } });
     const firstByte = Date.now() - t0;
-    await r.arrayBuffer().catch(() => null);
+    const words = mustHave?.length > 0 && r.status < 400;
+    const html = words ? await r.text().catch(() => "") : (await r.arrayBuffer().catch(() => null), "");
+    const missing = words ? missingWord(html, mustHave) : "";
+    if (missing) return { at: new Date().toISOString(), ok: false, status: r.status, ms: firstByte, totalMs: Date.now() - t0, missing, error: `"${missing}" is missing` };
     return { at: new Date().toISOString(), ok: r.status < 400, status: r.status, ms: firstByte, totalMs: Date.now() - t0 };
   } catch (err) {
     return { at: new Date().toISOString(), ok: false, status: 0, ms: Date.now() - t0, error: /timeout|abort/i.test(String(err?.name || err)) ? "No answer in 15s" : "Could not connect" };
@@ -43,6 +48,7 @@ export function alertSettings(m = {}) {
   return {
     down: m.alerts?.down !== false,
     changes: m.alerts?.changes !== false,
+    expiry: m.alerts?.expiry !== false,
     quietStart: Number.isInteger(m.alerts?.quietStart) ? m.alerts.quietStart : null,
     quietEnd: Number.isInteger(m.alerts?.quietEnd) ? m.alerts.quietEnd : null,
     webhook: m.webhookUrl || "",
@@ -55,11 +61,26 @@ export function inQuietHours(a, now = new Date()) {
   const h = now.getUTCHours();
   return a.quietStart < a.quietEnd ? h >= a.quietStart && h < a.quietEnd : h >= a.quietStart || h < a.quietEnd;
 }
-async function postWebhook(url, payload) {
-  if (!url) return;
+// Slack and Discord want their own shape (a message); anything else gets the JSON event with the message in it.
+export function webhookKind(url) {
   try {
-    await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "StampMyPage-Monitor/1.0" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(5000) });
-  } catch (_) { /* A dead webhook must never break the email alert or the check. */ }
+    const u = new URL(url);
+    if (u.hostname === "hooks.slack.com") return "slack";
+    if (/^(ptb\.|canary\.)?(discord|discordapp)\.com$/.test(u.hostname) && u.pathname.startsWith("/api/webhooks/")) return "discord";
+  } catch (_) {}
+  return "json";
+}
+export async function postWebhook(url, payload, message = "") {
+  if (!url) return { ok: false };
+  const kind = webhookKind(url);
+  const dash = "https://stampmypage.com/dashboard#monitoring";
+  const body = kind === "slack" ? { text: `${message}\n<${dash}|Open your dashboard>` } : kind === "discord" ? { content: `${message}\n${dash}`, username: "Stamp My Page" } : { ...payload, message };
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "StampMyPage-Monitor/1.0" }, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
+    return { ok: r.ok, status: r.status };
+  } catch (_) {
+    return { ok: false }; // A dead webhook must never break the email alert or the check.
+  }
 }
 function validWebhook(raw) {
   if (!raw) return "";
@@ -75,14 +96,14 @@ function validHour(v) {
   if (!Number.isInteger(n) || n < 0 || n > 23) throw new Error("Quiet hours must be whole hours from 0 to 23.");
   return n;
 }
-export async function setAlertSettings(email, url, { down, changes, quietStart, quietEnd, webhook }) {
+export async function setAlertSettings(email, url, { down, changes, expiry, quietStart, quietEnd, webhook }) {
   const u = await getUser(email);
   const page = sitesOf(u).find((s) => s === url);
   if (!page || !hasStayAlive(u)) return null;
   const qs = validHour(quietStart), qe = validHour(quietEnd);
   if ((qs == null) !== (qe == null)) throw new Error("Set both quiet hours, or neither.");
   const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
-  m.alerts = { down: down !== false, changes: changes !== false, quietStart: qs, quietEnd: qe };
+  m.alerts = { down: down !== false, changes: changes !== false, expiry: expiry !== false, quietStart: qs, quietEnd: qe };
   m.webhookUrl = validWebhook(webhook);
   await set(monitorKey(email, page), m);
   return m;
@@ -106,7 +127,7 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   if (!pageUrl || !hasStayAlive(u)) return null;
   const m = (await get(monitorKey(email, pageUrl))) || { url: pageUrl, checks: [], restamps: [] };
   if (m.pausedManual) return m;
-  const check = await confirmedCheck(pageUrl);
+  const check = await confirmedCheck(pageUrl, m.mustHave);
   const alert = record(m, check);
   const due = restamp || !m.lastRestampAt || Date.now() - new Date(m.lastRestampAt).getTime() > WEEK;
   if (due && check.ok) {
@@ -125,6 +146,7 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
       }
     }
   }
+  await dailyExtras(email, pageUrl, m).catch((e) => console.error("Extra checks failed:", pageUrl, e));
   await set(monitorKey(email, pageUrl), m);
   await sendUptimeAlert(email, pageUrl, m, alert);
   return m;
@@ -138,11 +160,11 @@ const HOUR = 3600000;
 const KEEP = 1200; // about 50 days of hourly checks, plus up/down changes
 
 // A failed check is tried once more 30 seconds later; the second answer counts.
-export async function confirmedCheck(pageUrl) {
-  const first = await checkOnce(pageUrl);
+export async function confirmedCheck(pageUrl, mustHave = []) {
+  const first = await checkOnce(pageUrl, mustHave);
   if (first.ok) return first;
   await new Promise((r) => setTimeout(r, 30000));
-  const again = await checkOnce(pageUrl);
+  const again = await checkOnce(pageUrl, mustHave);
   return again.ok ? again : { ...again, confirmed: true };
 }
 
@@ -179,20 +201,20 @@ export async function sendUptimeAlert(email, pageUrl, m, alert) {
   const c = alert.check;
   const dash = "https://stampmypage.com/dashboard#monitoring";
   if (alert.kind === "down") {
-    const what = c.status ? `answered ${c.status}` : String(c.error || "did not answer").toLowerCase();
+    const what = c.missing ? `answered, but "${c.missing}" is no longer on the page` : c.status ? `answered ${c.status}` : String(c.error || "did not answer").toLowerCase();
     await mail(email, {
       subject: `Down: ${host}`,
       text: `Stay Alive checked ${pageUrl} twice, 30 seconds apart, and it ${what}. Down since ${fmtUtc(c.at)}.\n\nWe keep checking every few minutes and email you the moment it's back.\n\n${dash}`,
       html: `<p>Stay Alive checked <a href="${pageUrl}">${pageUrl}</a> twice, 30 seconds apart, and it ${what}. Down since ${fmtUtc(c.at)}.</p><p>We keep checking every few minutes and email you the moment it's back.</p><p><a href="${dash}">See it in your dashboard</a></p>`,
     }).catch(() => {});
-    await postWebhook(alertSettings(m).webhook, { event: "down", url: pageUrl, host, status: c.status, error: c.error || null, at: c.at });
+    await postWebhook(alertSettings(m).webhook, { event: "down", url: pageUrl, host, status: c.status, error: c.error || null, missing: c.missing || null, at: c.at }, `🔴 Down: ${host}. It ${what}. Down since ${fmtUtc(c.at)}.`);
   } else {
     await mail(email, {
       subject: `Back up: ${host}, after ${span(alert.minutes)}`,
       text: `${pageUrl} is answering again (${c.status}, ${c.ms} ms). It was down for ${span(alert.minutes)}${alert.since ? `, from ${fmtUtc(alert.since)} to ${fmtUtc(c.at)}` : ""}.\n\n${dash}`,
       html: `<p><a href="${pageUrl}">${pageUrl}</a> is answering again (${c.status}, ${c.ms} ms). It was down for ${span(alert.minutes)}${alert.since ? `, from ${fmtUtc(alert.since)} to ${fmtUtc(c.at)}` : ""}.</p><p><a href="${dash}">See it in your dashboard</a></p>`,
     }).catch(() => {});
-    await postWebhook(alertSettings(m).webhook, { event: "up", url: pageUrl, host, status: c.status, downMinutes: alert.minutes, since: alert.since || null, at: c.at });
+    await postWebhook(alertSettings(m).webhook, { event: "up", url: pageUrl, host, status: c.status, downMinutes: alert.minutes, since: alert.since || null, at: c.at }, `🟢 Back up: ${host}, after ${span(alert.minutes)}.`);
   }
 }
 
@@ -211,7 +233,7 @@ export async function pulseAll() {
         const key = monitorKey(email, url);
         const before = await get(key);
         if (!before || before.pausedManual) return;
-        const check = await confirmedCheck(url);
+        const check = await confirmedCheck(url, before.mustHave);
         const m = (await get(key)) || before; // the daily run may have written meanwhile
         const alert = record(m, check);
         await set(key, m);
@@ -246,18 +268,148 @@ async function alertChange(email, pageUrl, c, m = {}) {
   const a = alertSettings(m);
   if (!a.changes || inQuietHours(a)) return;
   const host = new URL(pageUrl).hostname;
+  const google = c.google || [];
   const lines = [
-    ...c.added.map((t) => `Added: ${t}`),
-    ...c.removed.map((t) => `Removed: ${t}`),
+    ...google.map((g) => g.text),
+    ...(c.added || []).map((t) => `Added: ${t}`),
+    ...(c.removed || []).map((t) => `Removed: ${t}`),
     c.lcp ? `Main content now shows in ${(c.lcp.to / 1000).toFixed(1)}s (was ${(c.lcp.from / 1000).toFixed(1)}s)` : "",
     c.verdict ? `Stamp went from ${c.verdict.from} to ${c.verdict.to}` : "",
   ].filter(Boolean);
+  const hidden = google.some((g) => g.tone === "bad" && /noindex|robots|another site/.test(g.text));
+  const onlyGoogle = google.length && !c.added?.length && !c.removed?.length && !c.lcp && !c.verdict;
+  const subject = hidden ? `${host}: Google may drop this page` : onlyGoogle ? `${host}: what Google sees changed` : `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`;
+  const how = c.stampId ? "re-stamped" : "checked";
   await mail(email, {
-    subject: `${host} changed: ${c.verdict ? `now ${c.verdict.to}` : c.pixels ? "tracking changed" : c.lcp ? "speed changed" : "stack changed"}`,
-    text: `Stay Alive re-stamped ${pageUrl} and noticed:\n\n${lines.join("\n")}\n\nDetails in your dashboard: https://stampmypage.com/dashboard`,
-    html: `<p>Stay Alive re-stamped <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard">Details in your dashboard</a></p>`,
+    subject,
+    text: `Stay Alive ${how} ${pageUrl} and noticed:\n\n${lines.join("\n")}\n\nDetails in your dashboard: https://stampmypage.com/dashboard#monitoring`,
+    html: `<p>Stay Alive ${how} <a href="${pageUrl}">${pageUrl}</a> and noticed:</p><ul>${lines.map((l) => `<li>${l.replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard#monitoring">Details in your dashboard</a></p>`,
   }).catch(() => {});
-  await postWebhook(a.webhook, { event: "change", url: pageUrl, host, at: new Date().toISOString(), added: c.added, removed: c.removed, lcp: c.lcp, verdict: c.verdict });
+  await postWebhook(a.webhook, { event: "change", url: pageUrl, host, at: new Date().toISOString(), added: c.added || [], removed: c.removed || [], lcp: c.lcp || null, verdict: c.verdict || null, google }, `🟡 ${subject}\n${lines.map((l) => `• ${l}`).join("\n")}`);
+}
+
+// --- The daily extras: security certificate and domain renewal dates, what Google is told, and once a week the
+// links on the page. Warnings go out once per step (certificate: 14, 7, 1 days; domain: 30, 7, 1 days) and again
+// when it runs out; a renewal starts the steps over. ---
+const LINKS_EVERY = 6.5 * 86400000;
+async function dailyExtras(email, pageUrl, m) {
+  const host = new URL(pageUrl).hostname;
+  const [cert, domain, facts] = await Promise.all([pageUrl.startsWith("https:") ? certificate(host) : null, domainExpiry(host), pageFacts(pageUrl)]);
+  if (cert) m.cert = cert.error && m.cert?.validTo ? { ...m.cert, at: cert.at, error: cert.error } : cert;
+  m.domain = domain.error && m.domain?.expires && m.domain.domain === domain.domain ? { ...m.domain, at: domain.at } : domain;
+  await expiryAlerts(email, pageUrl, m);
+  const { html, finalUrl, ...google } = facts;
+  const lines = googleDiff(m.google, google);
+  if (!google.error || !m.google) m.google = google;
+  if (lines.length) {
+    const change = { at: google.at, google: lines, added: [], removed: [], lcp: null, verdict: null, pixels: false };
+    m.changes = [change, ...(m.changes || [])].slice(0, 30);
+    await alertChange(email, pageUrl, change, m);
+  }
+  if (html && (!m.links || Date.now() - Date.parse(m.links.at) > LINKS_EVERY)) {
+    const before = new Set((m.links?.broken || []).map((b) => b.url));
+    m.links = await brokenLinks(html, finalUrl || pageUrl);
+    const fresh = m.links.broken.filter((b) => !before.has(b.url));
+    if (fresh.length) await alertLinks(email, pageUrl, fresh, m);
+  }
+}
+
+const longDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const inDays = (n) => (n <= 0 ? "has run out" : n === 1 ? "runs out tomorrow" : `runs out in ${n} days`);
+async function expiryAlerts(email, pageUrl, m) {
+  const a = alertSettings(m);
+  const host = new URL(pageUrl).hostname;
+  m.expiryWarned ||= {};
+  const due = [];
+  const c = m.cert;
+  if (c?.validTo) {
+    const days = daysLeft(c.validTo);
+    const step = stepFor(days, [14, 7, 1]);
+    const w = m.expiryWarned.cert;
+    if (step != null && (w?.for !== c.validTo || step < w.step)) {
+      m.expiryWarned.cert = { for: c.validTo, step };
+      due.push({
+        kind: "certificate", days, on: c.validTo,
+        subject: `${host}: security certificate ${inDays(days)}`,
+        body: days <= 0
+          ? `The security certificate for ${host} ran out on ${longDate(c.validTo)}. Browsers now warn visitors away from the site. Renew it in your host's domain settings.`
+          : `The security certificate for ${host} ${inDays(days)} (${longDate(c.validTo)}). Once it does, browsers warn visitors away from the site. Most hosts renew it by themselves; this close to the date, check your host's domain settings.`,
+      });
+    }
+  }
+  if (c && c.trusted === false && c.problem && !/EXPIRED/i.test(c.problem)) {
+    if (m.expiryWarned.untrusted !== c.problem) {
+      m.expiryWarned.untrusted = c.problem;
+      due.push({ kind: "certificate", subject: `${host}: browsers don't trust its security certificate`, body: `Browsers show a warning on ${host}: its security certificate isn't valid for this address (${c.problem}). Check the domain settings at your host.` });
+    }
+  } else if (c?.trusted) m.expiryWarned.untrusted = null;
+  const d = m.domain;
+  if (d?.expires) {
+    const days = daysLeft(d.expires);
+    const step = stepFor(days, [30, 7, 1]);
+    const w = m.expiryWarned.domain;
+    if (step != null && (w?.for !== d.expires || step < w.step)) {
+      m.expiryWarned.domain = { for: d.expires, step };
+      due.push({
+        kind: "domain", days, on: d.expires,
+        subject: `${d.domain} ${days <= 0 ? "has expired" : `expires in ${days} day${days === 1 ? "" : "s"}`}`,
+        body: days <= 0
+          ? `The registration for ${d.domain} ran out on ${longDate(d.expires)}. The site and any email on it can stop working at any moment. Renew it at ${d.registrar || "your registrar"} now.`
+          : `The registration for ${d.domain} runs out on ${longDate(d.expires)}${d.registrar ? ` (registrar: ${d.registrar})` : ""}. If auto-renew is on with a card that works, there's nothing to do. If not, renew it before then, or the site and any email on it stop working.`,
+      });
+    }
+  }
+  if (!a.expiry) return;
+  for (const x of due) {
+    await mail(email, {
+      subject: x.subject,
+      text: `${x.body}\n\nhttps://stampmypage.com/dashboard#monitoring`,
+      html: `<p>${x.body.replace(/[<>&]/g, "")}</p><p><a href="https://stampmypage.com/dashboard#monitoring">See it in your dashboard</a></p>`,
+    }).catch(() => {});
+    await postWebhook(a.webhook, { event: "expiry", kind: x.kind, url: pageUrl, host, daysLeft: x.days ?? null, on: x.on || null }, `🟠 ${x.subject}`);
+  }
+}
+
+async function alertLinks(email, pageUrl, broken, m) {
+  const a = alertSettings(m);
+  if (!a.changes || inQuietHours(a)) return;
+  const host = new URL(pageUrl).hostname;
+  const line = (b) => `${b.label ? `"${b.label}" ` : ""}${b.url} (${b.status ? `answers ${b.status}` : b.why || "doesn't answer"})`;
+  const subject = `${host}: ${broken.length} broken link${broken.length === 1 ? "" : "s"}`;
+  await mail(email, {
+    subject,
+    text: `Stay Alive checked the links on ${pageUrl}. ${broken.length === 1 ? "This one leads" : "These lead"} nowhere:\n\n${broken.map(line).join("\n")}\n\nhttps://stampmypage.com/dashboard#monitoring`,
+    html: `<p>Stay Alive checked the links on <a href="${pageUrl}">${pageUrl}</a>. ${broken.length === 1 ? "This one leads" : "These lead"} nowhere:</p><ul>${broken.map((b) => `<li>${line(b).replace(/[<>&]/g, "")}</li>`).join("")}</ul><p><a href="https://stampmypage.com/dashboard#monitoring">See it in your dashboard</a></p>`,
+  }).catch(() => {});
+  await postWebhook(a.webhook, { event: "links", url: pageUrl, host, broken }, `🟡 ${subject}\n${broken.slice(0, 10).map((b) => `• ${line(b)}`).join("\n")}`);
+}
+
+// Words the page must show. Each one is checked against the page now, so a phrase the page only draws later in
+// the browser (which the checks can't see) is refused up front instead of raising false alarms.
+export async function setMustHave(email, url, phrases) {
+  const u = await getUser(email);
+  const page = sitesOf(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const list = cleanPhrases(phrases);
+  if (list.length) {
+    const f = await pageFacts(page);
+    if (f.error) throw new Error(`${f.error}, so we can't check the words right now. Try again in a minute.`);
+    const gone = list.filter((p) => missingWord(f.html, [p]));
+    if (gone.length) throw new Error(`We can't find ${gone.map((p) => `"${p}"`).join(", ")} in the page's HTML. If the page draws that text in the browser after it loads, the checks can't see it. Pick words from the title or the first screen, written as they are on the page.`);
+  }
+  const m = (await get(monitorKey(email, page))) || { url: page, checks: [] };
+  m.mustHave = list;
+  await set(monitorKey(email, page), m);
+  return m;
+}
+
+// A test message to the webhook from the dashboard, so people see it land before they rely on it.
+export async function testWebhook(raw) {
+  const url = validWebhook(raw);
+  if (!url) throw new Error("Paste a webhook URL first.");
+  const r = await postWebhook(url, { event: "test", at: new Date().toISOString() }, "✅ Stamp My Page is connected. Down, recovery and change alerts for your site will show up here.");
+  if (!r.ok) throw new Error(r.status ? `The webhook answered ${r.status}. Check the URL and try again.` : "The webhook didn't answer. Check the URL and try again.");
+  return { kind: webhookKind(url) };
 }
 
 // --- Upgrade 3: history, incidents, weekly reports, public status. Pure helpers, so the
