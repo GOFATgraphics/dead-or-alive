@@ -688,7 +688,7 @@ function Sites({ user, sites, pick, setPick, onChange }) {
         </div>
       )}
       {free > 0 && seats > 1 && <button type="button" className="link quiet" disabled={!!busy} onClick={() => slot(seats - 1)}>Remove an empty slot</button>}
-      <p className="fine">Every site gets daily uptime and speed checks, a weekly re-stamp, and change alerts. The app review stays one a month in total: you pick the site in App review.</p>
+      <p className="fine">Every site gets an uptime check every 5 minutes, a weekly re-stamp, and change alerts. The app review stays one a month in total: you pick the site in App review.</p>
       {err && <p className="alert" role="alert">{err}</p>}
     </section>
   );
@@ -1270,7 +1270,7 @@ function Welcome({ plan, user, go, onClose }) {
       ]
     : [
         ["done", "Stay Alive is on", "Payment confirmed. Cancel anytime from your dashboard."],
-        page ? ["run", `Watching ${host}`, "The first uptime check and re-stamp are running now. After that: daily checks and a fresh stamp every week."] : ["todo", "Add the page to watch", "Monitoring starts the moment you add it."],
+        page ? ["run", `Watching ${host}`, "The first uptime check and re-stamp are running now. After that: an uptime check every 5 minutes and a fresh stamp every week."] : ["todo", "Add the page to watch", "Monitoring starts the moment you add it."],
         ["todo", "Alerts by email", "When the page goes down, or its stack, speed, or tracking pixels change."],
         ["todo", "One app review a month", "For the site you pick. More sites can be added from Monitoring."],
       ];
@@ -1457,7 +1457,7 @@ function Dashboard({ data, setData, onOut }) {
         {sect === "stamps" && <Stamps user={user} />}
         {sect === "cards" && <MyCards user={user} />}
         {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
-        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
+        {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Uptime checked every 5 minutes, with an alert when it goes down and when it's back", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
         {sect === "account" && (
           <>

@@ -1,0 +1,15 @@
+# Stay Alive's frequent uptime check. Every 5 minutes this asks the site to check every watched page once;
+# the site does the checking and sends any down or back-up alerts. GitHub may start a run a few minutes late.
+name: Stay Alive uptime
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions: {}
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check every watched page
+        run: curl -fsS --max-time 290 "https://stampmypage.com/api/stamp?cron=pulse"

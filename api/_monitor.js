@@ -106,10 +106,8 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   if (!pageUrl || !hasStayAlive(u)) return null;
   const m = (await get(monitorKey(email, pageUrl))) || { url: pageUrl, checks: [], restamps: [] };
   if (m.pausedManual) return m;
-  const check = await checkOnce(pageUrl);
-  const wasUp = m.checks.length ? m.checks[m.checks.length - 1].ok : true;
-  m.checks = [...m.checks, check].slice(-90);
-  m.lastCheckAt = check.at;
+  const check = await confirmedCheck(pageUrl);
+  const alert = record(m, check);
   const due = restamp || !m.lastRestampAt || Date.now() - new Date(m.lastRestampAt).getTime() > WEEK;
   if (due && check.ok) {
     m.restampRunning = true;
@@ -128,15 +126,102 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
     }
   }
   await set(monitorKey(email, pageUrl), m);
-  if (wasUp && !check.ok && alertSettings(m).down) {
-    await mail(email, {
-      subject: `Your page is down: ${new URL(pageUrl).hostname}`,
-      text: `Stay Alive checked ${pageUrl} at ${check.at} and it ${check.status ? `answered ${check.status}` : check.error.toLowerCase()}.\n\nSee the history in your dashboard: https://stampmypage.com/dashboard`,
-      html: `<p>Stay Alive checked <a href="${pageUrl}">${pageUrl}</a> at ${check.at} and it ${check.status ? `answered ${check.status}` : check.error.toLowerCase()}.</p><p><a href="https://stampmypage.com/dashboard">See the history in your dashboard</a></p>`,
-    }).catch(() => {});
-    await postWebhook(alertSettings(m).webhook, { event: "down", url: pageUrl, host: new URL(pageUrl).hostname, status: check.status, error: check.error || null, at: check.at });
-  }
+  await sendUptimeAlert(email, pageUrl, m, alert);
   return m;
+}
+
+// --- Frequent uptime: every few minutes (a scheduled GitHub Action calls /api/stamp?cron=pulse), each watched
+// site gets a quick check. A failure is checked again 30 seconds later before it counts, so one blip never
+// emails anyone. History keeps one check an hour plus every change between up and down, so it stays small and
+// incidents keep their real start and end. ---
+const HOUR = 3600000;
+const KEEP = 1200; // about 50 days of hourly checks, plus up/down changes
+
+// A failed check is tried once more 30 seconds later; the second answer counts.
+export async function confirmedCheck(pageUrl) {
+  const first = await checkOnce(pageUrl);
+  if (first.ok) return first;
+  await new Promise((r) => setTimeout(r, 30000));
+  const again = await checkOnce(pageUrl);
+  return again.ok ? again : { ...again, confirmed: true };
+}
+
+// Adds a check to the history and says whether it changed the state: "down", "up" (with how long it was down),
+// or "" when nothing changed.
+export function record(m, check) {
+  m.checks ||= [];
+  const last = m.checks[m.checks.length - 1];
+  const wasUp = last ? last.ok : true;
+  const changed = !last || last.ok !== check.ok;
+  if (changed || Date.parse(check.at) - Date.parse(last.at) >= HOUR) m.checks = [...m.checks, check].slice(-KEEP);
+  m.lastCheckAt = check.at;
+  m.lastCheck = check;
+  if (wasUp && !check.ok) {
+    m.downSince = check.at;
+    return { kind: "down", check };
+  }
+  if (!wasUp && check.ok) {
+    const since = m.downSince || last?.at;
+    m.downSince = null;
+    return { kind: "up", check, since, minutes: since ? Math.max(1, Math.round((Date.parse(check.at) - Date.parse(since)) / 60000)) : null };
+  }
+  return { kind: "" };
+}
+
+const fmtUtc = (iso) => new Date(iso).toISOString().slice(11, 16) + " UTC";
+const span = (n) => (n == null ? "a while" : n < 60 ? `${n} minute${n === 1 ? "" : "s"}` : `${Math.floor(n / 60)} h ${n % 60} min`);
+
+// The email and webhook for a change between up and down. Down alerts and recoveries ignore quiet hours:
+// those only hold back change alerts.
+export async function sendUptimeAlert(email, pageUrl, m, alert) {
+  if (!alert?.kind || !alertSettings(m).down) return;
+  const host = new URL(pageUrl).hostname;
+  const c = alert.check;
+  const dash = "https://stampmypage.com/dashboard#monitoring";
+  if (alert.kind === "down") {
+    const what = c.status ? `answered ${c.status}` : String(c.error || "did not answer").toLowerCase();
+    await mail(email, {
+      subject: `Down: ${host}`,
+      text: `Stay Alive checked ${pageUrl} twice, 30 seconds apart, and it ${what}. Down since ${fmtUtc(c.at)}.\n\nWe keep checking every few minutes and email you the moment it's back.\n\n${dash}`,
+      html: `<p>Stay Alive checked <a href="${pageUrl}">${pageUrl}</a> twice, 30 seconds apart, and it ${what}. Down since ${fmtUtc(c.at)}.</p><p>We keep checking every few minutes and email you the moment it's back.</p><p><a href="${dash}">See it in your dashboard</a></p>`,
+    }).catch(() => {});
+    await postWebhook(alertSettings(m).webhook, { event: "down", url: pageUrl, host, status: c.status, error: c.error || null, at: c.at });
+  } else {
+    await mail(email, {
+      subject: `Back up: ${host}, after ${span(alert.minutes)}`,
+      text: `${pageUrl} is answering again (${c.status}, ${c.ms} ms). It was down for ${span(alert.minutes)}${alert.since ? `, from ${fmtUtc(alert.since)} to ${fmtUtc(c.at)}` : ""}.\n\n${dash}`,
+      html: `<p><a href="${pageUrl}">${pageUrl}</a> is answering again (${c.status}, ${c.ms} ms). It was down for ${span(alert.minutes)}${alert.since ? `, from ${fmtUtc(alert.since)} to ${fmtUtc(c.at)}` : ""}.</p><p><a href="${dash}">See it in your dashboard</a></p>`,
+    }).catch(() => {});
+    await postWebhook(alertSettings(m).webhook, { event: "up", url: pageUrl, host, status: c.status, downMinutes: alert.minutes, since: alert.since || null, at: c.at });
+  }
+}
+
+// One quick check of every watched site, no re-stamps. Ten at a time.
+export async function pulseAll() {
+  const emails = await members("idx:members");
+  const jobs = [];
+  for (const email of emails) {
+    const u = await getUser(email).catch(() => null);
+    if (hasStayAlive(u)) for (const url of watchedSites(u)) jobs.push([email, url]);
+  }
+  const out = { checked: 0, down: 0, up: 0 };
+  for (let i = 0; i < jobs.length; i += 10) {
+    await Promise.allSettled(
+      jobs.slice(i, i + 10).map(async ([email, url]) => {
+        const key = monitorKey(email, url);
+        const before = await get(key);
+        if (!before || before.pausedManual) return;
+        const check = await confirmedCheck(url);
+        const m = (await get(key)) || before; // the daily run may have written meanwhile
+        const alert = record(m, check);
+        await set(key, m);
+        await sendUptimeAlert(email, url, m, alert);
+        out.checked++;
+        if (alert.kind) out[alert.kind]++;
+      })
+    );
+  }
+  return out;
 }
 
 // What a re-stamp saw that's worth watching: every tool by category, main-content time, score, verdict.
@@ -178,6 +263,25 @@ async function alertChange(email, pageUrl, c, m = {}) {
 // --- Upgrade 3: history, incidents, weekly reports, public status. Pure helpers, so the
 // dashboard, the public status page, and the weekly email all read the same numbers. ---
 const monthKey = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+// Minutes spent down between from and to (ms), walking the history: each check holds until the next one.
+export function downMinutes(checks = [], from = 0, to = Date.now()) {
+  let down = 0;
+  for (let i = 0; i < checks.length; i++) {
+    if (checks[i].ok) continue;
+    const a = Math.max(from, Date.parse(checks[i].at));
+    const b = Math.min(to, i + 1 < checks.length ? Date.parse(checks[i + 1].at) : to);
+    if (b > a) down += (b - a) / 60000;
+  }
+  return down;
+}
+// Uptime percent over a window, by time rather than by number of checks.
+function uptimeOver(checks, from, to = Date.now()) {
+  const first = checks.length ? Math.max(from, Date.parse(checks[0].at)) : to;
+  const total = (to - first) / 60000;
+  if (total <= 0) return checks.length ? (checks[checks.length - 1].ok ? 100 : 0) : null;
+  return Math.round((1 - downMinutes(checks, first, to) / total) * 1000) / 10;
+}
+
 // Checks grouped by month, newest month first: checks, uptime percent, average speed.
 export function monthlyHistory(checks = []) {
   const by = {};
@@ -189,7 +293,8 @@ export function monthlyHistory(checks = []) {
     if (c.ok) { by[k].up++; by[k].ms += c.ms || 0; by[k].okMs++; }
   }
   return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => ({
-    ...m, uptime: m.checks ? Math.round((m.up / m.checks) * 1000) / 10 : null,
+    ...m,
+    uptime: m.checks ? uptimeOver(checks, Date.UTC(+m.month.slice(0, 4), +m.month.slice(5) - 1, 1), Math.min(Date.now(), Date.UTC(+m.month.slice(0, 4), +m.month.slice(5), 1))) : null,
     avgMs: m.okMs ? Math.round(m.ms / m.okMs) : null,
   }));
 }
@@ -221,7 +326,7 @@ export function reportSummary(m = {}, windowDays = 30) {
     url: m.url || "",
     windowDays: checks.length ? windowDays : null,
     checks: windowChecks.length,
-    uptime: windowChecks.length ? Math.round((up.length / windowChecks.length) * 1000) / 10 : null,
+    uptime: windowChecks.length ? uptimeOver(m.checks || [], Date.now() - windowDays * 86400000) : null,
     avgMs: up.length ? Math.round(up.reduce((a, c) => a + (c.ms || 0), 0) / up.length) : null,
     currentUp: windowChecks.length ? !!windowChecks[windowChecks.length - 1].ok : null,
     lastCheckAt: m.lastCheckAt || null,
@@ -254,10 +359,10 @@ function reportMail(email, m, s) {
 <tr><td style="padding-top:8px;font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1.1">${escH(s.host)}</td></tr>
 <tr><td style="padding-top:12px"><span style="display:inline-block;background:${s.currentUp ? "#dcfce7" : "#fee2e2"};color:${upColor};font-weight:700;font-size:15px;border-radius:999px;padding:6px 14px">● ${upWord}</span></td></tr>
 <tr><td style="padding-top:24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.uptime != null ? `${s.uptime}%` : "—"}</div><div style="font-size:13px;color:#5d6180">Uptime, last 7 days</div></td>
-<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.avgMs != null ? `${s.avgMs} ms` : "—"}</div><div style="font-size:13px;color:#5d6180">Average answer</div></td>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.uptime != null ? `${s.uptime}%` : "n/a"}</div><div style="font-size:13px;color:#5d6180">Uptime, last 7 days</div></td>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.avgMs != null ? `${s.avgMs} ms` : "n/a"}</div><div style="font-size:13px;color:#5d6180">Average answer</div></td>
 </tr><tr><td colspan="2" style="padding-top:12px"></td></tr><tr>
-<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.scoreTo != null ? `${s.scoreTo}/100` : "—"}</div><div style="font-size:13px;color:#5d6180">Latest stamp score</div></td>
+<td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.scoreTo != null ? `${s.scoreTo}/100` : "n/a"}</div><div style="font-size:13px;color:#5d6180">Latest stamp score</div></td>
 <td width="50%" style="border:1px solid #e6e3f1;border-radius:12px;padding:14px 16px;background:#ffffff"><div style="font-size:24px;font-weight:800">${s.incidents.length}</div><div style="font-size:13px;color:#5d6180">Outages this week</div></td>
 </tr></table></td></tr>
 <tr><td style="padding-top:24px;font-size:15px;line-height:1.6">${escH(scoreLine)}<br>Changes spotted: <b>${s.changes}</b> · Checks: <b>${s.checks}</b>${s.windowDays ? " in the last 7 days" : " so far"}.</td></tr>

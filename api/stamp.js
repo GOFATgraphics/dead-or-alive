@@ -10,12 +10,13 @@ import { takeStamp } from "./_limit.js";
 import { precheck } from "./_inspect.js";
 import { DESK } from "../src/config.js";
 import { KIND_HINT, checkPageUrl, pageKind } from "../src/url.js";
-import { monitorAll } from "./_monitor.js";
+import { monitorAll, pulseAll } from "./_monitor.js";
 import { get, set } from "./_store.js";
 
 // The daily Stay Alive run (vercel.json crons): uptime and speed for every member, and the weekly re-stamps.
 // Vercel signs cron calls with CRON_SECRET when it's set; without it, only Vercel's cron agent gets in, once a day.
 async function cron(req, res) {
+  if (req.query?.cron === "pulse") return pulse(req, res);
   const secret = process.env.CRON_SECRET || "";
   const auth = String(req.headers.authorization || "");
   const fromVercel = /vercel-cron/i.test(String(req.headers["user-agent"] || ""));
@@ -25,6 +26,15 @@ async function cron(req, res) {
   await set("cron:monitor", Date.now()).catch(() => {});
   const out = await monitorAll();
   res.status(200).json(out);
+}
+
+// The frequent uptime run (.github/workflows/uptime.yml calls it every 5 minutes). It only checks pages, so it
+// needs no secret: however often it's called, it runs at most once every 4 minutes.
+async function pulse(req, res) {
+  const last = await get("cron:pulse").catch(() => null);
+  if (last && Date.now() - last < 4 * 60000) return res.status(200).json({ skipped: "Ran in the last 4 minutes." });
+  await set("cron:pulse", Date.now()).catch(() => {});
+  res.status(200).json(await pulseAll());
 }
 
 export default async function handler(req, res) {
