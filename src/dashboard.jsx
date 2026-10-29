@@ -614,7 +614,8 @@ function KsRival({ report, onChange }) {
   const host = (u) => u.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const done = r && !r.failed && !r.running;
   const used = report.rivalsUsed ?? (done ? 1 : 0);
-  const left = Math.max(0, 3 - used);
+  const allowed = 3 + (report.rivalsBonus || 0);
+  const left = Math.max(0, allowed - used);
   const failNote = report.rivalError?.failed ? `We couldn't stamp ${host(report.rivalError.url)}: ${report.rivalError.failed} That one didn't count.` : r?.failed ? `We couldn't stamp ${host(r.url)}: ${r.failed}` : "";
   return (
     <>
@@ -641,7 +642,7 @@ function KsRival({ report, onChange }) {
       )}
       {!r?.running && left > 0 && (
         <>
-          {done && <p className="fine compare-more"><b>Compare another.</b> {left} of 3 left in this Kill Sheet. The newest one shows above.</p>}
+          {done && <p className="fine compare-more"><b>Compare another.</b> {left} of {allowed} left in this Kill Sheet. The newest one shows above.</p>}
           <form className="row-actions" onSubmit={go}>
             <input className="inline-input" type="text" inputMode="url" value={url} maxLength={300} onChange={(e) => setUrl(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor's page" />
             <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !url.trim()}>{busy && !picking ? "Checking…" : "Compare"}</button>
@@ -650,7 +651,7 @@ function KsRival({ report, onChange }) {
           <FindRivals url={report.url} pick={compare} pickLabel="Compare with mine" picking={picking} />
         </>
       )}
-      {!r?.running && left === 0 && <p className="fine">You've used all 3 comparisons in this Kill Sheet.{" "}With Stay Alive, competitors are re-stamped every week next to your site.</p>}
+      {!r?.running && left === 0 && <p className="fine">You've used all {allowed} comparisons in this Kill Sheet.{" "}With Stay Alive, competitors are re-stamped every week next to your site.</p>}
     </>
   );
 }

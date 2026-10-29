@@ -697,7 +697,8 @@ export default async function handler(req, res) {
       if (report?.status !== "ready") return res.status(409).json({ error: "Your Kill Sheet is still being made. Try again in a minute." });
       if (report.rival?.running) return res.status(409).json({ error: "A comparison is still running. It takes about a minute." });
       const used = report.rivalsUsed ?? (report.rival && !report.rival.failed ? 1 : 0);
-      if (used >= KS_RIVALS) return res.status(409).json({ error: `You've used all ${KS_RIVALS} comparisons in this Kill Sheet.` });
+      const allowed = KS_RIVALS + (report.rivalsBonus || 0);
+      if (used >= allowed) return res.status(409).json({ error: `You've used all ${allowed} comparisons in this Kill Sheet.` });
       const page = checkPageUrl(b.url);
       if (!page.url) return res.status(400).json({ error: page.error });
       if (new URL(page.url).hostname.replace(/^www\./, "") === new URL(report.url).hostname.replace(/^www\./, "")) return res.status(400).json({ error: "That's your own site. Pick a competitor's page." });

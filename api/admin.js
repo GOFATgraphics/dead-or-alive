@@ -11,6 +11,7 @@
 //   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
 //   POST rescout { email }         runs a member's Kill Sheet again
 //   POST grant-restamp { email }   gives a member with an active Kill Sheet one more free re-stamp
+//   POST grant-compare { email }   gives a member's Kill Sheet one more competitor comparison
 //   POST recards { cursor }        redraws published stamps' share cards in the current design, about 10 per call
 // Env: ADMIN_KEY.
 import { waitUntil } from "@vercel/functions";
@@ -20,7 +21,7 @@ import { redisReady } from "./_redis.js";
 import { get, members, remove, set, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
 import { paymentsOverview, polarApiReady, reconcile } from "./_billing.js";
-import { runScout } from "./_scout.js";
+import { comparesLeft, readReport, reportKey, runScout } from "./_scout.js";
 import { redrawCards } from "./_publish.js";
 import { list as listBlobs } from "@vercel/blob";
 
@@ -69,10 +70,12 @@ export default async function handler(req, res) {
   if (op === "members") {
     const emails = await members("idx:users");
     const users = (await Promise.all(emails.slice(-500).map((e) => getUser(e)))).filter(Boolean);
+    // Comparisons left live on each Kill Sheet report, so read those for Kill Sheet members only.
+    const left = Object.fromEntries(await Promise.all(users.filter((u) => u.killSheet).map(async (u) => [u.email, comparesLeft(await readReport(u.email).catch(() => null))])));
     return res.status(200).json({
       members: users
         .filter((u) => u.killSheet || u.stayAlive)
-        .map((u) => ({ email: u.email, createdAt: u.createdAt, killSheet: u.killSheet ? { since: u.killSheet.since, url: u.killSheet.url, active: hasKillSheet(u), restampsLeft: u.killSheet.restampsLeft } : null, stayAlive: u.stayAlive ? { interval: u.stayAlive.interval || "month", seats: u.stayAlive.seats || 1, sites: (u.stayAlive.sites || (u.stayAlive.url ? [u.stayAlive.url] : [])).length, status: u.stayAlive.status, since: u.stayAlive.since, renews: u.stayAlive.renews, cancelAtPeriodEnd: u.stayAlive.cancelAtPeriodEnd, url: u.stayAlive.url, active: hasStayAlive(u) } : null, stamps: (u.stamps || []).length })),
+        .map((u) => ({ email: u.email, createdAt: u.createdAt, killSheet: u.killSheet ? { since: u.killSheet.since, url: u.killSheet.url, active: hasKillSheet(u), restampsLeft: u.killSheet.restampsLeft, comparesLeft: left[u.email] ?? null } : null, stayAlive: u.stayAlive ? { interval: u.stayAlive.interval || "month", seats: u.stayAlive.seats || 1, sites: (u.stayAlive.sites || (u.stayAlive.url ? [u.stayAlive.url] : [])).length, status: u.stayAlive.status, since: u.stayAlive.since, renews: u.stayAlive.renews, cancelAtPeriodEnd: u.stayAlive.cancelAtPeriodEnd, url: u.stayAlive.url, active: hasStayAlive(u) } : null, stamps: (u.stamps || []).length })),
       accounts: users.length,
     });
   }
@@ -231,6 +234,16 @@ export default async function handler(req, res) {
     await updateUser(email, (x) => ({ ...x, killSheet: { ...x.killSheet, restampsLeft: (x.killSheet.restampsLeft || 0) + 1 } }));
     const after = await getUser(email);
     return res.status(200).json({ restampsLeft: after?.killSheet?.restampsLeft || 0 });
+  }
+
+  if (op === "grant-compare") {
+    const u = await getUser(email);
+    if (!u) return res.status(404).json({ error: "No such member." });
+    if (!hasKillSheet(u)) return res.status(400).json({ error: "No active Kill Sheet on this account." });
+    const r = await readReport(email);
+    if (r?.status !== "ready") return res.status(400).json({ error: "This member's Kill Sheet isn't ready yet." });
+    await set(reportKey(email), { ...r, rivalsBonus: (r.rivalsBonus || 0) + 1, rivalError: null });
+    return res.status(200).json({ comparesLeft: comparesLeft(await readReport(email)) });
   }
 
   if (op === "recards") {

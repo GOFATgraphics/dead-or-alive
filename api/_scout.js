@@ -430,6 +430,12 @@ export async function markFix(email, title, done) {
 
 // One competitor stamped with the same rules, once per Kill Sheet, shown check by check next to the member's page.
 export const KS_RIVALS = 3;
+// Comparisons a Kill Sheet still has: 3, plus any the admin gave, minus the ones used. Null while it isn't ready.
+export function comparesLeft(r) {
+  if (r?.status !== "ready") return null;
+  const used = r.rivalsUsed ?? (r.rival && !r.rival.failed ? 1 : 0);
+  return Math.max(0, KS_RIVALS + (r.rivalsBonus || 0) - used);
+}
 export async function stampKsRival(email, url) {
   const r = await stampNow(url).catch((e) => ({ failed: e.message }));
   const rival = r.failed ? { url, failed: String(r.failed).slice(0, 200), at: new Date().toISOString() } : { url, id: r.id, verdict: r.verdict, score: r.score, image: r.image, checks: checkRows(r), at: new Date().toISOString() };
