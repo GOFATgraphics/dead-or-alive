@@ -160,6 +160,27 @@ export async function runMonitor(email, { restamp = false, url = "" } = {}) {
   return m;
 }
 
+// Every check for one site, now, from the dashboard: uptime (with key pages and words), certificate, domain,
+// Google, and the links. No re-stamp. At most once every 10 minutes per site.
+export async function checkNow(email, url) {
+  const u = await getUser(email);
+  const page = watchedSites(u).find((s) => s === url);
+  if (!page || !hasStayAlive(u)) return null;
+  const key = monitorKey(email, page);
+  const m = (await get(key)) || { url: page, checks: [], restamps: [] };
+  if (m.checkedNowAt && Date.now() - Date.parse(m.checkedNowAt) < 10 * 60000) throw new Error("Checked a few minutes ago. You can run them again 10 minutes after the last run.");
+  m.checkedNowAt = new Date().toISOString();
+  await set(key, m);
+  const [check, keys] = await Promise.all([confirmedCheck(page, m.mustHave), checkKeys(m)]);
+  const alert = record(m, check);
+  const keyAlerts = recordKeys(m, keys);
+  await dailyExtras(email, page, m, { links: true }).catch((e) => console.error("Extra checks failed:", page, e));
+  await set(key, m);
+  await sendUptimeAlert(email, page, m, alert);
+  for (const k of keyAlerts) await sendUptimeAlert(email, k.url, m, k.alert);
+  return m;
+}
+
 // --- Key pages: up to 5 more pages of the same site (pricing, signup, checkout), checked every 5 minutes with the
 // same confirmed down and recovery alerts. Each keeps about a week of hourly samples. ---
 const bareHost = (u) => new URL(u).hostname.replace(/^www\./, "");
@@ -372,7 +393,7 @@ async function alertChange(email, pageUrl, c, m = {}) {
 // links on the page. Warnings go out once per step (certificate: 14, 7, 1 days; domain: 30, 7, 1 days) and again
 // when it runs out; a renewal starts the steps over. ---
 const LINKS_EVERY = 6.5 * 86400000;
-async function dailyExtras(email, pageUrl, m) {
+async function dailyExtras(email, pageUrl, m, { links = false } = {}) {
   const host = new URL(pageUrl).hostname;
   const [cert, domain, facts] = await Promise.all([pageUrl.startsWith("https:") ? certificate(host) : null, domainExpiry(host), pageFacts(pageUrl)]);
   if (cert) m.cert = cert.error && m.cert?.validTo ? { ...m.cert, at: cert.at, error: cert.error } : cert;
@@ -386,7 +407,7 @@ async function dailyExtras(email, pageUrl, m) {
     m.changes = [change, ...(m.changes || [])].slice(0, 30);
     await alertChange(email, pageUrl, change, m);
   }
-  if (html && (!m.links || Date.now() - Date.parse(m.links.at) > LINKS_EVERY)) {
+  if (html && (links || !m.links || Date.now() - Date.parse(m.links.at) > LINKS_EVERY)) {
     const before = new Set((m.links?.broken || []).map((b) => b.url));
     m.links = await brokenLinks(html, finalUrl || pageUrl);
     const fresh = m.links.broken.filter((b) => !before.has(b.url));

@@ -952,10 +952,23 @@ const daysTo = (iso) => (iso ? Math.floor((Date.parse(iso) - Date.now()) / 86400
 const inDaysText = (n) => (n < 0 ? "Ran out" : n === 0 ? "Runs out today" : n === 1 ? "1 day left" : `${n} days left`);
 
 // The daily extra checks for one site: certificate, domain, what Google is told, and the weekly link check.
-function SiteHealth({ monitor }) {
+function SiteHealth({ monitor, onChange }) {
   const { cert, domain, google, links } = monitor;
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const runNow = async () => {
+    setBusy(true); setNote("");
+    try { onChange && onChange(await api("check-now", { url: monitor.url })); setNote("Done. Everything below is from just now."); }
+    catch (x) { setNote(x.message); } finally { setBusy(false); }
+  };
+  const button = (
+    <div className="row-actions">
+      <button type="button" className="btn btn-line btn-sm" disabled={busy || monitor.pausedManual} onClick={runNow}>{busy ? "Checking… about 30 seconds" : "Run all checks now"}</button>
+      {note ? <span className="muted" role="status">{note}</span> : <span className="fine">{monitor.checkedNowAt ? `Last run by you ${fmtTime(monitor.checkedNowAt)}. ` : ""}Uptime, key pages, words, certificate, domain, Google, and links. No re-stamp.</span>}
+    </div>
+  );
   if (!cert && !domain && !google && !links) {
-    return (<><h3>Health checks</h3><p className="fine">Security certificate, domain renewal, what Google sees, and broken links are checked once a day. The first results show here after the next daily run.</p></>);
+    return (<><h3>Health checks</h3><p className="fine">Security certificate, domain renewal, what Google sees, and broken links are checked once a day. Run them now to see them straight away.</p>{button}</>);
   }
   const certDays = daysTo(cert?.validTo);
   const domDays = daysTo(domain?.expires);
@@ -997,6 +1010,7 @@ function SiteHealth({ monitor }) {
           {google.canonical && <div><dt>Canonical</dt><dd>{google.canonical.replace(/^https?:\/\//, "")}</dd></div>}
         </dl>
       )}
+      {button}
       {links?.broken?.length > 0 && (
         <ul className="history">
           {links.broken.map((b) => (<li key={b.url}><span className="v-chip v-dead">{b.status || "DEAD"}</span><a href={b.url} target="_blank" rel="noopener noreferrer">{b.label ? `${b.label} · ` : ""}{b.url.replace(/^https?:\/\//, "")}</a><time>{b.status ? `answers ${b.status}` : b.why}</time></li>))}
@@ -1154,7 +1168,7 @@ function SiteMonitor({ user, monitor, onChange }) {
             </div>
           )}
           {monitor.restampRunning && <Working text="Re-stamping your page now." />}
-          <SiteHealth monitor={monitor} />
+          <SiteHealth monitor={monitor} onChange={onChange} />
           <KeyPages monitor={monitor} onChange={onChange} />
           <MustHave monitor={monitor} onChange={onChange} />
           <h3>History</h3>

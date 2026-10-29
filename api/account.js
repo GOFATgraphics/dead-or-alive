@@ -25,7 +25,7 @@ import {
 } from "./_account.js";
 import { cancelStayAlive, checkoutUrl, confirmCheckout, logBilling, offerCheckoutUrl, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
 import { markFix, readReport, runScout, sheetToken, stampKsRival } from "./_scout.js";
-import { forgetSite, readMonitors, rivalsKey, runMonitor, seatsOf, setAlertSettings, setKeyPages, setMustHave, setPaused, setPublicStatus, setReportBrand, setRivals, sendReportNow, sitesOf, stampRival, testWebhook } from "./_monitor.js";
+import { checkNow, forgetSite, readMonitors, rivalsKey, runMonitor, seatsOf, setAlertSettings, setKeyPages, setMustHave, setPaused, setPublicStatus, setReportBrand, setRivals, sendReportNow, sitesOf, stampRival, testWebhook } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
 import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
@@ -605,6 +605,17 @@ export default async function handler(req, res) {
       const u = await getUser(email);
       if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
       await setReportBrand(email, b.name);
+      return res.status(200).json(await me(email));
+    }
+    // Every check for one site, right now (no re-stamp): { url }.
+    if (op === "check-now") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      try {
+        if (!(await checkNow(email, page.url))) return res.status(409).json({ error: "This site is paused. Add a site slot to watch it." });
+      } catch (e) { return res.status(429).json({ error: e.message }); }
       return res.status(200).json(await me(email));
     }
     // Sends one test message to a webhook (Slack, Discord, or any URL), without saving it.
