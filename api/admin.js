@@ -10,6 +10,7 @@
 //   POST login { email, id }       shows a review's test login, only while it's In review
 //   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
 //   POST rescout { email }         runs a member's Kill Sheet again
+//   POST grant-restamp { email }   gives a member with an active Kill Sheet one more free re-stamp
 //   POST recards { cursor }        redraws published stamps' share cards in the current design, about 10 per call
 // Env: ADMIN_KEY.
 import { waitUntil } from "@vercel/functions";
@@ -221,6 +222,15 @@ export default async function handler(req, res) {
     if (!hasKillSheet(u) || !u.killSheet.url) return res.status(400).json({ error: "No Kill Sheet with a page on this account." });
     waitUntil(runScout(email, u.killSheet.url).catch((e) => console.error("Rescout failed:", e)));
     return res.status(202).json({ started: true });
+  }
+
+  if (op === "grant-restamp") {
+    const u = await getUser(email);
+    if (!u) return res.status(404).json({ error: "No such member." });
+    if (!hasKillSheet(u)) return res.status(400).json({ error: "No active Kill Sheet on this account." });
+    await updateUser(email, (x) => ({ ...x, killSheet: { ...x.killSheet, restampsLeft: (x.killSheet.restampsLeft || 0) + 1 } }));
+    const after = await getUser(email);
+    return res.status(200).json({ restampsLeft: after?.killSheet?.restampsLeft || 0 });
   }
 
   if (op === "recards") {

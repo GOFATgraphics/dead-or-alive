@@ -537,11 +537,11 @@ import { barChart, renderAnalytics } from "./analytics.js";
       table(
         [
           { label: "Member", cell: (m) => person(m.email, `Joined ${date(m.createdAt)}`) },
-          { label: "Kill Sheet", cell: (m) => (m.killSheet ? el("span", { className: "ad-stack" }, chip(m.killSheet.active ? "Active" : "Refunded", m.killSheet.active ? "ink" : "bad"), muted(`since ${date(m.killSheet.since)}`)) : muted("None")) },
+          { label: "Kill Sheet", cell: (m) => (m.killSheet ? el("span", { className: "ad-stack" }, chip(m.killSheet.active ? "Active" : "Refunded", m.killSheet.active ? "ink" : "bad"), muted(`since ${date(m.killSheet.since)}`), m.killSheet.restampsLeft != null ? muted(`${m.killSheet.restampsLeft} re-stamp${m.killSheet.restampsLeft === 1 ? "" : "s"} left`) : "") : muted("None")) },
           { label: "Stay Alive", cell: (m) => (m.stayAlive ? el("span", { className: "ad-stack" }, chip(m.stayAlive.cancelAtPeriodEnd ? "Cancelling" : m.stayAlive.status, m.stayAlive.active && !m.stayAlive.cancelAtPeriodEnd ? "ok" : "warn"), muted(`${(m.stayAlive.seats || 1) > 1 ? `${m.stayAlive.seats} sites, ` : ""}${m.stayAlive.interval === "year" ? "yearly, " : ""}${m.stayAlive.cancelAtPeriodEnd ? "ends" : "renews"} ${date(m.stayAlive.renews)}`)) : muted("None")) },
           { label: "Page", cls: "hide-md", cell: (m) => { const u = m.stayAlive?.url || m.killSheet?.url; return u ? el("a", { className: "ad-ell", href: u, target: "_blank", rel: "noopener noreferrer", textContent: u.replace(/^https?:\/\//, "") }) : muted("No page yet"); } },
           { label: "Stamps", cls: "num hide-sm", cell: (m) => el("span", { className: "ad-num", textContent: m.stamps }) },
-          { label: "", cls: "num", cell: (m) => (m.killSheet?.url ? rescout(m) : "") },
+          { label: "", cls: "num", cell: (m) => (m.killSheet?.active ? el("span", { className: "ad-stack" }, m.killSheet?.url ? rescout(m) : "", grantRestamp(m)) : "") },
         ],
         ms,
         { empty: `No members yet. ${plural(data.accounts || 0, "free account")}.` }
@@ -557,6 +557,22 @@ import { barChart, renderAnalytics } from "./analytics.js";
       try {
         await call("rescout", { email: m.email });
         b.replaceChildren(icon("check"), "Started");
+      } catch (err) {
+        b.disabled = false;
+        b.title = err.message;
+        b.replaceChildren(icon("circle-alert"), "Failed");
+      }
+    };
+    return b;
+  }
+  function grantRestamp(m) {
+    const b = el("button", { type: "button", className: "btn btn-line btn-sm", title: "Give this member one more free re-stamp", textContent: "+1 re-stamp" });
+    b.onclick = async () => {
+      if (!confirm(`Give ${m.email} one more free re-stamp?`)) return;
+      b.disabled = true;
+      try {
+        await call("grant-restamp", { email: m.email });
+        await loadMembers(true);
       } catch (err) {
         b.disabled = false;
         b.title = err.message;
