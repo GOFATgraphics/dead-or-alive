@@ -25,7 +25,7 @@ import {
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
 } from "./_account.js";
 import { cancelStayAlive, checkoutUrl, confirmCheckout, logBilling, offerCheckoutUrl, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
-import { markFix, readReport, runScout, sheetToken, stampKsRival } from "./_scout.js";
+import { KS_RIVALS, markFix, readReport, runScout, sheetToken, stampKsRival } from "./_scout.js";
 import { checkNow, forgetSite, readMonitors, rivalsKey, runMonitor, seatsOf, setAlertSettings, setKeyPages, setMustHave, setPaused, setPublicStatus, setReportBrand, setRivals, sendReportNow, sitesOf, stampRival, testWebhook } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
 import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
@@ -688,19 +688,23 @@ export default async function handler(req, res) {
         return res.status(502).json({ error: "We couldn't read your page just now, so the scan didn't run. Try again in a minute." });
       }
     }
-    // One competitor stamped next to the Kill Sheet page, once: { url }.
+    // A competitor stamped next to the Kill Sheet page: { url }. Up to 3 per Kill Sheet; the newest shows as the
+    // table, earlier ones stay listed. A comparison that couldn't stamp gives its turn back.
     if (op === "ks-rival") {
       const u = await getUser(email);
       if (!hasKillSheet(u)) return res.status(403).json({ error: "The Kill Sheet isn't on this account." });
       const report = await readReport(email);
       if (report?.status !== "ready") return res.status(409).json({ error: "Your Kill Sheet is still being made. Try again in a minute." });
-      if (report.rival && !report.rival.failed) return res.status(409).json({ error: "Your competitor comparison is already done." });
+      if (report.rival?.running) return res.status(409).json({ error: "A comparison is still running. It takes about a minute." });
+      const used = report.rivalsUsed ?? (report.rival && !report.rival.failed ? 1 : 0);
+      if (used >= KS_RIVALS) return res.status(409).json({ error: `You've used all ${KS_RIVALS} comparisons in this Kill Sheet.` });
       const page = checkPageUrl(b.url);
       if (!page.url) return res.status(400).json({ error: page.error });
       if (new URL(page.url).hostname.replace(/^www\./, "") === new URL(report.url).hostname.replace(/^www\./, "")) return res.status(400).json({ error: "That's your own site. Pick a competitor's page." });
       const p = await precheck(page.url);
       if (!p.ok) return res.status(400).json({ error: p.error });
-      await set(`report:${email}`, { ...report, rival: { url: page.url, running: true } });
+      const past = report.rival && !report.rival.failed ? [report.rival, ...(report.pastRivals || [])].slice(0, 5) : report.pastRivals || [];
+      await set(`report:${email}`, { ...report, rival: { url: page.url, running: true }, pastRivals: past, rivalsUsed: used + 1, rivalError: null });
       waitUntil(stampKsRival(email, page.url).catch((e) => console.error("Competitor stamp failed:", e)));
       return res.status(202).json(await me(email));
     }

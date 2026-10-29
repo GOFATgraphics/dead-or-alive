@@ -445,3 +445,4 @@ select { width: 100%; min-height: 2.9rem; padding: 0.6rem 0.9rem; border: 1px so
 .found-why { margin-top: 0.3rem; font-size: 0.8rem; color: var(--soft); }
 .found-why .about-chip:first-child { margin-left: 0.25rem; }
 @media (max-width: 560px) { .found li { grid-template-columns: auto minmax(0, 1fr); } .found li > .btn { grid-column: 1 / -1; } }
+.compare-more { margin-top: 1rem; }

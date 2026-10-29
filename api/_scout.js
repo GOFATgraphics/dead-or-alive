@@ -429,10 +429,17 @@ export async function markFix(email, title, done) {
 }
 
 // One competitor stamped with the same rules, once per Kill Sheet, shown check by check next to the member's page.
+export const KS_RIVALS = 3;
 export async function stampKsRival(email, url) {
   const r = await stampNow(url).catch((e) => ({ failed: e.message }));
   const rival = r.failed ? { url, failed: String(r.failed).slice(0, 200), at: new Date().toISOString() } : { url, id: r.id, verdict: r.verdict, score: r.score, image: r.image, checks: checkRows(r), at: new Date().toISOString() };
-  await update(reportKey(email), (x) => (x ? { ...x, rival } : x));
+  // A failed stamp hands its turn back and shows the last good comparison again, with the reason.
+  await update(reportKey(email), (x) => {
+    if (!x) return x;
+    if (!r.failed) return { ...x, rival };
+    const [prev, ...rest] = x.pastRivals || [];
+    return { ...x, rival: prev || rival, pastRivals: prev ? rest : x.pastRivals || [], rivalsUsed: Math.max(0, (x.rivalsUsed || 1) - 1), rivalError: { url, failed: rival.failed } };
+  });
   return rival;
 }
 

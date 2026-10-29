@@ -612,22 +612,17 @@ function KsRival({ report, onChange }) {
   };
   const go = (e) => { e.preventDefault(); compare(url); };
   const host = (u) => u.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const done = r && !r.failed && !r.running;
+  const used = report.rivalsUsed ?? (done ? 1 : 0);
+  const left = Math.max(0, 3 - used);
+  const failNote = report.rivalError?.failed ? `We couldn't stamp ${host(report.rivalError.url)}: ${report.rivalError.failed} That one didn't count.` : r?.failed ? `We couldn't stamp ${host(r.url)}: ${r.failed}` : "";
   return (
     <>
       <h3>You vs a competitor</h3>
-      {!r || r.failed ? (
-        <>
-          <p className="fine">Stamp one competitor's page with the same 13 checks and see where they beat you, check by check. One comparison is included.{r?.failed ? ` The last try couldn't stamp ${host(r.url)}: ${r.failed}` : ""}</p>
-          <form className="row-actions" onSubmit={go}>
-            <input className="inline-input" type="text" inputMode="url" value={url} maxLength={300} onChange={(e) => setUrl(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor's page" />
-            <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !url.trim()}>{busy && !picking ? "Checking…" : "Compare"}</button>
-          </form>
-          {err && <p className="alert" role="alert">{err}</p>}
-          <FindRivals url={report.url} pick={compare} pickLabel="Compare with mine" picking={picking} />
-        </>
-      ) : r.running ? (
-        <Working text={`Stamping ${host(r.url)} with the same checks. About a minute.`} />
-      ) : (
+      {!done && !r?.running && <p className="fine">Stamp a competitor's page with the same 13 checks and see where they beat you, check by check. {left} comparison{left === 1 ? "" : "s"} included.</p>}
+      {failNote && !r?.running && <p className="note">{failNote}</p>}
+      {r?.running && <Working text={`Stamping ${host(r.url)} with the same checks. About a minute.`} />}
+      {done && (
         <table className="hist-table vs" aria-label="Your page and the competitor's, check by check">
           <thead><tr><th>Check</th><th>You</th><th>{host(r.url)}</th></tr></thead>
           <tbody>
@@ -641,6 +636,21 @@ function KsRival({ report, onChange }) {
           <caption className="fine">Red rows are where they pass and you don't: those are the fixes that close the gap.</caption>
         </table>
       )}
+      {report.pastRivals?.length > 0 && (
+        <p className="fine">Earlier: {report.pastRivals.map((x) => <a key={x.id || x.url} className="about-chip" href={`/v/${x.id}`}>{host(x.url)} · {x.verdict} {x.score}</a>)}</p>
+      )}
+      {!r?.running && left > 0 && (
+        <>
+          {done && <p className="fine compare-more"><b>Compare another.</b> {left} of 3 left in this Kill Sheet. The newest one shows above.</p>}
+          <form className="row-actions" onSubmit={go}>
+            <input className="inline-input" type="text" inputMode="url" value={url} maxLength={300} onChange={(e) => setUrl(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor's page" />
+            <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !url.trim()}>{busy && !picking ? "Checking…" : "Compare"}</button>
+          </form>
+          {err && <p className="alert" role="alert">{err}</p>}
+          <FindRivals url={report.url} pick={compare} pickLabel="Compare with mine" picking={picking} />
+        </>
+      )}
+      {!r?.running && left === 0 && <p className="fine">You've used all 3 comparisons in this Kill Sheet.{" "}With Stay Alive, competitors are re-stamped every week next to your site.</p>}
     </>
   );
 }
