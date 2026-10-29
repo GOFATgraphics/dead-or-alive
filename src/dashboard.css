@@ -302,30 +302,3 @@ select { width: 100%; min-height: 2.9rem; padding: 0.6rem 0.9rem; border: 1px so
   .welcome-steps li { padding: 0.7rem 0.85rem; }
   .welcome-actions { position: sticky; bottom: 0; margin-top: 0.5rem; padding: 0.85rem 0 1.1rem; background: var(--card); }
 }
-
-/* One stamp, inside the dashboard */
-.sv-back { justify-self: start; margin: 0; text-decoration: none; }
-.sv-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; }
-.sv-host { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--body); }
-.sv-host img { border-radius: 4px; }
-.sv-verdict { display: flex; align-items: baseline; gap: 0.75rem; margin-top: 0.25rem; font-size: 3rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
-.sv-verdict span { font: 600 1.125rem var(--mono); letter-spacing: 0; color: var(--ink); }
-.sv-head.v-dead .sv-verdict { color: var(--dead); }
-.sv-head.v-cope .sv-verdict { color: var(--cope); }
-.sv-head.v-alive .sv-verdict { color: var(--alive); }
-.sv-meta { margin-top: 0.4rem; font-size: 0.875rem; color: var(--soft); }
-.sv-actions { margin-top: 0; }
-.sv-quote { margin-top: 1.1rem; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.4; }
-.sv-shot { display: block; margin-top: 1.1rem; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
-.sv-shot img { width: 100%; }
-.fixes .fix { color: var(--ink); }
-.fixes .fix b { margin-right: 0.4rem; font: 600 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--red); }
-.sv-passed { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.5rem; }
-.sv-passed li { display: grid; grid-template-columns: 1rem minmax(0, 1fr); gap: 0 0.5rem; padding: 0.6rem 0.75rem; border-radius: 10px; background: var(--canvas); font-size: 0.875rem; font-weight: 600; }
-.sv-passed .ic { margin-top: 0.2rem; color: var(--green); }
-.sv-passed small { grid-column: 2; font-weight: 400; color: var(--soft); overflow-wrap: anywhere; }
-.sv-stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.5rem; }
-.sv-stack li { display: grid; gap: 0.1rem; padding: 0.7rem 0.85rem; border: 1px solid var(--line); border-radius: 10px; font-size: 0.875rem; }
-.sv-stack span { font: 500 0.6875rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); }
-.sv-stack small { color: var(--body); overflow-wrap: anywhere; }
-@media (max-width: 560px) { .sv-verdict { font-size: 2.4rem; } .sv-actions .btn { flex: 1 1 100%; } }

@@ -380,7 +380,7 @@ function KillSheet({ user, report, onChange }) {
       {report?.status === "ready" && (
         <div className="report">
           {report.stamp && (
-            <a className={"r-stamp v-" + report.stamp.verdict.toLowerCase()} href={`#stamp/${report.stamp.id}`}>
+            <a className={"r-stamp v-" + report.stamp.verdict.toLowerCase()} href={`/v/${report.stamp.id}`}>
               <img src={report.stamp.image} alt="" loading="lazy" />
               <span><b>{report.stamp.verdict}</b> {report.stamp.score}/100{ks.before && ks.before.id !== report.stamp.id ? ` · was ${ks.before.verdict} ${ks.before.score}` : ""}</span>
               <em>“{report.stamp.sentence}”</em>
@@ -600,7 +600,7 @@ function SiteMonitor({ monitor }) {
                     {c.lcp && <p><b>Speed:</b> main content in {(c.lcp.to / 1000).toFixed(1)}s, was {(c.lcp.from / 1000).toFixed(1)}s</p>}
                     {c.added.map((t) => <p key={"a" + t} className="add">+ {t}</p>)}
                     {c.removed.map((t) => <p key={"r" + t} className="rem">− {t}</p>)}
-                    {c.stampId && <a href={`#stamp/${c.stampId}`}>See that stamp</a>}
+                    {c.stampId && <a href={`/v/${c.stampId}`}>See that stamp</a>}
                   </div>
                 </li>
               ))}
@@ -615,7 +615,7 @@ function SiteMonitor({ monitor }) {
                 r.failed ? (
                   <li key={r.at}><span className="v-chip">FAIL</span><span>Couldn't stamp: {r.failed}</span><time>{fmtDate(r.at)}</time></li>
                 ) : (
-                  <li key={r.at}><span className={"v-chip v-" + r.verdict.toLowerCase()}>{r.verdict}</span><a href={`#stamp/${r.id}`}>{r.score}/100{r.lcp ? ` · main content in ${(r.lcp / 1000).toFixed(1)}s` : ""}</a><time>{fmtDate(r.at)}</time></li>
+                  <li key={r.at}><span className={"v-chip v-" + r.verdict.toLowerCase()}>{r.verdict}</span><a href={`/v/${r.id}`}>{r.score}/100{r.lcp ? ` · main content in ${(r.lcp / 1000).toFixed(1)}s` : ""}</a><time>{fmtDate(r.at)}</time></li>
                 )
               )}
             </ul>
@@ -749,7 +749,7 @@ function StampTable({ stamps }) {
     <div className="tbl" role="table" aria-label="Stamps">
       <div className="tr th" role="row"><span role="columnheader">Site</span><span role="columnheader">Verdict</span><span role="columnheader">Score</span><span role="columnheader">Date</span></div>
       {stamps.map((s) => (
-        <a key={s.id} className="tr" role="row" href={`#stamp/${s.id}`}>
+        <a key={s.id} className="tr" role="row" href={`/v/${s.id}`}>
           <span className="site" role="cell">{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : <i>{s.host[0].toUpperCase()}</i>}{s.host}</span>
           <span role="cell"><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b></span>
           <span role="cell" className="num">{s.score ?? "n/a"}</span>
@@ -757,120 +757,6 @@ function StampTable({ stamps }) {
         </a>
       ))}
     </div>
-  );
-}
-
-// One stamp, inside the dashboard: verdict, screenshot, every check with its fix, then the stack, speed, SEO and
-// security. The public page stays one click away, for sharing.
-function StampView({ id, user, back }) {
-  const [r, setR] = useState(null);
-  const [err, setErr] = useState("");
-  useEffect(() => {
-    let live = true;
-    setR(null);
-    setErr("");
-    fetch(`/api/verdict?id=${encodeURIComponent(id)}`)
-      .then((x) => (x.ok ? x.json() : Promise.reject(x.status)))
-      .then((x) => live && setR(x))
-      .catch(() => live && setErr("This stamp couldn't be loaded. It may have been taken down."));
-    return () => {
-      live = false;
-    };
-  }, [id]);
-  if (err) return <><button type="button" className="link quiet" onClick={back}>← All stamps</button><p className="alert">{err}</p></>;
-  if (!r) return <Working text="Opening the stamp…" />;
-  const checks = (r.checks || []).filter((k) => !k.skip);
-  const failed = checks.filter((k) => !k.pass);
-  const passed = checks.filter((k) => k.pass);
-  const s = r.snapshot || {};
-  const b = s.browser || {};
-  const v = r.verdict.toLowerCase();
-  const sec = (ms) => (ms == null ? "n/a" : `${(ms / 1000).toFixed(1)}s`);
-  const kb = b.kb ? Object.values(b.kb).reduce((a, x) => a + (x || 0), 0) : null;
-  const saved = (user.stamps || []).some((x) => x.id === r.id);
-  return (
-    <>
-      <button type="button" className="link quiet sv-back" onClick={back}>← All stamps</button>
-      <section className={"panel sv-head v-" + v}>
-        <div className="sv-top">
-          <div>
-            <p className="sv-host">{r.icon && <img src={r.icon} alt="" width="18" height="18" />}{r.host}</p>
-            <h1 className="sv-verdict">{r.verdict}<span>{r.score ?? "n/a"}/100</span></h1>
-            <p className="sv-meta">#{String(r.number || 0).padStart(4, "0")} · {fmtDate(r.createdAt)} · {passed.length} of {checks.length} checks passed{saved ? " · saved" : ""}</p>
-          </div>
-          <div className="row-actions sv-actions">
-            <a className="btn btn-dark btn-sm" href={`/v/${r.id}`} target="_blank" rel="noopener">Share or open public page <Icon name="external-link" size={14} /></a>
-            <a className="btn btn-line btn-sm" href={`/?url=${encodeURIComponent(r.pageUrl)}#top`}><Icon name="rotate-ccw" size={14} /> Stamp it again</a>
-          </div>
-        </div>
-        {r.sentence && <p className="sv-quote">“{r.sentence}”</p>}
-        {r.image && <a className="sv-shot" href={r.image} target="_blank" rel="noopener noreferrer"><img src={r.image} alt={`First screen of ${r.host}, stamped ${r.verdict}.`} /></a>}
-      </section>
-
-      <Panel title={failed.length ? `${failed.length} ${failed.length === 1 ? "thing" : "things"} holding it back` : "Every check passed"} desc="Scored by rules, not AI. Each fail says what we found and how to fix it.">
-        {failed.length > 0 && (
-          <ol className="fixes">
-            {failed.map((k) => (
-              <li key={k.id || k.label}>
-                <b>{k.label}</b>
-                <p>{k.detail}</p>
-                {k.fix && <p className="fix"><b>Fix</b>{k.fix}</p>}
-              </li>
-            ))}
-          </ol>
-        )}
-        {passed.length > 0 && (
-          <>
-            <h3>Passed</h3>
-            <ul className="sv-passed">{passed.map((k) => <li key={k.id || k.label}><Icon name="check" size={14} />{k.label}<small>{k.detail}</small></li>)}</ul>
-          </>
-        )}
-      </Panel>
-
-      {(s.stack?.length > 0 || s.browser || s.seo) && (
-        <Panel title="Under the hood" desc="Measured in a real browser and from the page's HTML and headers.">
-          {s.browser && (
-            <>
-              <h3>Speed</h3>
-              <dl className="scout">
-                <div><dt>Main content</dt><dd className={b.lcp > 2500 ? "bad" : "ok"}>{sec(b.lcp)}</dd></div>
-                <div><dt>Server answered</dt><dd>{sec(b.ttfb)}</dd></div>
-                <div><dt>Layout shift</dt><dd className={b.cls > 0.1 ? "bad" : ""}>{b.cls ?? "n/a"}</dd></div>
-                <div><dt>Fully loaded</dt><dd>{sec(b.load)}</dd></div>
-                <div><dt>Requests</dt><dd>{b.requests ?? "n/a"}</dd></div>
-                {kb != null && <div><dt>Page weight</dt><dd>{kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`}</dd></div>}
-              </dl>
-            </>
-          )}
-          {s.stack?.length > 0 && (
-            <>
-              <h3>Stack · {s.stack.length}</h3>
-              <ul className="sv-stack">{s.stack.map((t) => <li key={t.name}><b>{t.name}</b><span>{t.category}</span><small>{t.evidence}</small></li>)}</ul>
-            </>
-          )}
-          {s.seo && (
-            <>
-              <h3>Search</h3>
-              <dl className="scout">
-                <div><dt>Search engines</dt><dd className={s.seo.noindex ? "bad" : "ok"}>{s.seo.noindex ? "Blocked" : "Allowed"}</dd></div>
-                <div><dt>Headlines (h1)</dt><dd className={s.seo.h1Count === 1 ? "" : "bad"}>{s.seo.h1Count}</dd></div>
-                <div><dt>Title</dt><dd>{s.seo.titleLength} <small>chars</small></dd></div>
-                <div><dt>Description</dt><dd>{s.seo.descriptionLength} <small>chars</small></dd></div>
-                <div><dt>Images without alt</dt><dd className={s.seo.imagesWithoutAlt ? "bad" : ""}>{s.seo.imagesWithoutAlt} <small>of {s.seo.images}</small></dd></div>
-              </dl>
-            </>
-          )}
-          {s.security && (
-            <>
-              <h3>Security headers</h3>
-              <dl className="scout">
-                {Object.entries({ hsts: "HSTS", csp: "Content policy", frameOptions: "Frame options", noSniff: "No sniff", referrerPolicy: "Referrer policy" }).map(([k, label]) => (s.security[k] == null ? null : <div key={k}><dt>{label}</dt><dd className={s.security[k] ? "ok" : "bad"}>{s.security[k] ? "Yes" : "No"}</dd></div>))}
-              </dl>
-            </>
-          )}
-        </Panel>
-      )}
-    </>
   );
 }
 
@@ -1091,18 +977,11 @@ function Dashboard({ data, setData, onOut }) {
     return () => clearTimeout(t);
   }, [running, data, banner, refresh]);
 
-  // Free stamps from this browser: saved as soon as you're in. Came from a result page? Open that result here.
+  // Free stamps from this browser: saved as soon as you're in. Came from a result page? Back to it.
   useEffect(() => {
     const j = jobs();
     const back = params.get("back") || "";
-    const from = /^\/v\/([A-Za-z0-9_-]{6,40})$/.exec(back)?.[1] || "";
-    const done = () => {
-      if (!from || PLAN) return;
-      history.replaceState(null, "", `/dashboard#stamp/${from}`);
-      setView(from);
-      setSect("stamps");
-      setSaved(true);
-    };
+    const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(`${back}?signedin=1`);
     if (j.length) api("claim", { jobs: j }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
     else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1111,28 +990,13 @@ function Dashboard({ data, setData, onOut }) {
 
   // Sections live in the URL hash, so back and forward work and links can point at one.
   const first = PAID === "killSheet" ? "kill-sheet" : PAID === "stayAlive" ? "monitoring" : "overview";
-  // #stamp/<id> opens one stamp inside Stamps.
-  const stampIn = () => /^#stamp\/([A-Za-z0-9_-]{6,40})$/.exec(location.hash)?.[1] || "";
-  const [view, setView] = useState(stampIn);
-  const [saved, setSaved] = useState(false);
-  const [sect, setSect] = useState(() => (stampIn() ? "stamps" : SECTIONS.some((x) => x.id === location.hash.slice(1)) ? location.hash.slice(1) : first));
+  const [sect, setSect] = useState(() => (SECTIONS.some((x) => x.id === location.hash.slice(1)) ? location.hash.slice(1) : first));
   useEffect(() => {
-    const on = () => {
-      const id = stampIn();
-      if (id) {
-        setView(id);
-        setSect("stamps");
-        scrollTo({ top: 0 });
-      } else if (SECTIONS.some((x) => x.id === location.hash.slice(1))) {
-        setView("");
-        setSect(location.hash.slice(1));
-      }
-    };
+    const on = () => SECTIONS.some((x) => x.id === location.hash.slice(1)) && setSect(location.hash.slice(1));
     addEventListener("hashchange", on);
     return () => removeEventListener("hashchange", on);
   }, []);
   const go = (id) => {
-    setView("");
     history.replaceState(null, "", `${location.pathname}${location.search}#${id}`);
     setSect(id);
     scrollTo({ top: 0 });
@@ -1167,18 +1031,15 @@ function Dashboard({ data, setData, onOut }) {
         {banner === "slow" && <div className="banner warn">Your payment hasn't been confirmed to us yet. This page keeps checking; if it takes more than a few minutes, write to {DESK.contact} with your receipt.</div>}
         {banner === "active" && <Welcome plan={PAID} user={user} go={go} onClose={() => setBanner("")} />}
         {params.get("confirmed") && !banner && <Toast text="Email confirmed. You're signed in." />}
-        {saved && <Toast text="Signed in. This stamp is saved to your account." />}
         {err && <p className="alert" role="alert">{err}</p>}
 
-        {!(sect === "stamps" && view) && (
-          <div className="page-head">
-            <h1>{here.label}</h1>
-            <p>{here.desc}</p>
-          </div>
-        )}
+        <div className="page-head">
+          <h1>{here.label}</h1>
+          <p>{here.desc}</p>
+        </div>
 
         {sect === "overview" && <Overview user={user} report={report} monitor={monitor} go={go} />}
-        {sect === "stamps" && (view ? <StampView id={view} user={user} back={() => go("stamps")} /> : <Stamps user={user} />)}
+        {sect === "stamps" && <Stamps user={user} />}
         {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
         {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}

@@ -365,13 +365,3 @@ if (demo) {
     }, { threshold: 0.35 }).observe(demo);
   }
 }
-
-// "Stamp it again" from the dashboard links here with ?url=: fill the form, ready to press.
-{
-  const again = new URLSearchParams(location.search).get("url");
-  const field = $("#page_url");
-  if (again && field && !new URLSearchParams(location.search).get("job")) {
-    field.value = again.slice(0, 500);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
