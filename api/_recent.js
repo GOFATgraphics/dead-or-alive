@@ -4,6 +4,7 @@
 // Reads the Redis list _publish.js keeps; without Redis, reads the newest published records from Blob.
 import { list } from "@vercel/blob";
 import { pipeline, redisReady } from "./_redis.js";
+import { get } from "./_store.js";
 
 // How many to return: ?recent=N asks for up to N (the carousel takes 12, the card 3).
 const MAX_SHOW = 12;
@@ -40,7 +41,8 @@ const safeIcon = (u) => (/^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.c
 // Newest first, ALIVE always on the card when there is one: up to two ALIVE and one COPE, then whatever is newer.
 function pick(items, show) {
   const seen = new Set();
-  const fresh = items.filter((s) => ["ALIVE", "COPE"].includes(s.verdict) && s.host && !seen.has(s.host) && seen.add(s.host));
+  const norm = (h) => String(h || "").toLowerCase().trim().replace(/^www\./, "");
+  const fresh = items.filter((s) => ["ALIVE", "COPE"].includes(s.verdict) && s.host && !seen.has(norm(s.host)) && seen.add(norm(s.host)));
   const alive = fresh.filter((s) => s.verdict === "ALIVE");
   const cope = fresh.filter((s) => s.verdict === "COPE");
   const chosen = [...alive.slice(0, Math.max(2, show - 1)), ...cope.slice(0, 1)];
@@ -59,6 +61,15 @@ export async function recentStamps(req, res) {
   } catch (err) {
     console.error("Recent stamps failed:", err.message);
   }
+  // Admin carousel control: hosts hidden in admin never show, in either source. Unhiding
+  // restores them without a new stamp, because the underlying list is left untouched.
+  try {
+    const hidden = await get("carousel:hidden").catch(() => null);
+    if (Array.isArray(hidden) && hidden.length) {
+      const set = new Set(hidden.map((h) => String(h).toLowerCase().trim()));
+      items = items.filter((s) => !set.has(String(s.host || "").toLowerCase().trim()));
+    }
+  } catch (_) {}
   res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const show = Math.min(MAX_SHOW, Math.max(1, parseInt(req.query.recent, 10) || 3));
   res.status(200).json({ stamps: pick(items, show) });

@@ -10,12 +10,14 @@
 //   POST login { email, id }       shows a review's test login, only while it's In review
 //   POST review { email, id, status, result }  moves a review along; Delivered deletes its test login
 //   POST rescout { email }         runs a member's Kill Sheet again
+//   POST grant-restamp { email }   gives a member with an active Kill Sheet one more free re-stamp
 //   POST recards { cursor }        redraws published stamps' share cards in the current design, about 10 per call
 // Env: ADMIN_KEY.
 import { waitUntil } from "@vercel/functions";
-import { polarReady, readResult, requireAdmin } from "./_lib.js";
+import { polarReady, requireAdmin } from "./_lib.js";
+import { readFullResult } from "./_gate.js";
 import { redisReady } from "./_redis.js";
-import { get, members, remove, storeReady, unseal } from "./_store.js";
+import { get, members, remove, set, storeReady, unseal } from "./_store.js";
 import { getUser, hasKillSheet, hasStayAlive, updateUser } from "./_account.js";
 import { paymentsOverview, polarApiReady, reconcile } from "./_billing.js";
 import { runScout } from "./_scout.js";
@@ -98,24 +100,44 @@ export default async function handler(req, res) {
     // Which account saved each stamp.
     const owners = new Map();
     for (const u of (await Promise.all((await members("idx:users")).map((e) => getUser(e)))).filter(Boolean)) for (const st of u.stamps || []) owners.set(st.id, u.email);
+    const hiddenRaw = await get("carousel:hidden").catch(() => null);
+    const hiddenSet = new Set(Array.isArray(hiddenRaw) ? hiddenRaw.map((h) => String(h).toLowerCase().trim()) : []);
     const rows = await Promise.all(
       slice.map(async (x) => {
         const id = x.pathname.slice(9, -5);
         const r = await fetch(`${x.url}?t=${Date.parse(x.uploadedAt) || 0}`).then((y) => (y.ok ? y.json() : null)).catch(() => null);
         if (!r) return null;
         const checks = Array.isArray(r.checks) ? r.checks.filter((k) => !k.skip) : [];
+        const snap = r.snapshot || (await get(`snap:${id}`).catch(() => null));
+        // Who claimed it: this stamp's claim, or its host's claim inherited by re-stamps.
+        // Admin-only: email is shown here, never on the public result page.
+        let claimed = null;
+        try {
+          const hostKey = r.host ? String(r.host).toLowerCase().trim() : "";
+          let claimEmail = await get(`claim:${id}`).catch(() => null);
+          if (claimEmail && hostKey) {
+            const hostClaim = await get(`claimhost:${hostKey}`).catch(() => null);
+            if (!hostClaim) await set(`claimhost:${hostKey}`, claimEmail).catch(() => {});
+          }
+          if (!claimEmail && hostKey) claimEmail = await get(`claimhost:${hostKey}`).catch(() => null);
+          if (claimEmail) {
+            const cu = await getUser(claimEmail);
+            claimed = { email: claimEmail, username: cu?.x?.username || "", name: cu?.x?.name || "" };
+          }
+        } catch (_) {}
         return {
           id, number: r.number, host: r.host, pageUrl: r.pageUrl, verdict: r.verdict, score: r.score ?? null, createdAt: r.createdAt, icon: r.icon || "",
-          failed: checks.filter((k) => !k.pass).map((k) => k.label), stack: (r.snapshot?.stack || []).length, lcp: r.snapshot?.browser?.lcp || null,
+          failed: checks.filter((k) => !k.pass).map((k) => k.label), stack: (snap?.stack || []).length, lcp: snap?.browser?.lcp || null,
           owner: owners.get(id) || "",
+          claimed, hidden: hiddenSet.has(String(r.host || "").toLowerCase().trim()),
         };
       })
     );
-    return res.status(200).json({ stamps: rows.filter(Boolean), total: blobs.length, page: pageNo, pages: Math.ceil(blobs.length / per) });
+    return res.status(200).json({ stamps: rows.filter(Boolean), total: blobs.length, page: pageNo, pages: Math.ceil(blobs.length / per), hiddenHosts: [...hiddenSet] });
   }
 
   if (op === "stamp") {
-    const r = await readResult(String(req.query.id || ""));
+    const r = await readFullResult(String(req.query.id || ""));
     return r ? res.status(200).json({ stamp: r }) : res.status(404).json({ error: "No such stamp." });
   }
 
@@ -134,6 +156,17 @@ export default async function handler(req, res) {
   if (op === "payments") return res.status(200).json(await paymentsOverview());
 
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
+
+  if (op === "carousel-hide" || op === "carousel-show") {
+    const host = String(b.host || "").toLowerCase().trim();
+    if (!host) return res.status(400).json({ error: "Which site?" });
+    const raw = await get("carousel:hidden").catch(() => null);
+    let hidden = Array.isArray(raw) ? raw.map((h) => String(h).toLowerCase().trim()).filter(Boolean) : [];
+    if (op === "carousel-hide") { if (!hidden.includes(host)) hidden.push(host); }
+    else hidden = hidden.filter((h) => h !== host);
+    await set("carousel:hidden", hidden);
+    return res.status(200).json({ ok: true, host, hidden, hiddenHosts: hidden });
+  }
 
   if (op === "sync") {
     const email = String(b.email || "").trim().toLowerCase();
@@ -189,6 +222,15 @@ export default async function handler(req, res) {
     if (!hasKillSheet(u) || !u.killSheet.url) return res.status(400).json({ error: "No Kill Sheet with a page on this account." });
     waitUntil(runScout(email, u.killSheet.url).catch((e) => console.error("Rescout failed:", e)));
     return res.status(202).json({ started: true });
+  }
+
+  if (op === "grant-restamp") {
+    const u = await getUser(email);
+    if (!u) return res.status(404).json({ error: "No such member." });
+    if (!hasKillSheet(u)) return res.status(400).json({ error: "No active Kill Sheet on this account." });
+    await updateUser(email, (x) => ({ ...x, killSheet: { ...x.killSheet, restampsLeft: (x.killSheet.restampsLeft || 0) + 1 } }));
+    const after = await getUser(email);
+    return res.status(200).json({ restampsLeft: after?.killSheet?.restampsLeft || 0 });
   }
 
   if (op === "recards") {

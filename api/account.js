@@ -2,8 +2,10 @@
 // Vercel's 12-function limit. Signed-in state is an HttpOnly session cookie (see _account.js).
 //   GET  me                      the account, its stamps, Kill Sheet report, Stay Alive monitor
 //   GET  link&t=...              a one-time email sign-in link: signs in, then opens the dashboard
-//   POST signup | login | sendlink | logout | password | delete
+//   POST signup | login | sendlink | sendcode | verify-code | logout | password | delete
 //   POST claim { jobs }          saves free stamps this browser made to the account
+//   POST verify-token { host }   the DNS TXT record for Stage 3 website verification
+//   POST verify-domain { host }  checks that TXT record and marks the site verified
 //   POST checkout { plan, url }  the Polar checkout link, with this account's email and id
 //   POST confirm { checkoutId }  back from Polar: confirm the payment now if the API token is set
 //   POST url { plan, url }       sets the page a plan works on and starts its run
@@ -12,21 +14,22 @@
 //   POST review { ... }          submits an app review; POST revoke { id } deletes its test login
 import crypto from "node:crypto";
 import { waitUntil } from "@vercel/functions";
-import { readResult, resultId } from "./_lib.js";
+import { isResultId, readResult, resultId } from "./_lib.js";
 import { mail } from "./_publish.js";
-import { addTo, get, remove, seal, set, storeReady } from "./_store.js";
+import { addTo, get, remove, seal, set, storeReady, unseal } from "./_store.js";
 import {
   checkPassword, clearFails, endSession, ensureUser, getUser, hasKillSheet, hasStayAlive, hashPassword, magicToken, noteFail, normEmail,
   publicUser, reviewAllowance, sessionEmail, startSession, tooManyFails, updateUser, useMagicToken, userKey, validEmail,
 } from "./_account.js";
 import { cancelStayAlive, checkoutUrl, confirmCheckout, polarApiReady, reconcile, resumeStayAlive, setStayAliveSeats } from "./_billing.js";
 import { readReport, runScout } from "./_scout.js";
-import { forgetSite, readMonitors, runMonitor, seatsOf, sitesOf } from "./_monitor.js";
+import { forgetSite, readMonitors, runMonitor, seatsOf, setAlertSettings, setPaused, setPublicStatus, sendReportNow, sitesOf } from "./_monitor.js";
 import { xCallback, xReady, xStart } from "./_x.js";
-import { SAY, passwordSignIn, resendConfirmation, sendSignInLink, signUp, supaReady, verifyLink } from "./_supa.js";
+import { SAY, passwordSignIn, resendConfirmation, sendSignInCode, sendSignInLink, signUp, supaReady, updateOwnPassword, verifyCode, verifyLink } from "./_supa.js";
 import { PLANS } from "../src/config.js";
 import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
+import { checkDomain, ensureToken } from "./_gate.js";
 
 const mailReady = () => !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
 const origin = () => (process.env.SITE_URL || "https://stampmypage.com").replace(/\/$/, "");
@@ -80,7 +83,7 @@ async function me(email) {
 }
 
 function setup() {
-  return { ready: storeReady(), emailLinks: supaReady() || mailReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
+  return { ready: storeReady(), emailLinks: supaReady() || mailReady(), code: supaReady(), x: xReady(), polarApi: polarApiReady(), portal: PORTAL };
 }
 
 async function sendLink(email, next) {
@@ -112,8 +115,14 @@ function afterConfirm(q) {
 const backTo = (next) => `${origin()}/dashboard${typeof next === "string" && /^\?[\w=&%.-]*$/.test(next) ? next : ""}`;
 
 // Free stamps the browser made: the job id is only known to the browser that started it, so it proves the stamp is theirs.
-async function claim(email, jobs) {
-  const ids = [...new Set((Array.isArray(jobs) ? jobs : []).filter((j) => UUID.test(String(j))).slice(0, 50))].map((j) => resultId(j));
+async function claim(email, jobs, directIds = []) {
+  // Two ways in: job ids from the browser that made the stamp (proof it is theirs), and stamp ids
+  // from a result page Claim button or a ?save= link (so a visitor who opens the result in another
+  // browser can still claim it). Either way, first saver wins, and an already-owned stamp is skipped,
+  // so claiming by link cannot take someone else's stamp.
+  const fromJobs = [...new Set((Array.isArray(jobs) ? jobs : []).filter((j) => UUID.test(String(j))).slice(0, 50))].map((j) => resultId(j));
+  const direct = [...new Set((Array.isArray(directIds) ? directIds : []).filter((id) => isResultId(id)).slice(0, 50))];
+  const ids = [...new Set([...fromJobs, ...direct])];
   const found = (await Promise.all(ids.map((id) => readResult(id)))).filter(Boolean);
   if (!found.length) return 0;
   // A stamp belongs to the first account that saves it. Another account signing in on the same browser later
@@ -136,6 +145,35 @@ async function claim(email, jobs) {
     return u;
   });
   return added;
+}
+
+// Manual site claim, separate from saving a stamp. Saving never creates a claim card on its own;
+// only an explicit Claim this site press sets claim:<id>. First claimer wins, and a later claimer
+// gets taken:true, never the card over. The stamp is also added to the claimer's dashboard list.
+async function claimSite(email, id) {
+  if (!isResultId(id)) return { error: "No such stamp." };
+  const r = await readResult(id);
+  if (!r) return { error: "No such stamp." };
+  const existing = await get(`claim:${id}`).catch(() => null);
+  if (existing && existing !== email) return { taken: true };
+  const u = await getUser(email);
+  const hasX = !!u?.x?.username;
+  if (!existing) {
+    await set(`claim:${id}`, email);
+    const h = String(r.host || "").toLowerCase().trim();
+    if (h) {
+      const hostClaim = await get(`claimhost:${h}`).catch(() => null);
+      if (!hostClaim) await set(`claimhost:${h}`, email).catch(() => {});
+    }
+    await updateUser(email, (cur) => {
+      if (!cur) return undefined;
+      if ((cur.stamps || []).some((s) => s.id === id)) return undefined;
+      const add = { id: r.id, url: r.pageUrl, host: r.host, verdict: r.verdict, score: r.score ?? null, icon: r.icon || "", at: r.createdAt };
+      cur.stamps = [...(cur.stamps || []), add].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200);
+      return cur;
+    });
+  }
+  return { claimed: true, hasX, username: u?.x?.username || "" };
 }
 
 const APP_LINK = /^https:\/\/(apps\.apple\.com|itunes\.apple\.com|play\.google\.com|testflight\.apple\.com)\//i;
@@ -214,23 +252,37 @@ export default async function handler(req, res) {
       const email = normEmail(b.email);
       const password = String(b.password || "");
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
-      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, or use an email link." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
       const u = await getUser(email);
       let created = false;
       if (u?.pass) {
-        // Accounts made before email confirmation keep their own password.
+        // Accounts made before email confirmation keep their own password. A correct password earns a
+        // code, not a session yet: email, password, Continue, then the code. Without Supabase, the old
+        // direct sign-in below still applies.
         if (!(await checkPassword(password, u.pass))) {
           await noteFail(email);
           await new Promise((r) => setTimeout(r, 400));
           return res.status(401).json({ error: "That password doesn't match this email.", code: "wrongpass" });
         }
         await clearFails(email);
+        if (supaReady()) {
+          const c = await sendSignInCode(email);
+          if (!c.ok) return res.status(c.status === 429 ? 429 : 502).json({ error: SAY[c.code] || "The code didn't send. Try again." });
+          return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below to continue.` });
+        }
       } else if (supaReady()) {
-        // Sign in; if there's no login for this email yet, sign up, and the confirmation email goes out.
+        // Sign in; if there's no login for this email yet, sign up, and the confirmation code goes out.
+        // A correct password never signs in directly here: it earns a code, and the code signs in.
         const r = await passwordSignIn(email, password);
+        if (r.ok) {
+          const c = await sendSignInCode(email);
+          if (!c.ok) return res.status(c.status === 429 ? 429 : 502).json({ error: SAY[c.code] || "The code didn't send. Try again." });
+          await clearFails(email);
+          return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below to continue.` });
+        }
         if (!r.ok && r.code === "email_not_confirmed") {
           await resendConfirmation(email, backTo(b.next)).catch(() => {});
-          return res.status(202).json({ sent: true, note: `Confirm your email first. We sent the link again to ${email}.` });
+          return res.status(202).json({ sent: true, code: true, note: `Confirm your email first. We sent a code to ${email}. Enter it below to continue.` });
         }
         if (!r.ok) {
           if (password.length < 8) return res.status(400).json({ error: "New here? Pick a password with at least 8 characters. Been here before? That password doesn't match." });
@@ -249,7 +301,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ ...(await me(email)), created: true, setup: setup() });
           }
           if (up.error) return res.status(400).json({ error: SAY[up.error] || up.msg || "That didn't work. Try again." });
-          if (up.sent) return res.status(202).json({ sent: true, confirm: true, note: `Almost there. We sent a confirmation link to ${email}. Open it on any device to finish.` });
+          if (up.sent) return res.status(202).json({ sent: true, confirm: true, code: true, note: `Almost there. We sent a code to ${email}. Enter it below to finish.` });
           created = !u;
         }
         await clearFails(email);
@@ -296,6 +348,90 @@ export default async function handler(req, res) {
       if (Array.isArray(b.jobs)) await claim(email, b.jobs);
       return res.status(200).json({ ...(await me(email)), setup: setup() });
     }
+    if (op === "sendcode") {
+      const email = normEmail(b.email);
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      const r = await sendSignInCode(email);
+      if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again." });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below to continue.` });
+    }
+    if (op === "verify-code") {
+      const email = normEmail(b.email);
+      const token = String(b.token || "").replace(/[\s-]/g, "");
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!/^\d{6,8}$/.test(token)) return res.status(400).json({ error: "Enter the code from the email." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
+      // A sign-up code first, then a sign-in code: both prove the same inbox.
+      const v = (await verifyCode(email, token, "signup").catch(() => ({ ok: false }))) || { ok: false };
+      const w = v.ok ? v : await verifyCode(email, token, "email").catch(() => ({ ok: false }));
+      if (!w.ok) {
+        await noteFail(email);
+        return res.status(400).json({ error: "That code didn't match or it expired. Try again, or send a new code.", code: "badcode" });
+      }
+      await clearFails(email);
+      await ensureUser(w.email);
+      await startSession(res, w.email);
+      if (Array.isArray(b.jobs)) await claim(w.email, b.jobs);
+      return res.status(200).json({ ...(await me(w.email)), verified: true, setup: setup() });
+    }
+    if (op === "forgot") {
+      const email = normEmail(b.email);
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!supaReady()) return res.status(503).json({ error: `Forgot your password and can't get a code? Write to ${process.env.CONTACT_EMAIL || "us"} and we'll help you in.` });
+      const r = await sendSignInCode(email);
+      if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: SAY[r.code] || "The email didn't send. Try again." });
+      return res.status(202).json({ sent: true, code: true, note: `We sent a code to ${email}. Enter it below with a new password.` });
+    }
+    if (op === "verify-reset-code") {
+      // Step 2 of a reset: the code alone. A good code earns a one-time reset token, good for 15
+      // minutes, that carries the verified session (sealed) into step 3. The code itself is spent here,
+      // so it can't be replayed, and step 3 never needs the code again.
+      const email = normEmail(b.email);
+      const token = String(b.token || "").replace(/[\s-]/g, "");
+      if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
+      if (!/^\d{6,8}$/.test(token)) return res.status(400).json({ error: "Enter the code from the email." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      if (await tooManyFails(email)) return res.status(429).json({ error: "Too many tries. Wait 15 minutes, then try again." });
+      const v = (await verifyCode(email, token, "signup").catch(() => ({ ok: false }))) || { ok: false };
+      const w = v.ok ? v : await verifyCode(email, token, "email").catch(() => ({ ok: false }));
+      if (!w.ok || !w.accessToken) {
+        await noteFail(email);
+        return res.status(400).json({ error: "That code didn't match or it expired. Try again, or send a new code.", code: "badcode" });
+      }
+      await clearFails(w.email);
+      const resetToken = crypto.randomBytes(32).toString("base64url");
+      const key = `reset:${crypto.createHash("sha256").update(resetToken).digest("base64url")}`;
+      await set(key, { email: w.email, sealed: seal(w.accessToken) }, 15 * 60);
+      return res.status(200).json({ verified: true, resetToken, note: "Code confirmed. Create your new password." });
+    }
+    if (op === "reset-password") {
+      // Step 3 of a reset: new password plus confirmation, authorised by the reset token from step 2.
+      // The email comes from the token, not from the request, so one reset can't be aimed at another
+      // account. No session starts here: the user signs in the normal way, with the new password and a
+      // fresh code.
+      const resetToken = String(b.resetToken || "");
+      const password = String(b.password || "");
+      const confirm = String(b.confirm || "");
+      if (!resetToken || resetToken.length > 100) return res.status(400).json({ error: "That reset session expired. Send a new code and try again." });
+      if (password.length < 8) return res.status(400).json({ error: "Pick a new password with at least 8 characters." });
+      if (password !== confirm) return res.status(400).json({ error: "The two passwords don't match. Type them again." });
+      if (!supaReady()) return res.status(503).json({ error: "Codes need Supabase. Try again later." });
+      const key = `reset:${crypto.createHash("sha256").update(resetToken).digest("base64url")}`;
+      const rec = await get(key);
+      if (rec) await remove(key);
+      if (!rec?.email || !rec?.sealed) return res.status(400).json({ error: "That reset session expired. Send a new code and try again." });
+      let accessToken = "";
+      try { accessToken = unseal(rec.sealed); } catch { accessToken = ""; }
+      if (!accessToken) return res.status(400).json({ error: "That reset session expired. Send a new code and try again." });
+      const upd = await updateOwnPassword(accessToken, password);
+      if (!upd.ok) return res.status(502).json({ error: SAY[upd.code] || "That didn't work. Send a new code and try again." });
+      const u = await getUser(rec.email);
+      if (u?.pass) await updateUser(rec.email, async (x) => ({ ...x, pass: await hashPassword(password) }));
+      await clearFails(rec.email);
+      return res.status(200).json({ reset: true, note: "Password changed. Sign in with your new password." });
+    }
     if (op === "sendlink") {
       const email = normEmail(b.email);
       if (!validEmail(email)) return res.status(400).json({ error: "Enter a real email address." });
@@ -324,8 +460,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
     if (op === "claim") {
-      const n = await claim(email, b.jobs);
+      const n = await claim(email, b.jobs, b.ids);
       return res.status(200).json({ saved: n, ...(await me(email)) });
+    }
+    if (op === "claim-site") {
+      const out = await claimSite(email, String(b.id || ""));
+      if (out.error) return res.status(404).json(out);
+      return res.status(200).json({ ...out, ...(await me(email)) });
+    }
+    // Stage 3, website verification: the DNS TXT record for this account and host, and the check that
+    // marks the site verified. Reading the technical report (Stage 2) does not need this.
+    if (op === "verify-token") {
+      return res.status(200).json(await ensureToken(email, b.host));
+    }
+    if (op === "verify-domain") {
+      const v = await checkDomain(email, b.host);
+      if (v.error && !v.pending) return res.status(400).json(v);
+      return res.status(200).json(v);
     }
     if (op === "checkout") {
       const plan = String(b.plan || "");
@@ -387,6 +538,40 @@ export default async function handler(req, res) {
       });
       waitUntil(runMonitor(email, { restamp: true, url: page.url }).catch((e) => console.error("Monitor failed:", e)));
       return res.status(202).json(await me(email));
+    }
+    if (op === "public-status") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      await setPublicStatus(email, page.url, !!b.on);
+      return res.status(200).json(await me(email));
+    }
+    if (op === "alerts") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      try {
+        await setAlertSettings(email, page.url, { down: b.down, changes: b.changes, quietStart: b.quietStart, quietEnd: b.quietEnd, webhook: b.webhook });
+      } catch (e) { return res.status(400).json({ error: e.message }); }
+      return res.status(200).json(await me(email));
+    }
+    if (op === "pause-site") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      await setPaused(email, page.url, !!b.paused);
+      return res.status(200).json(await me(email));
+    }
+    if (op === "report-now") {
+      const u = await getUser(email);
+      if (!hasStayAlive(u)) return res.status(403).json({ error: "Stay Alive isn't on for this account." });
+      const page = checkPageUrl(b.url);
+      if (!page.url || !sitesOf(u).includes(page.url)) return res.status(404).json({ error: "That site isn't on your account." });
+      await sendReportNow(email, page.url);
+      return res.status(200).json(await me(email));
     }
     // How many sites Stay Alive covers: 1 with the plan, each extra one $5 a month, prorated.
     if (op === "seats") {

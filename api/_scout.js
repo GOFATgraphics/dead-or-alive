@@ -19,11 +19,55 @@ const decode = (s) =>
 const textOf = (html) => decode(String(html || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 
+// Copy that is not live copy must not be scouted as if it were: struck-through
+// or deleted text is explicitly no longer accurate, and blocks marked as an
+// example, sample, mock, or showcase card are illustrative, not the page's
+// own claims. A tag-stack walk handles nested blocks, which a single regex
+// cannot, since an example card contains nested divs of its own.
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+const EXAMPLE_ATTR = /(?:class|id)\s*=\s*["'][^"']*(?:example|sample|mock|scard|r-ex)[^"']*["']/i;
+export function stripNonLive(html) {
+  const src = String(html || "");
+  let out = "";
+  let last = 0;
+  let skipDepth = 0;
+  const tagRe = /<\/?([a-z][a-z0-9]*)\b([^>]*)\/?>/gi;
+  let m;
+  while ((m = tagRe.exec(src)) !== null) {
+    const [tag, name, attrs] = [m[0], m[1].toLowerCase(), m[2] || ""];
+    const isEnd = tag.startsWith("</");
+    const selfClosing = tag.endsWith("/>") || VOID_TAGS.has(name);
+    if (skipDepth > 0) {
+      if (!isEnd && !selfClosing) skipDepth++;
+      if (isEnd) skipDepth--;
+      if (skipDepth === 0) {
+        out += " ";
+        last = tagRe.lastIndex;
+      }
+      continue;
+    }
+    if (!isEnd) {
+      const struck = name === "s" || name === "del" || name === "strike";
+      const example = (name === "section" || name === "div" || name === "figure" || name === "article" || name === "aside") && EXAMPLE_ATTR.test(attrs);
+      if ((struck || example) && !selfClosing) {
+        out += src.slice(last, m.index) + " ";
+        skipDepth = 1;
+        last = tagRe.lastIndex;
+        continue;
+      }
+    }
+    out += src.slice(last, m.index) + tag;
+    last = tagRe.lastIndex;
+  }
+  out += src.slice(last);
+  return out;
+}
+
 // What the whole page says and does, read from its HTML.
 export function scoutHtml(html) {
-  const body = String(html || "")
+  const body = stripNonLive(String(html || "")
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, " ");
+    .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, " "));
   const text = textOf(body);
   const lower = text.toLowerCase();
   const words = text.split(/\s+/).filter(Boolean);
@@ -100,44 +144,115 @@ function whatItDoes(text, name) {
   return w.length ? w.slice(0, 8).join(" ").replace(/[,;:]$/, "") : "";
 }
 
+// Audience, including a comma/and list: "for landing pages, SaaS sites
+// and indie launches" is three audiences, not one. The FOR regex stops at
+// the first comma, so expand the list from the source text at that point,
+// stopping at the first segment that is not a short noun phrase.
+const AUDIENCE_STOP = new Set(["scored", "with", "without", "using", "based", "from", "that", "which", "who", "to", "for", "in", "on", "at", "by", "not", "free"]);
 function audienceOf(texts) {
   for (const t of texts) {
-    const m = String(t || "").match(FOR);
-    if (m) return m[1].trim().split(/\s+/).slice(0, 4).join(" ");
-    const w = String(t || "").match(WHO);
+    const s = String(t || "");
+    const m = s.match(FOR);
+    if (m) {
+      const off = m[0].search(/\bfor\s/i);
+      const rest = s.slice(m.index + (off >= 0 ? off + 3 : 0)).trim();
+      const segs = [];
+      for (const part of rest.split(/,\s*|\s+and\s+/)) {
+        const seg = part.trim().replace(/[.;:]+$/, "").split(/\s+to\s+/)[0].trim();
+        if (!seg) continue;
+        const first = seg.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+        if (AUDIENCE_STOP.has(first) || seg.split(/\s+/).length > 3) break;
+        segs.push(seg);
+        if (segs.length >= 3) break;
+      }
+      if (segs.length === 1) return segs[0];
+      if (segs.length === 2) return `${segs[0]}, ${segs[1]}`;
+      if (segs.length >= 3) return `${segs.slice(0, -1).join(", ")} and ${segs[segs.length - 1]}`;
+      return m[1].trim().split(/\s+/).slice(0, 4).join(" ");
+    }
+    const w = s.match(WHO);
     if (w) return w[0];
   }
   return "";
 }
 
-function buttonFor(page, name) {
-  const t = page.lower;
-  if (/free trial/.test(t)) return "Start your free trial";
-  if (/waitlist|wait list|early access/.test(t)) return "Join the waitlist";
-  if (/book a (?:call|demo)|schedule a demo|get a demo/.test(t)) return "Book a 15-minute demo";
-  if (/app store|google play/.test(t)) return `Get ${name} on your phone`;
-  if (/\bfree\b|no card|no credit card/.test(t)) return `Try ${name} free`;
+// The button is the page's own main button, never a funnel step guessed from
+// words found anywhere on the page. Guessing from full text is how a free,
+// no-signup page ended up with "Join the waitlist": the word "waitlist"
+// appeared somewhere in the copy, but no button on the page said that.
+const SECONDARY_BUTTON = /^(try another|see how it works|learn more|read more|view|back|close|menu|sign in|log in|skip)\b/i;
+function buttonFor(ctas, name) {
+  const labels = (ctas || []).map((t) => String(t || "").trim()).filter((t) => t && t.length <= 60);
+  const main = labels.find((t) => !SECONDARY_BUTTON.test(t) && ACTION.test(t))
+    || labels.find((t) => !SECONDARY_BUTTON.test(t))
+    || labels[0];
+  if (main) return cap(main);
   return `Get started with ${name}`;
+}
+
+// Strip the audience out of "what it does": the templates add "for {who}"
+// themselves, so a "what" that already contains "for {who}" reads twice.
+// Also handles the case where whatItDoes truncated the audience mid-phrase.
+function stripAudience(what, who) {
+  let s = String(what || "");
+  if (!who) return s;
+  const esc = who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const first = who.split(/[\s,]+/).filter(Boolean)[0];
+  if (first) {
+    // Cut from the "for" that starts the audience, audience list and all.
+    // This must run before any partial removal, or it leaves an orphan tail
+    // like ", SaaS sites" behind. It also covers the case where "what" was
+    // truncated mid-list and who is only its first part.
+    const m = s.match(new RegExp(`\\bfor\\s+${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i"));
+    if (m && m.index !== undefined) s = s.slice(0, m.index).trim();
+  }
+  s = s.replace(new RegExp(`\\bfor\\s+${esc}\\b`, "i"), " ");
+  s = s.replace(new RegExp(`\\b${esc}\\b`, "i"), " ");
+  return s.replace(/\s{2,}/g, " ").replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/\s+(and|&)\s*$/, "").replace(/[,;:]$/, "").trim();
+}
+
+// A "what" that starts with a noun ("13 first-screen checks") needs a verb
+// before it can follow "helps ... to" or "helps ...". Verb-led phrases pass through.
+const VERB_START = /^(get|find|see|check|know|understand|fix|improve|turn|make|create|build|launch|grow|save|stop|start|discover|measure|score|run|try|use|book|join|buy|order|send|share|track|monitor|protect|audit|test|scan|verify|compare|calculate)\b/i;
+const verbWhat = (what) => (VERB_START.test(what) ? what : `get ${lowerFirst(what)}`);
+
+// Guard against a headline that repeats itself: any 3-word run appearing
+// twice, or "for" appearing twice, means the parts overlapped again.
+function repeatsItself(h) {
+  const words = String(h || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+  const seen = new Set();
+  for (let i = 0; i + 2 < words.length; i++) {
+    const gram = words.slice(i, i + 3).join(" ");
+    if (seen.has(gram)) return true;
+    seen.add(gram);
+  }
+  return (String(h).match(/\bfor\b/gi) || []).length > 1;
 }
 
 export function rewrites({ h1, subhead, description, title, host, ctas, fullText }) {
   const name = productName(title, host);
-  const what = whatItDoes(subhead || description || h1, name) || "[what it does, in plain words]";
-  const who = audienceOf([h1, subhead, description, title, fullText]) || "[who it's for]";
+  const rawWhat = whatItDoes(subhead || description || h1, name);
+  // Audience is a noun ("teams", "landing pages"), not a verb phrase: a
+  // "for teams to track work" capture must stop at "teams", or every
+  // template that adds "to" after it reads twice.
+  const whoRaw = audienceOf([h1, subhead, description, title, fullText]) || "[who it's for]";
+  const who = whoRaw.split(/\s+(?:to|that|which|who|when|where)\s+/)[0].replace(/[,;:]$/, "").trim() || whoRaw;
+  const what = stripAudience(rawWhat, who) || rawWhat || "[what it does, in plain words]";
+  const doing = verbWhat(what);
   const proof = (fullText.match(/\b\d[\d,.]*\s?(?:k|m)?\+?\s+(?:users|customers|teams|companies|founders|businesses|people|downloads|reviews|creators|stores|members|developers)\b/i) || [""])[0];
+  const fallback = `${cap(what)} for ${who}.`;
   const headlines = [
     `${cap(what)} for ${who}.`,
     `${cap(who)}: ${lowerFirst(what)}, without [the slow part].`,
-    `The simple way for ${who} to ${lowerFirst(what)}.`,
-  ].map((h) => h.replace(/\s{2,}/g, " "));
-  const page = { lower: String(fullText || "").toLowerCase() };
+    `The simple way for ${who} to ${lowerFirst(doing)}.`,
+  ].map((h) => h.replace(/\s{2,}/g, " ")).map((h) => (repeatsItself(h) ? fallback : h));
   return {
     product: name,
     found: { what, who, proof },
     before: { headline: h1 || "", subhead: subhead || description || "", buttons: (ctas || []).slice(0, 4) },
     headlines,
-    subhead: `${name} helps ${who} ${lowerFirst(what)}. ${proof ? `Trusted by ${proof}.` : "[One proof point: a number, a customer, or a result.]"}`,
-    button: buttonFor(page, name),
+    subhead: `${name} helps ${who} ${lowerFirst(doing)}. ${proof ? `Trusted by ${proof}.` : "[One proof point: a number, a customer, or a result.]"}`,
+    button: buttonFor(ctas, name),
     secondary: "See how it works",
     rules: ["Short enough to read in one glance", "No pitch-deck words", "Says who it's for", "One main button that says what happens next"],
   };
@@ -155,7 +270,17 @@ export function rankFixes(stamp, scout) {
     if (!s.proof && !s.logos && !s.stat) out.push({ title: "Nobody vouches for it", problem: "No testimonials, customer logos, ratings, or usage numbers anywhere on the page.", fix: "Add 2 or 3 short quotes with a real name and face, or the logos of who uses it, right under the first screen.", impact: "High", from: "Page scout" });
     if (s.longestForm > 5) out.push({ title: "The form asks too much", problem: `The longest form has ${s.longestForm} fields.`, fix: "Ask for an email only. Get the rest after they're in.", impact: "High", from: "Page scout" });
     if (!s.closingCta) out.push({ title: "No ask at the end", problem: "Someone who reads to the bottom finds no button to act on.", fix: "Repeat the main button in a closing section with one line on what happens next.", impact: "Medium", from: "Page scout" });
-    if (s.ctaLabels.length > 4) out.push({ title: "Too many different asks", problem: `${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`, fix: "Pick one main action and use the same words on every main button.", impact: "Medium", from: "Page scout" });
+    if (s.ctaLabels.length > 4) {
+      // Same problem as the first-screen "Buttons don't fight each other"
+      // check, told twice. Merge into that entry instead of listing both.
+      const buttons = out.find((f) => f.title === "Buttons don't fight each other");
+      if (buttons) {
+        buttons.problem += ` ${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`;
+        buttons.fix = "Pick one main action and use the same words on every main button. Keep one main button on the first screen and one quiet second choice at most.";
+      } else {
+        out.push({ title: "Too many different asks", problem: `${s.ctaLabels.length} different button labels: ${s.ctaLabels.slice(0, 5).join(", ")}.`, fix: "Pick one main action and use the same words on every main button.", impact: "Medium", from: "Page scout" });
+      }
+    }
     if (!s.riskReversal) out.push({ title: "Nothing lowers the risk", problem: "No free trial, guarantee, 'no card', or 'cancel anytime' anywhere.", fix: "Say what it costs to try: free, no card, or cancel anytime. Put it under the main button.", impact: "Medium", from: "Page scout" });
     if (s.we > s.you && s.we > 8) out.push({ title: "It talks about itself", problem: `“We/our/us” ${s.we} times, “you/your” ${s.you} times.`, fix: "Rewrite the top sections around what the visitor gets, in 'you' words.", impact: "Medium", from: "Page scout" });
     if (s.fog.length >= 3) out.push({ title: "Pitch-deck words across the page", problem: `Found: ${s.fog.join(", ")}.`, fix: "Swap each for what it actually does, in words a stranger can picture.", impact: "Medium", from: "Page scout" });

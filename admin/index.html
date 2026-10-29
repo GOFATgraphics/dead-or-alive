@@ -41,7 +41,17 @@
 
       <div class="app" id="app" hidden>
         <aside class="side">
+          <div class="side-top">
+            <span class="side-top-label">Menu</span>
+            <button type="button" class="side-toggle" id="side-toggle" aria-expanded="true" aria-label="Collapse sidebar"></button>
+          </div>
+          <div class="side-search">
+            <svg class="side-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+            <input type="search" id="side-search" placeholder="Search sections…" aria-label="Search sections" autocomplete="off" />
+            <kbd>⌘K</kbd>
+          </div>
           <nav class="side-nav" id="side-nav" aria-label="Admin"></nav>
+          <div class="side-foot" id="side-foot" hidden></div>
         </aside>
 
         <div class="main">
@@ -60,6 +70,7 @@
             </header>
             <div class="ad-tools">
               <input type="search" id="st-q" placeholder="Search site or account" aria-label="Search stamps on this page" />
+              <label><input type="checkbox" id="st-claimed" /> Claimed only</label>
               <div class="ad-seg" id="st-v" role="group" aria-label="Verdict">
                 <button type="button" data-v="" aria-pressed="true">All</button>
                 <button type="button" data-v="DEAD" aria-pressed="false">Dead</button>

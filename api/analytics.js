@@ -25,6 +25,32 @@ function lastDays(n) {
 }
 const sum = (rows, key) => rows.reduce((a, r) => a + (r[key] || 0), 0);
 const top = (map, n = 10) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, count]) => ({ name, count }));
+const allTop = (map) => top(map, 1000);
+// Where a visitor came from, in plain words: a search engine, a social app, a link on
+// another site, a named link you posted (?ref= / ?utm_source=), or Direct (no referrer
+// recorded: typed URL, bookmark, app, or a browser that strips referrers).
+function channelOf(name) {
+  const n = String(name || "").toLowerCase();
+  if (n === "direct") return "Direct";
+  if (n.includes("google") || n.includes("bing") || n.includes("duckduckgo") || n.includes("yahoo") || n.includes("brave") || n.includes("ecosia") || n.includes("yandex") || n.includes("baidu")) return "Search";
+  if (n.includes("twitter") || n === "x" || n.includes("x.com") || n.includes("linkedin") || n.includes("facebook") || n.includes("instagram") || n.includes("youtube") || n.includes("reddit") || n.includes("tiktok") || n.includes("threads") || n.includes("bluesky") || n.includes("pinterest") || n.includes("discord") || n.includes("telegram") || n.includes("whatsapp")) return "Social";
+  if (n.includes(".")) return "Referral";
+  return "Campaign";
+}
+function channels(list) {
+  const map = new Map();
+  for (const { name, count } of list) {
+    const ch = channelOf(name);
+    let e = map.get(ch);
+    if (!e) { e = { channel: ch, visits: 0, sources: [] }; map.set(ch, e); }
+    e.visits += count;
+    e.sources.push({ name, count });
+  }
+  const total = [...map.values()].reduce((s, e) => s + e.visits, 0);
+  return [...map.values()]
+    .sort((x, y) => y.visits - x.visits)
+    .map((e) => ({ ...e, share: total ? Math.round((e.visits / total) * 100) : 0, sources: e.sources.sort((x, y) => y.count - x.count) }));
+}
 
 async function traffic(days) {
   const cmds = [];
@@ -56,6 +82,10 @@ async function traffic(days) {
     verdictShares: { DEAD: totals["share_copy:v:DEAD"], COPE: totals["share_copy:v:COPE"], ALIVE: totals["share_copy:v:ALIVE"] },
     referrers: top(zsum["ref:home"]),
     resultReferrers: top(zsum["ref:result"]),
+    referrerTotal: [...zsum["ref:home"].values()].reduce((s, v) => s + v, 0),
+    resultReferrerTotal: [...zsum["ref:result"].values()].reduce((s, v) => s + v, 0),
+    channels: channels(allTop(zsum["ref:home"])),
+    resultChannels: channels(allTop(zsum["ref:result"])),
     countries: top(zsum.country),
     devices: top(zsum.device, 3),
     errors: top(zsum.err),

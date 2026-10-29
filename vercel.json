@@ -36,6 +36,14 @@
     {
       "source": "/auth/confirm",
       "destination": "/api/account?op=confirm"
+    },
+    {
+      "source": "/status/:id",
+      "destination": "/api/monitor-status?id=:id"
+    },
+    {
+      "source": "/status-badge/:id",
+      "destination": "/api/monitor-status?id=:id&badge=1"
     }
   ],
   "headers": [
@@ -44,7 +52,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://*.public.blob.vercel-storage.com; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://pbs.twimg.com; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         },
         {
           "key": "X-Frame-Options",
@@ -106,6 +114,15 @@
     },
     {
       "source": "/dashboard(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/status(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

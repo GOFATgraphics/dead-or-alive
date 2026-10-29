@@ -316,26 +316,32 @@ function chip(s) {
   return li;
 }
 
-// Doubles the chips so the loop is seamless (the copies are hidden from screen readers), and paces the speed.
+// Once only, but moving again: each stamp shows once, no loop clones, and the strip
+// auto-scrolls like the old marquee. It scrolls to the end, pauses, then starts over,
+// instead of cloning the strip for a seamless loop, which is what made one page appear
+// several times. Pauses while you hover or focus it, and stays still for reduced motion.
+let mqTimer = null;
 function loopTrack() {
   const track = $("#mq-track");
   if (!track) return;
   [...track.querySelectorAll("[data-clone]")].forEach((n) => n.remove());
-  const items = [...track.children];
-  // Short lists repeat until the strip is wide enough to loop without a gap.
-  let copies = items.length < 6 ? Math.ceil(6 / Math.max(1, items.length)) : 1;
-  const extra = [];
-  for (let i = 1; i < copies; i++) extra.push(...items.map((n) => n.cloneNode(true)));
-  extra.forEach((n) => n.setAttribute("aria-hidden", "true"));
-  track.append(...extra);
-  const half = [...track.children];
-  half.forEach((n) => {
-    const c = n.cloneNode(true);
-    c.dataset.clone = "";
-    c.setAttribute("aria-hidden", "true");
-    track.append(c);
-  });
-  track.style.setProperty("--mq-dur", `${Math.max(20, half.length * 4.5)}s`);
+  track.style.animation = "none";
+  const win = track.closest(".mq-window");
+  if (!win || still) return;
+  if (mqTimer) clearInterval(mqTimer);
+  let paused = false, rest = 0;
+  win.addEventListener("mouseenter", () => { paused = true; });
+  win.addEventListener("mouseleave", () => { paused = false; });
+  win.addEventListener("focusin", () => { paused = true; });
+  win.addEventListener("focusout", () => { paused = false; });
+  mqTimer = setInterval(() => {
+    if (paused || document.hidden) return;
+    const max = win.scrollWidth - win.clientWidth;
+    if (max <= 0) return;
+    if (rest > 0) { rest--; return; }
+    if (win.scrollLeft >= max - 1) { win.scrollLeft = 0; rest = 50; return; }
+    win.scrollLeft += 1;
+  }, 30);
 }
 
 loopTrack();

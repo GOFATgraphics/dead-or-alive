@@ -1,0 +1,36 @@
+/* Public status page. A real stylesheet, not inline styles: the site CSP is
+   style-src 'self', so an inline <style> block is blocked by the browser and the
+   page renders unstyled. This file is served from /status.css, same origin. */
+body { margin: 0; background: #f6f5fc; color: #12132a; font-family: -apple-system, Segoe UI, Helvetica, Arial, sans-serif; }
+.bar { display: flex; align-items: center; gap: 0.6rem; max-width: 42rem; margin: 0 auto; padding: 1.25rem 1rem 0; }
+.bar img { display: block; }
+.bar span { font-weight: 800; letter-spacing: -0.01em; }
+.bar em { margin-left: auto; padding: 0.25rem 0.65rem; border: 1px solid #e6e3f1; border-radius: 999px; background: #fff; font-size: 0.75rem; font-style: normal; font-weight: 700; color: #5d6180; }
+main { max-width: 42rem; margin: 1.25rem auto 0; padding: 0 1rem 3rem; }
+.card { background: #fff; border: 1px solid #e6e3f1; border-radius: 16px; padding: 1.5rem 1.75rem; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: #5d6180; }
+h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin: 0.5rem 0; overflow-wrap: anywhere; }
+.pill { display: inline-block; padding: 0.35rem 0.85rem; border-radius: 999px; font-weight: 800; font-size: 0.9375rem; }
+.pill.up { background: #dcfce7; color: #15803d; }
+.pill.down { background: #fee2e2; color: #b91c1c; }
+.pill.checking { background: #f6f5fc; color: #5d6180; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.5rem 0 0; }
+.kpi { border: 1px solid #e6e3f1; border-radius: 12px; padding: 1rem 1.1rem; }
+.kpi b { display: block; font-size: 1.375rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.kpi span { display: block; margin-top: 0.25rem; font-size: 0.8125rem; color: #5d6180; }
+.muted { color: #5d6180; font-size: 0.875rem; }
+h2 { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; margin: 1.75rem 0 0.5rem; }
+.dots { display: flex; flex-wrap: wrap; gap: 5px; margin: 0.75rem 0; }
+.dot { width: 14px; height: 14px; border-radius: 4px; background: #e6e3f1; }
+.dot.up { background: #22c55e; }
+.dot.down { background: #ef4444; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid #e6e3f1; }
+th { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #5d6180; }
+.btn { display: inline-block; margin-top: 1.25rem; background: #12132a; color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9375rem; border-radius: 12px; padding: 0.8rem 1.25rem; }
+footer { max-width: 42rem; margin: 0 auto; padding: 0 1rem 2rem; text-align: center; color: #5d6180; font-size: 0.85rem; }
+footer a { color: #12132a; font-weight: 700; }
+@media (max-width: 560px) {
+  .card { padding: 1.25rem; }
+  .grid { grid-template-columns: 1fr; }
+}

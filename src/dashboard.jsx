@@ -8,11 +8,13 @@ import { Toast } from "./toast.jsx";
 import { DESK, PLANS } from "./config.js";
 import { REVIEW_STEPS, planHref, point } from "./plans.js";
 import { track, trackView } from "./track.js";
+import { embedSvg, svgUri, tierFor } from "./badge.js";
+import { snapshotRows } from "./snapshot.js";
 import { hasChecked, markChecked } from "./checked.js";
 
 // The dashboard: sign up or in, then everything a membership includes, in one place.
 // URL: ?plan=killSheet|stayAlive&url=… (buying: account first, then checkout), ?paid=…&checkout_id=… (back from checkout),
-// ?save=<stamp id> (save a free stamp), ?mode=signup|login, ?link=expired.
+// ?save=<stamp id> (save a free stamp), ?claim=<stamp id> (manual site claim), ?mode=signup|login, ?link=expired.
 
 const params = new URLSearchParams(location.search);
 const PLAN = PLANS[params.get("plan")] ? params.get("plan") : "";
@@ -47,6 +49,25 @@ async function api(op, data = {}) {
   const body = await r.json().catch(() => ({}));
   if (!r.ok && r.status !== 202) throw Object.assign(new Error(body.error || `Error ${r.status}.`), { body, status: r.status });
   return body;
+}
+
+
+function Copy({ text, label, done = "Copied", className = "btn btn-line btn-sm" }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button type="button" className={className} onClick={async () => {
+      try { await navigator.clipboard.writeText(text); } catch (_) {
+        const el = document.createElement("textarea"); el.value = text; document.body.appendChild(el); el.select(); document.execCommand("copy"); el.remove();
+      }
+      setOk(true); setTimeout(() => setOk(false), 2000);
+    }}>{ok ? done : label}</button>
+  );
+}
+
+// Badge embed code for one stamp, steel or dark, as on the result page.
+function badgeEmbed(s, theme) {
+  const origin = location.origin;
+  return `<a href="${origin}/v/${s.id}"><img src="${origin}/badge/${s.id}${theme === "steel" ? "" : `?theme=${theme}`}" alt="${s.host}, alive on Stamp My Page" width="300" height="64"></a>`;
 }
 
 function Bar({ user, onOut }) {
@@ -102,7 +123,12 @@ function Auth({ setup, onIn }) {
   const [busy, setBusy] = useState(false);
   const xNote = X_NOTE[params.get("x")];
   const [msg, setMsg] = useState(params.get("link") === "expired" ? { bad: true, text: "That sign-in link expired or was already used. Send a new one." } : xNote ? { bad: true, text: xNote } : null);
-  const [wrong, setWrong] = useState(false);
+  const [codeFor, setCodeFor] = useState("");
+  const [forgot, setForgot] = useState(false);
+  const [resetFor, setResetFor] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [resetVerified, setResetVerified] = useState(false);
   const plan = PLANS[PLAN];
   // Where X sends them back to: the same dashboard URL (plan, page, stamp to save), minus old X notes.
   const next = (() => {
@@ -120,26 +146,112 @@ function Auth({ setup, onIn }) {
     setMsg(null);
     try {
       const out = await api("continue", { email: f.get("email"), password: f.get("password"), jobs: jobs(), next });
-      if (out.sent) setMsg({ text: out.note || "Check your email for a sign-in link." });
+      if (out.sent) {
+        if (out.code) setCodeFor(f.get("email"));
+        setMsg({ text: out.note || "Check your email for a sign-in link." });
+      }
       else {
         track(out.created ? "signup" : "login", { plan: PLAN || "none" });
         onIn(out);
       }
     } catch (err) {
-      setWrong(err.body?.code === "wrongpass");
       setMsg({ bad: true, text: err.message });
     } finally {
       setBusy(false);
     }
   }
-  async function link(e) {
+  // Resend the code inside the code box only. There is no link or code option on the main form:
+  // email, password, Continue, then the code. That's the whole sign-in.
+  async function sendCode(e) {
     const form = e.currentTarget.closest("form");
-    const email = new FormData(form).get("email");
+    const email = (form && new FormData(form).get("email")) || codeFor;
     if (!email) return setMsg({ bad: true, text: "Enter your email first." });
     setBusy(true);
     try {
-      await api("sendlink", { email, next });
-      setMsg({ text: `We sent a sign-in link to ${email}. It works once, for 15 minutes.` });
+      const out = await api("sendcode", { email, next });
+      setCodeFor(email);
+      setMsg({ text: out.note || `We sent a code to ${email}.` });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  // Forgot password: a link on the form, not a sign-in option. It opens a reset card: email, then a
+  // code, then a new password. After the reset, the user signs in the normal way.
+  function openForgot(e) {
+    const form = e.currentTarget.closest("form");
+    const email = form && new FormData(form).get("email");
+    if (email) setResetFor(email);
+    setForgot(true);
+    setResetSent(false);
+    setResetVerified(false);
+    setResetToken("");
+    setMsg(null);
+  }
+  async function sendReset(e) {
+    if (e.preventDefault) e.preventDefault();
+    const form = e.currentTarget.closest("form");
+    const email = (form && new FormData(form).get("email")) || resetFor;
+    if (!email) return setMsg({ bad: true, text: "Enter your email first." });
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("forgot", { email });
+      setResetFor(email);
+      setResetSent(true);
+      setMsg({ text: out.note || `We sent a code to ${email}.` });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verifyResetCode(e) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("verify-reset-code", { email: resetFor, token: f.get("code") });
+      setResetToken(out.resetToken);
+      setResetVerified(true);
+      setMsg({ text: out.note || "Code confirmed. Create your new password." });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resetPassword(e) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    if (f.get("password") !== f.get("confirm")) return setMsg({ bad: true, text: "The two passwords don't match. Type them again." });
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("reset-password", { resetToken, password: f.get("password"), confirm: f.get("confirm") });
+      setForgot(false);
+      setResetSent(false);
+      setResetVerified(false);
+      setResetToken("");
+      setResetFor("");
+      setMsg({ text: out.note || "Password changed. Sign in with your new password." });
+    } catch (err) {
+      setMsg({ bad: true, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verifyCode(e) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api("verify-code", { email: codeFor, token: f.get("code"), jobs: jobs(), next });
+      track("login", { plan: PLAN || "none" });
+      onIn(out);
     } catch (err) {
       setMsg({ bad: true, text: err.message });
     } finally {
@@ -175,7 +287,7 @@ function Auth({ setup, onIn }) {
         )}
       </div>
 
-      <form className="auth-card" onSubmit={submit}>
+      {!forgot && !codeFor && (<form className="auth-card" onSubmit={submit}>
         <h2 className="auth-h">{plan ? "Continue to checkout" : "Sign up or sign in"}</h2>
         {setup?.x && (
           <>
@@ -185,12 +297,39 @@ function Auth({ setup, onIn }) {
         )}
         <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200} /></label>
         <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
-        <p className="fine">New here? Pick any password with 8 or more characters and your account is made. Been here before? Use the one you set.</p>
+        <button type="button" className="link quiet-link" onClick={openForgot} disabled={busy}>Forgot password?</button>
+        <p className="fine">New here? Pick any password with 8 or more characters, then enter the code we send to your email. Been here before? Use the one you set, then enter the code we send.</p>
         <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Continue"}</button>
         {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
-        {setup?.emailLinks && (wrong || !msg) && <button type="button" className="link quiet-link" onClick={link} disabled={busy}><Icon name="mail" /> {wrong ? "Forgot it? Email me a sign-in link" : "Or email me a sign-in link, no password"}</button>}
         <p className="fine">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
-      </form>
+      </form>)}
+      {forgot && (
+        <form className="auth-card" onSubmit={resetVerified ? resetPassword : resetSent ? verifyResetCode : sendReset}>
+          <h2 className="auth-h">Reset your password</h2>
+          <p className="sect-sub">Enter your email, we send a code. Enter the code, then create a new password and confirm it. After that, sign in with the new password.</p>
+          {!resetVerified && <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200} defaultValue={resetFor} /></label>}
+          {resetSent && !resetVerified && <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={8} placeholder="Enter code" /></label>}
+          {resetVerified && (<>
+            <label>Create new password<input name="password" type="password" autoComplete="new-password" required /></label>
+            <label>Confirm new password<input name="confirm" type="password" autoComplete="new-password" required /></label>
+          </>)}
+          <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : resetVerified ? "Set new password" : resetSent ? "Verify code" : "Send reset code"}</button>
+          {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
+          {resetSent && !resetVerified && <button type="button" className="link quiet-link" onClick={sendReset} disabled={busy}>Send a new code</button>}
+          <button type="button" className="link quiet-link" onClick={() => { setForgot(false); setResetSent(false); setResetVerified(false); setResetToken(""); setMsg(null); }} disabled={busy}>Back to sign in</button>
+        </form>
+      )}
+      {codeFor && (
+        <form className="auth-card" onSubmit={verifyCode}>
+          <h2 className="auth-h">Enter the code</h2>
+          <p className="sect-sub">We sent a code to {codeFor}. Enter it to finish signing in.</p>
+          <label>Code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={8} placeholder="Enter code" /></label>
+          <button className="btn btn-red" type="submit" disabled={busy}>{busy ? "One moment…" : "Verify code"}</button>
+          {msg && <p className={msg.bad ? "alert" : "note"} role={msg.bad ? "alert" : "status"}>{msg.text}</p>}
+          <button type="button" className="link quiet-link" onClick={sendCode} disabled={busy}>Send a new code</button>
+          <button type="button" className="link quiet-link" onClick={() => { setCodeFor(""); setMsg(null); }} disabled={busy}>Use a different email</button>
+        </form>
+      )}
     </main>
   );
 }
@@ -461,7 +600,7 @@ function StayAlive({ user, monitors, onChange }) {
   return (
     <>
       <Sites user={user} sites={sites} pick={pick} setPick={setPick} onChange={onChange} />
-      {m && <SiteMonitor monitor={m} />}
+      {m && <SiteMonitor key={m.url} monitor={m} onChange={onChange} />}
     </>
   );
 }
@@ -521,7 +660,7 @@ function Sites({ user, sites, pick, setPick, onChange }) {
       <ul className="site-list">
         {sites.map((s, i) => {
           const last = s.checks?.at(-1);
-          const state = s.paused ? ["", "Paused"] : !s.checks ? ["run", "Starting"] : last?.ok === false ? ["bad", "Down"] : ["ok", "Up"];
+          const state = s.pausedManual ? ["", "Paused"] : s.paused ? ["", "Paused"] : !s.checks ? ["run", "Starting"] : last?.ok === false ? ["bad", "Down"] : ["ok", "Up"];
           return (
             <li key={s.url} className={i === pick ? "on" : ""}>
               <button type="button" className="site-pick" onClick={() => setPick(i)} aria-pressed={i === pick}>
@@ -555,7 +694,52 @@ function Sites({ user, sites, pick, setPick, onChange }) {
   );
 }
 
-function SiteMonitor({ monitor }) {
+function TrendChart({ points }) {
+  if (points.length < 2) return null;
+  const vals = points.map((x) => x.v);
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  const pts = points.map((x, i) => `${(i / (points.length - 1)) * 280 + 10},${70 - ((x.v - min) / span) * 55}`).join(" ");
+  return (
+    <svg className="trend-chart" viewBox="0 0 300 80" role="img" aria-label={`Trend from ${points[0].v} to ${points[points.length - 1].v}`}>
+      <polyline points={pts} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((x, i) => <circle key={i} cx={(i / (points.length - 1)) * 280 + 10} cy={70 - ((x.v - min) / span) * 55} r="3" fill="var(--card)" stroke="var(--ink)" strokeWidth="1.5" />)}
+    </svg>
+  );
+}
+function monthRows(checks) {
+  const by = {};
+  for (const c of checks || []) {
+    const d = new Date(c.at);
+    if (Number.isNaN(d.getTime())) continue;
+    const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    (by[k] ||= { month: k, checks: 0, up: 0, ms: 0, ok: 0 });
+    by[k].checks++;
+    if (c.ok) { by[k].up++; by[k].ms += c.ms || 0; by[k].ok++; }
+  }
+  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1)).map((m) => ({ ...m, uptime: m.checks ? Math.round((m.up / m.checks) * 1000) / 10 : null, avgMs: m.ok ? Math.round(m.ms / m.ok) : null }));
+}
+function incidentRows(checks) {
+  const out = []; let cur = null;
+  for (const c of checks || []) {
+    if (!c.ok && !cur) cur = { start: c.at };
+    if (c.ok && cur) { cur.end = c.at; out.push(cur); cur = null; }
+  }
+  if (cur) out.push({ ...cur, ongoing: true });
+  return out.reverse();
+}
+function SiteMonitor({ monitor, onChange }) {
+  const [busy, setBusy] = useState("");
+  const [note, setNote] = useState("");
+  const [alertDown, setAlertDown] = useState(monitor.alerts?.down !== false);
+  const [alertChanges, setAlertChanges] = useState(monitor.alerts?.changes !== false);
+  const [quietStart, setQuietStart] = useState(monitor.alerts?.quietStart ?? "");
+  const [quietEnd, setQuietEnd] = useState(monitor.alerts?.quietEnd ?? "");
+  const [webhook, setWebhook] = useState(monitor.webhookUrl || "");
+  const run = async (key, fn) => {
+    setBusy(key); setNote("");
+    try { onChange && onChange(await fn()); setNote(key === "report" ? "Report sent to your email." : "Saved."); }
+    catch (x) { setNote(x.message); } finally { setBusy(""); }
+  };
   const checks = monitor?.checks || [];
   const last = checks[checks.length - 1];
   const up = checks.length ? Math.round((checks.filter((c) => c.ok).length / checks.length) * 1000) / 10 : null;
@@ -573,7 +757,7 @@ function SiteMonitor({ monitor }) {
         </div>
       </div>
       {monitor.paused && <p className="note">Paused: you have more sites than site slots. Add a slot or remove a site to watch it again.</p>}
-      {!monitor.paused && !ready && <Working text="Switching monitoring on: first uptime check and re-stamp are running." />}
+      {!monitor.paused && !monitor.pausedManual && !ready && <Working text="Switching monitoring on: first uptime check and re-stamp are running." />}
       {ready && (
         <>
           <dl className="scout">
@@ -589,6 +773,70 @@ function SiteMonitor({ monitor }) {
             </div>
           )}
           {monitor.restampRunning && <Working text="Re-stamping your page now." />}
+          <h3>History</h3>
+          {(() => {
+            const months = monthRows(checks);
+            const scores = (monitor.restamps || []).filter((r) => !r.failed && r.score != null).map((r) => ({ v: r.score, at: r.at }));
+            const speeds = checks.slice(-30).filter((c) => c.ok).map((c) => ({ v: c.ms || 0, at: c.at }));
+            const incs = incidentRows(checks);
+            return (
+              <>
+                {scores.length > 1 && (<><p className="muted">Score trend: {scores[0].v} to {scores[scores.length - 1].v} across {scores.length} re-stamps.</p><TrendChart points={scores} /></>)}
+                {speeds.length > 1 && (<><p className="muted">Server answer, last {speeds.length} good checks.</p><TrendChart points={speeds} /></>)}
+                {months.length > 0 && (
+                  <table className="hist-table" aria-label="Uptime by month"><thead><tr><th>Month</th><th>Checks</th><th>Uptime</th><th>Avg answer</th></tr></thead><tbody>
+                    {months.map((mo) => (<tr key={mo.month}><td>{mo.month}</td><td>{mo.checks}</td><td>{mo.uptime != null ? `${mo.uptime}%` : "—"}</td><td>{mo.avgMs != null ? `${mo.avgMs} ms` : "—"}</td></tr>))}
+                  </tbody></table>
+                )}
+                <p className="muted">Outages in this history: {incs.length ? "" : "none."}</p>
+                {incs.length > 0 && (<ul className="history">{incs.map((i, idx) => (<li key={idx}><span className="v-chip">{i.ongoing ? "ONGOING" : "DOWN"}</span><span>{fmtDate(i.start)}{i.end ? ` to ${fmtDate(i.end)}` : ", still down"}</span></li>))}</ul>)}
+                <div className="row-actions">
+                  <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("report", () => api("report-now", { url: monitor.url }))}>{busy === "report" ? "Sending…" : "Email me this week's report now"}</button>
+                  {note && <span className="muted">{note}</span>}
+                </div>
+              </>
+            );
+          })()}
+          <h3>Public status page</h3>
+          <p className="muted">Optional, off by default. When on, anyone with the link sees only uptime, speed, and the latest stamp for this site, never your email, your stack, or your changes.</p>
+          {monitor.publicId ? (
+            <div className="row-actions">
+              <a className="btn btn-line btn-sm" href={`/status/${monitor.publicId}`} target="_blank" rel="noopener noreferrer">Open public status page</a>
+              <Copy text={`${location.origin}/status/${monitor.publicId}`} label="Copy status link" done="Status link copied" />
+              <Copy text={`<a href="${location.origin}/status/${monitor.publicId}"><img src="${location.origin}/status-badge/${monitor.publicId}" alt="${monitor.url} status, monitored by StampMyPage"></a>`} label="Copy status badge" done="Badge copied" />
+              <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => run("public-off", () => api("public-status", { url: monitor.url, on: false }))}>{busy === "public-off" ? "Saving…" : "Turn public status off"}</button>
+            </div>
+          ) : (
+            <div className="row-actions">
+              <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("public-on", () => api("public-status", { url: monitor.url, on: true }))}>{busy === "public-on" ? "Saving…" : "Make status public"}</button>
+            </div>
+          )}
+          {monitor.pausedManual && <p className="note">Paused by you: no checks or alerts run for this site until you resume it.</p>}
+          <h3>Alerts</h3>
+          <p className="muted">Per site, not per account. Turning an alert off never stops the checks or the history, it only stops that notification.</p>
+          {!monitor.paused && (
+            <div className="row-actions">
+              {monitor.pausedManual
+                ? <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("resume", () => api("pause-site", { url: monitor.url, paused: false }))}>{busy === "resume" ? "Resuming…" : "Resume watching"}</button>
+                : <button type="button" className="btn btn-line btn-sm" disabled={!!busy} onClick={() => confirm(`Pause watching ${monitor.url}? No checks or alerts will run until you resume it.`) && run("pause", () => api("pause-site", { url: monitor.url, paused: true }))}>{busy === "pause" ? "Pausing…" : "Pause watching"}</button>}
+            </div>
+          )}
+          <div className="alert-form">
+            <label className="check"><input type="checkbox" checked={alertDown} onChange={(e) => setAlertDown(e.target.checked)} /> Down alerts by email</label>
+            <label className="check"><input type="checkbox" checked={alertChanges} onChange={(e) => setAlertChanges(e.target.checked)} /> Change alerts by email</label>
+            <div className="quiet-row">
+              <label>Quiet hours (UTC)<select value={quietStart} onChange={(e) => setQuietStart(e.target.value)}><option value="">Off</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
+              <span>to</span>
+              <label><span className="sr-only">Quiet hours end</span><select value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)}><option value="">Off</option>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}</select></label>
+            </div>
+            <p className="muted">Quiet hours silence change alerts only, never down alerts. A down page at night is still urgent, a stack change can wait until morning. Times are UTC.</p>
+            <label>Webhook URL (optional)<input type="url" value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://example.com/hooks/stampmypage" /></label>
+            <p className="muted">When set, down and change alerts also POST as JSON to this URL. Email stays on unless you turn it off above. Leave it blank to remove it.</p>
+            <div className="row-actions">
+              <button type="button" className="btn btn-dark btn-sm" disabled={!!busy} onClick={() => run("alerts", () => api("alerts", { url: monitor.url, down: alertDown, changes: alertChanges, quietStart: quietStart === "" ? null : Number(quietStart), quietEnd: quietEnd === "" ? null : Number(quietEnd), webhook }))}>{busy === "alerts" ? "Saving…" : "Save alert settings"}</button>
+              {note && <span className="muted">{note}</span>}
+            </div>
+          </div>
           <h3>Changes spotted</h3>
           {monitor.changes?.length ? (
             <ul className="changes">
@@ -760,12 +1008,141 @@ function StampTable({ stamps }) {
   );
 }
 
+
+function StampDetail({ stamp, onClose }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { scrollTo({ top: 0 }); }, [stamp.id]);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/verdict?id=${encodeURIComponent(stamp.id)}`, { cache: "no-store" })
+      .then((r) => r.json().then((b) => ({ ok: r.ok, b })))
+      .then(({ ok, b }) => { if (live) { if (!ok) setErr(b.error || "Could not load this stamp."); else setData(b); } })
+      .catch(() => live && setErr("Could not load this stamp."));
+    return () => { live = false; };
+  }, [stamp.id]);
+  const rows = data?.snapshot ? snapshotRows(data.snapshot) : [];
+  const checks = Array.isArray(data?.checks) ? data.checks : [];
+  return (
+    <div className="detail-page">
+      <button type="button" className="btn btn-line btn-sm detail-back" onClick={onClose}><Icon name="chevron-left" size={16} /> Back to Stamps</button>
+      <section className="panel detail-hero" aria-label={`Details for ${stamp.host}`}>
+        <div className="detail-hero-main">
+          <p className="muted">Stamps / {stamp.host}</p>
+          <h2>{stamp.icon ? <img src={stamp.icon} alt="" width="26" height="26" /> : null}{stamp.host}</h2>
+          <p><b className={"v-chip v-" + stamp.verdict.toLowerCase()}>{stamp.verdict}</b>{stamp.score != null && <span className="num"> {stamp.score} / 100</span>}<span className="muted"> · {fmtDate(stamp.at)}</span></p>
+          {err && <p className="alert" role="alert">{err}</p>}
+          {!data && !err && <p className="muted">Loading details…</p>}
+          {data && data.locked && <p className="note">Full details live on the result page. <a href={`/v/${stamp.id}`}>Open the result</a>.</p>}
+        </div>
+        <div className="row-actions detail-actions">
+          <a className="btn btn-dark btn-sm" href={`/v/${stamp.id}`}>Open full result</a>
+          <Copy text={`${location.origin}/v/${stamp.id}`} label="Copy link" done="Link copied" />
+        </div>
+      </section>
+      {rows.length > 0 && (
+        <section className="panel" aria-label="Tech stack and speed">
+          <header className="panel-head"><div><h2>Tech stack and speed</h2><p>What this page is built with, and how fast it loads.</p></div></header>
+          <div className="kv">{rows.map((r) => (<div key={r.label}><dt>{r.label}</dt><dd>{r.value}</dd></div>))}</div>
+        </section>
+      )}
+      {checks.length > 0 && (
+        <section className="panel" aria-label="Checks">
+          <header className="panel-head"><div><h2>Checks</h2><p>All 13 first-screen checks for this stamp.</p></div></header>
+          <ul className="status-list">{checks.map((c) => (
+            <li key={c.id || c.label}><span className={"dot " + (c.pass ? "ok" : c.skip ? "" : "bad")} /><div><b>{c.label}</b><p>{c.detail || (c.pass ? "Passed" : "Failed")}</p></div></li>
+          ))}</ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function MyCards({ user }) {
+  const stamps = user.stamps || [];
+  // One card per page, latest run only: stamps are newest first, so the first stamp
+  // per normalized host (lowercase, www. stripped) wins. Both kinds show: pages claimed
+  // with X, and pages saved to this account. Claimed pages are marked once their
+  // verdict check comes back, and a filter narrows the list to claimed only.
+  const deduped = [];
+  const seen = new Set();
+  for (const s of stamps) {
+    const key = String(s.host || "").toLowerCase().trim().replace(/^www\./, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(s);
+  }
+  const [claimed, setClaimed] = useState(new Set());
+  const [claimedOnly, setClaimedOnly] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.all(deduped.map((s) =>
+      fetch(`/api/verdict?id=${encodeURIComponent(s.id)}`, { cache: "no-store" })
+        .then((r) => r.json().catch(() => ({})))
+        .then((b) => (b.isOwner ? s.id : null))
+        .catch(() => null)
+    )).then((ids) => { if (live) setClaimed(new Set(ids.filter(Boolean))); });
+    return () => { live = false; };
+  }, [user.stamps]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = claimedOnly ? deduped.filter((s) => claimed.has(s.id)) : deduped;
+  return (
+    <Panel title="My cards" desc="One card per page, latest run only. Claimed pages and account pages both show here; claimed pages are marked. If you stamped a page more than once, only its newest run gets a card.">
+      {deduped.length ? (
+        <>
+          <div className="row-actions" style={{ marginTop: 0, marginBottom: "1rem" }}>
+            <button type="button" className={claimedOnly ? "btn btn-dark btn-sm" : "btn btn-line btn-sm"} onClick={() => setClaimedOnly(!claimedOnly)}>
+              {claimedOnly ? "Showing claimed only" : "Show claimed only"}
+            </button>
+            <span className="muted">{deduped.length} page{deduped.length === 1 ? "" : "s"} · {claimed.size} claimed</span>
+          </div>
+          <div className="stamp-cards">
+            {shown.map((s) => {
+              const tier = s.verdict === "ALIVE" ? tierFor(s.verdict, s.score) : null;
+              const isClaimed = claimed.has(s.id);
+              return (
+                <article key={s.id} className="stamp-card">
+                  <p className="stamp-card-host">{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : null}{s.host}{isClaimed && <b className="v-chip v-alive">Claimed</b>}</p>
+                  <p><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b>{s.score != null && <span className="num"> {s.score} / 100</span>}{tier && <span className="muted"> · {tier.name}</span>}</p>
+                  {tier && <img className="stamp-card-badge" src={svgUri(embedSvg({ tier, score: s.score, theme: "steel" }))} alt={`${tier.name}, alive on Stamp My Page`} width="300" height="64" />}
+                  <div className="row-actions">
+                    {tier && <><Copy text={badgeEmbed(s, "steel")} label="Copy steel badge" /><Copy text={badgeEmbed(s, "dark")} label="Copy dark badge" /></>}
+                    <Copy text={`${location.origin}/v/${s.id}`} label="Copy link" done="Link copied" />
+                    <a className="btn btn-line btn-sm" href={`/v/${s.id}`}>Open result</a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {!shown.length && <p className="note">No claimed pages yet. Tap a stamp's result page and claim it with X, and it will show here.</p>}
+        </>
+      ) : <Empty text="No stamps yet. Stamp a page and your cards show up here." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
+    </Panel>
+  );
+}
+
 function Stamps({ user }) {
   const stamps = user.stamps || [];
+  const [picked, setPicked] = useState(null);
+  if (picked) return <StampDetail stamp={picked} onClose={() => { setPicked(null); scrollTo({ top: 0 }); }} />;
   return (
-    <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
-      {stamps.length ? <StampTable stamps={stamps} /> : <Empty text="No stamps yet." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
-    </Panel>
+    <>
+      <Panel title="Stamps" desc="Every stamp saved to your account, newest first. Stamps you make while signed in are saved automatically. Tap Details on any stamp to open its full detail page." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp a page</a>}>
+        {stamps.length ? (
+          <div className="tbl" role="table" aria-label="Stamps">
+            <div className="tr th" role="row"><span role="columnheader">Site</span><span role="columnheader">Verdict</span><span role="columnheader">Score</span><span role="columnheader">Date</span><span role="columnheader" /></div>
+            {stamps.map((s) => (
+              <div key={s.id} className="tr" role="row">
+                <a className="site" role="cell" href={`/v/${s.id}`}>{s.icon ? <img src={s.icon} alt="" width="18" height="18" /> : <i>{s.host[0].toUpperCase()}</i>}{s.host}</a>
+                <span role="cell"><b className={"v-chip v-" + s.verdict.toLowerCase()}>{s.verdict}</b></span>
+                <span role="cell" className="num">{s.score ?? "n/a"}</span>
+                <span role="cell" className="muted">{fmtDate(s.at)}</span>
+                <span role="cell"><button type="button" className="btn btn-line btn-sm" onClick={() => setPicked(s)}>Details</button></span>
+              </div>
+            ))}
+          </div>
+        ) : <Empty text="No stamps yet." action={<a className="btn btn-dark btn-sm" href="/#top">Stamp your first page</a>} />}
+      </Panel>
+    </>
   );
 }
 
@@ -824,9 +1201,16 @@ function Overview({ user, report, monitor, go }) {
           </Panel>
         )}
       </div>
+{latest && latest.verdict === "ALIVE" && (() => { const tier = tierFor(latest.verdict, latest.score); return (
+        <Panel title="Your status badge" desc={`Your latest stamp, ${latest.host}, earned ${tier.name}. Copy a badge into your footer, it links back to that stamp.`} action={<button type="button" className="link" onClick={() => go("cards")}>All my cards</button>}>
+          <img className="stamp-card-badge" src={svgUri(embedSvg({ tier, score: latest.score, theme: "steel" }))} alt={`${tier.name}, alive on Stamp My Page`} width="300" height="64" />
+          <div className="row-actions"><Copy text={badgeEmbed(latest, "steel")} label="Copy steel badge" /><Copy text={badgeEmbed(latest, "dark")} label="Copy dark badge" /></div>
+        </Panel>
+      ); })()}
     </>
   );
 }
+
 
 function Settings({ user, onOut }) {
   const [msg, setMsg] = useState(null);
@@ -978,11 +1362,27 @@ function Dashboard({ data, setData, onOut }) {
   }, [running, data, banner, refresh]);
 
   // Free stamps from this browser: saved as soon as you're in. Came from a result page? Back to it.
+  // A ?save= stamp id is saved too, so a visitor who opens the result in another browser can
+  // still save it, not only the browser that made it. First saver still wins on the server.
+  // A ?claim= stamp id is a manual site claim, separate from saving: it sets the Owned by card,
+  // and only a Claim this site press sends it, never an automatic save.
   useEffect(() => {
     const j = jobs();
+    const saveId = params.get("save") || "";
+    const ids = /^[A-Za-z0-9_-]{6,40}$/.test(saveId) ? [saveId] : [];
+    const claimId = params.get("claim") || "";
+    const claimIds = /^[A-Za-z0-9_-]{6,40}$/.test(claimId) ? [claimId] : [];
     const back = params.get("back") || "";
     const done = () => /^\/v\/[A-Za-z0-9_-]{6,40}$/.test(back) && !PLAN && location.replace(`${back}?signedin=1`);
-    if (j.length) api("claim", { jobs: j }).then((out) => { forgetJobs(j); if (out.saved && out.user) setData((d) => ({ ...d, ...out })); }).catch(() => {}).finally(done);
+    const run = async () => {
+      if (j.length || ids.length) {
+        const out = await api("claim", { jobs: j, ids }).catch(() => ({}));
+        forgetJobs(j);
+        if (out.saved && out.user) setData((d) => ({ ...d, ...out }));
+      }
+      if (claimIds.length) await api("claim-site", { id: claimIds[0] }).catch(() => ({}));
+    };
+    if (j.length || ids.length || claimIds.length) run().finally(done);
     else done();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -990,6 +1390,13 @@ function Dashboard({ data, setData, onOut }) {
 
   // Sections live in the URL hash, so back and forward work and links can point at one.
   const first = PAID === "killSheet" ? "kill-sheet" : PAID === "stayAlive" ? "monitoring" : "overview";
+  const [sideQ, setSideQ] = useState("");
+  const sideSearchRef = useRef(null);
+  useEffect(() => {
+    const onKey = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); sideSearchRef.current?.focus(); } };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
   const [sect, setSect] = useState(() => (SECTIONS.some((x) => x.id === location.hash.slice(1)) ? location.hash.slice(1) : first));
   useEffect(() => {
     const on = () => SECTIONS.some((x) => x.id === location.hash.slice(1)) && setSect(location.hash.slice(1));
@@ -1006,14 +1413,19 @@ function Dashboard({ data, setData, onOut }) {
   const here = SECTIONS.find((x) => x.id === sect);
 
   return (
-    <div className="app wrap">
+    <div className="app">
       <aside className="side" aria-label="Dashboard">
         <a className="btn btn-dark side-cta" href="/#top"><Icon name="arrow-right" /> Stamp a page</a>
+        <div className="side-search">
+          <Icon name="search" size={16} className="side-search-ic" />
+          <input type="search" value={sideQ} onChange={(e) => setSideQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setSideQ(""); }} placeholder="Search sections…" aria-label="Search sections" autoComplete="off" ref={sideSearchRef} />
+          <kbd>⌘K</kbd>
+        </div>
         <nav className="side-nav">
-          {SECTIONS.map((x) => (
+          {SECTIONS.filter((x) => !sideQ.trim() || x.label.toLowerCase().includes(sideQ.trim().toLowerCase())).map((x) => (
             <button key={x.id} type="button" className={sect === x.id ? "on" : ""} aria-current={sect === x.id ? "page" : undefined} onClick={() => go(x.id)}>
-              <Icon name={x.icon} size={16} />
-              <span>{x.label}</span>
+              <span className="side-ic"><Icon name={x.icon} size={16} /></span>
+              <span className="side-label">{x.label}</span>
               {locked[x.id] ? <Icon name="lock" size={13} className="side-lock" /> : counts[x.id] ? <em>{counts[x.id]}</em> : null}
             </button>
           ))}
@@ -1021,7 +1433,10 @@ function Dashboard({ data, setData, onOut }) {
         <div className="side-plan">
           <p>{user.member ? "Member" : "Free plan"}</p>
           <b>{[user.killSheetActive && "Kill Sheet", user.stayAliveActive && "Stay Alive"].filter(Boolean).join(" + ") || "Stamps and full details"}</b>
-          {!user.stayAliveActive && <a href={planHref(user.killSheetActive ? "stayAlive" : "killSheet")}>{user.killSheetActive ? "Add Stay Alive" : "Upgrade"}</a>}
+          <div className="side-plan-links">
+            {!user.stayAliveActive && <a href={planHref(user.killSheetActive ? "stayAlive" : "killSheet")}>{user.killSheetActive ? "Add Stay Alive" : "Upgrade"}</a>}
+            <a href="/">View site</a>
+          </div>
         </div>
       </aside>
 
@@ -1040,6 +1455,7 @@ function Dashboard({ data, setData, onOut }) {
 
         {sect === "overview" && <Overview user={user} report={report} monitor={monitor} go={go} />}
         {sect === "stamps" && <Stamps user={user} />}
+        {sect === "cards" && <MyCards user={user} />}
         {sect === "kill-sheet" && (user.killSheetActive ? <KillSheet user={user} report={report} onChange={onChange} /> : <Locked plan="killSheet" title="Kill Sheet" lines={["A scout of your whole page, not just the first screen", "Your headline, subhead, and button rewritten", "3 to 5 fixes ranked by impact, and a free re-stamp", "One app review"]} />)}
         {sect === "monitoring" && (user.stayAliveActive ? <StayAlive user={user} monitors={monitors} onChange={onChange} /> : <Locked plan="stayAlive" title="Monitoring" lines={["A fresh stamp every week, with the score over time", "Daily uptime checks and an alert when it goes down", "Alerts when your stack, speed, or a tracking pixel changes", "Watch more sites, added from your dashboard", "One app review a month"]} />)}
         {sect === "reviews" && <Reviews user={user} onChange={onChange} />}
@@ -1057,6 +1473,7 @@ function Dashboard({ data, setData, onOut }) {
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: "gauge", desc: "Your stamps and plan at a glance." },
   { id: "stamps", label: "Stamps", icon: "list-checks", desc: "Every page you've stamped, with the full checks, stack, and speed behind each." },
+  { id: "cards", label: "My cards", icon: "image", desc: "Your status badges to copy into a footer, and every stamp's link to share." },
   { id: "kill-sheet", label: "Kill Sheet", icon: "clipboard-list", desc: "The whole page scouted, your copy rewritten, and the fixes ranked." },
   { id: "monitoring", label: "Monitoring", icon: "activity", desc: "Uptime, speed, weekly re-stamps, and what changed." },
   { id: "reviews", label: "App review", icon: "search", desc: "A person tests your app end to end. The result lands here." },

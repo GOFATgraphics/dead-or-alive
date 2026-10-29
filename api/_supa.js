@@ -1,6 +1,8 @@
-// Supabase Auth for email sign-up and email links. Supabase sends the emails (confirm sign-up, sign-in link);
-// their templates point at https://<site>/auth/confirm?token_hash=…&type=…&next=…, which verifies the link here
-// and starts our own session. Accounts, plans, and stamps stay in our store, keyed by the confirmed email.
+// Supabase Auth for email sign-up, email links, and email codes. Supabase sends the emails (confirm sign-up,
+// sign-in link, sign-in code); with Resend set as its custom SMTP, those emails come from the verified
+// domain instead of Supabase's shared sender. A link verifies with a token hash, a code verifies with the
+// verification token the user types in. Either way the link/code only proves the email; accounts, plans, and
+// stamps stay in our store, keyed by the confirmed email, and our own session starts here.
 // Everything runs server-side with the project's publishable key (api/_plans.js SUPABASE).
 import { SUPABASE } from "./_plans.js";
 
@@ -34,6 +36,30 @@ export async function signUp(email, password, redirectTo) {
 
 export const resendConfirmation = (email, redirectTo) => call("resend", { type: "signup", email }, { redirect_to: redirectTo });
 export const sendSignInLink = (email, redirectTo) => call("otp", { email, create_user: true }, { redirect_to: redirectTo });
+// A verification code for sign-in, instead of a link. Whether the email actually carries a code depends on the
+// Magic Link template in Supabase: it must include {{ .Token }}. The link in the same email still works.
+export const sendSignInCode = (email) => call("otp", { email, create_user: true });
+
+// The code from an email: the digits the user types in. type "signup" is the confirm-sign-up code,
+// type "email" is the sign-in code. { ok, email, accessToken } when it's good. The access token is the
+// user's own verified session, which is how a forgotten password is set without an admin key: the user
+// proves the inbox with the code, then that session is allowed to change its own password.
+export async function verifyCode(email, token, type) {
+  const r = await call("verify", { email, token, type });
+  const userEmail = r.data.user?.email;
+  return r.ok && userEmail ? { ok: true, email: userEmail, accessToken: r.data.access_token || null } : { ok: false, code: r.code, msg: r.msg };
+}
+
+// Sets the password of the account that owns this verified session. No admin key, no link.
+export async function updateOwnPassword(accessToken, password) {
+  const r = await fetch(`${SUPABASE.url}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: SUPABASE.key, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, code: data.error_code || data.code || "", msg: data.msg || data.error_description || data.message || "" };
+}
 
 // The link from an email: the token hash and its type. { ok, email } when it's good.
 export async function verifyLink(tokenHash, type) {

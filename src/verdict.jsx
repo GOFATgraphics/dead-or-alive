@@ -195,6 +195,7 @@ function Status({ r }) {
         </div>
       </div>
 
+      {!r.ownerX && (
       <div className="embed">
         <div>
           <h3>Put it in your footer</h3>
@@ -209,6 +210,7 @@ function Status({ r }) {
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }
@@ -264,6 +266,52 @@ function localJobs() {
   }
 }
 
+// A stamp claimed by hand, whose claimer linked X: who claimed it, with a link to their X profile.
+// This replaces the claim card for that stamp, for every viewer, and there is no claim option on it:
+// the site is already claimed. Saving a stamp never creates this card on its own.
+function OwnedBy({ owner }) {
+  const url = `https://x.com/${encodeURIComponent(owner.username)}`;
+  return (
+    <section className="wrap save-wrap" aria-labelledby="owned-h">
+      <div className="save">
+        {owner.avatar ? (
+          <a href={url} target="_blank" rel="noreferrer"><img src={owner.avatar} alt="" width="48" height="48" style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} onError={(e) => { e.currentTarget.style.display = "none"; }} /></a>
+        ) : (
+          <span className="ic-tile"><Icon name="user" size={20} /></span>
+        )}
+        <div>
+          <p className="eyebrow">Owned by</p>
+          <h2 id="owned-h"><a href={url} target="_blank" rel="noreferrer">@{owner.username}</a>{owner.verified ? (<span> <Icon name="shield-check" size={16} /> Verified</span>) : null}</h2>
+          <p>{owner.name ? `${owner.name} · ` : ""}Owner of this stamp.</p>
+        </div>
+        <div className="save-actions">
+          <a className="btn btn-line" href={url} target="_blank" rel="noreferrer">View on X <Icon name="external-link" /></a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClaimSite({ r }) {
+  // Simplified claim: no account steps on this card. Connect with X is the claim itself, even
+  // if X was already used for sign-up. X connect sets the claim record and returns here, where
+  // the Owned by card then shows the X profile.
+  return (
+    <section className="wrap save-wrap" aria-labelledby="claim-h">
+      <div className="save">
+        <span className="ic-tile"><Icon name="shield-check" size={20} /></span>
+        <div>
+          <h2 id="claim-h">Claim this site.</h2>
+          <p>Connect with X to claim it yourself, so anyone visiting this result page sees you as the owner.</p>
+        </div>
+        <div className="save-actions">
+          <a className="btn btn-dark" href={`/auth/x?claim=${encodeURIComponent(r.id)}`} onClick={() => track("claim_click", { v: r.verdict })}>Connect with X</a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SavePrompt({ r }) {
   const [state, setState] = useState({ status: "loading" });
   useEffect(() => {
@@ -303,8 +351,8 @@ function SavePrompt({ r }) {
         {state.status === "out" ? (
           <>
             <div>
-              <h2 id="save-h">Create a free account to save it.</h2>
-              <p>Keep this stamp, see all your stamps in one place, and get a free re-stamp after you fix it. No card.</p>
+              <h2 id="save-h">Create a free account to save it and see the details.</h2>
+              <p>Keep this stamp, see all your stamps in one place, get a free re-stamp after you fix it, and see the full technical report under the hood. No card.</p>
             </div>
             <div className="save-actions">
               <a className="btn btn-dark" href={next} onClick={() => track("save_click", { v: r.verdict })}>Save it free</a>
@@ -460,7 +508,62 @@ function Stack({ stack }) {
   );
 }
 
-function Snapshot({ s }) {
+function Snapshot({ s, r }) {
+  // Locked, Stage 1: headings and stack categories only, never values. No DNS check here: a free account
+  // is all it takes to read the full report (Stage 2), and the server already withheld the values.
+  // Locked: headings only, no second button. The SavePrompt card earlier on the page is the one
+  // free-account card, and it covers both saving the stamp and seeing these details.
+  if (s?.locked) {
+    return (
+      <section className="sect wrap" id="stack" aria-labelledby="stack-h">
+        <div className="sect-head">
+          <p className="eyebrow">Stack and speed</p>
+          <h2 id="stack-h">Under the hood</h2>
+          <p className="sect-sub">Measured once, when we stamped the page, in a real browser and from its HTML and headers. The details below need a free account. No DNS check just to read them.</p>
+        </div>
+        {s.hasStack && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="layers" /> Tech stack</h3>
+            <p className="hood-list">{s.stackCategories.join(", ")} detected. Tool names and evidence need a free account.</p>
+          </div>
+        )}
+        {s.hasSpeed && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="gauge" /> Real speed</h3>
+            <p className="hood-list">Load-time measurements need a free account.</p>
+          </div>
+        )}
+        {s.hasFacts && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="search" /> Search, security, delivery</h3>
+            <p className="hood-list">Header values and configuration details need a free account.</p>
+          </div>
+        )}
+        {(s.hasThirdParty || s.hasFonts) && (
+          <div className="hood-block hood-two">
+            {s.hasThirdParty && (
+              <div>
+                <h3 className="hood-h"><Icon name="globe" /> Other domains loaded</h3>
+                <p className="hood-list">Third-party domains need a free account.</p>
+              </div>
+            )}
+            {s.hasFonts && (
+              <div>
+                <h3 className="hood-h"><Icon name="type" /> Fonts in use</h3>
+                <p className="hood-list">Fonts in use need a free account.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {s.hasRequestRows && (
+          <div className="hood-block">
+            <h3 className="hood-h"><Icon name="server" /> From our own request</h3>
+            <p className="hood-list">HTML size, script count, and load measurements need a free account.</p>
+          </div>
+        )}
+      </section>
+    );
+  }
   const rows = snapshotRows(s);
   if (!rows.length && !s?.stack?.length) return null;
   const speed = speedRows(s?.browser);
@@ -552,12 +655,13 @@ function Result({ r }) {
       <main>
         {justSignedIn && <Toast text="Signed in. This stamp is saved to your dashboard." href="/dashboard" action="Dashboard" />}
         <Hero r={r} />
+        {r.ownerX && <OwnedBy owner={r.ownerX} />}
         <Status r={r} />
         <Checks r={r} />
-        <SavePrompt r={r} />
-        <Offers r={r} />
+        {!r.ownerX && (<><ClaimSite r={r} /><SavePrompt r={r} /></>)}
         <Share r={r} />
-        <Snapshot s={r.snapshot} />
+        {!r.ownerX && <Offers r={r} />}
+        {!r.ownerX && <Snapshot s={r.snapshot} r={r} />}
         <section className="final" aria-labelledby="final-h">
           <div className="final-in">
             <span className="app-tile"><img src="/brand/smp-mark.svg" alt="" width="32" height="32" /></span>

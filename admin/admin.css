@@ -1,11 +1,19 @@
 /* Admin: the dashboard's app layout (dashboard.css) on a grey canvas, with white panels, real tables, a detail
    drawer, and the Analytics tab. Dark mode comes from the shared tokens in theme.css. */
 body.ad { background: var(--canvas); }
+/* Admin tokens, scoped here so the rest of the site is untouched. Surfaces use
+   one radius scale: inputs and nav 10px, cards and tables 14px, modals 16px.
+   Muted text is darkened in light mode and lightened in dark mode, because the
+   shared --soft token fails WCAG 2.2 AA for small text on both backgrounds. */
+body.ad { --ad-r-md: 10px; --ad-r-lg: 14px; --ad-r-xl: 16px; }
+:root[data-theme="light"] body.ad { --soft: #6f6d7d; }
+:root[data-theme="dark"] body.ad { --soft: #a3a1b0; }
 body.ad-locked { overflow: hidden; }
-.ad .wrap { max-width: 82rem; }
+.ad .wrap { max-width: none; padding: 0; }
 
 /* Header */
 .ad-bar { gap: 0.75rem; justify-content: flex-start; border-bottom: 1px solid var(--line); background: var(--card); }
+/* Header: plain white bar; the sidebar owns the full height in the new shell. */
 .ad-tag { padding: 0.15rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
 .ad .who { gap: 0.6rem; }
 .ad-pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.8125rem; font-weight: 600; background: var(--canvas); color: var(--body); white-space: nowrap; }
@@ -14,37 +22,100 @@ body.ad-locked { overflow: hidden; }
 .ad-pill.warn { color: var(--amber); }
 
 /* Unlock */
-.ad-unlock { display: grid; gap: 1rem; max-width: 26rem; margin: clamp(3rem, 10vh, 6rem) auto; padding: 2rem; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow-2); }
+.ad-unlock { display: grid; gap: 1rem; max-width: 26rem; margin: clamp(3rem, 10vh, 6rem) auto; padding: 2rem; border: 1px solid var(--line); border-radius: var(--ad-r-xl); background: var(--card); box-shadow: var(--shadow-2); }
 .ad-unlock h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
 .ad-unlock > p { color: var(--body); font-size: 0.9375rem; }
 .ad-unlock .btn { width: 100%; }
 
-/* Layout */
-.ad .app { grid-template-columns: 13.5rem minmax(0, 1fr); gap: 2rem; padding-top: 1.75rem; }
-.ad .side { top: 1.25rem; }
-.ad .side-nav button:hover { background: var(--card); }
-.ad .side-nav button.on { background: var(--card); box-shadow: inset 2px 0 0 var(--ink), 0 0 0 1px var(--line); }
+/* Layout: the reference shell. A flush full-height sidebar on the left, content on
+   the right, hairline borders, no floating cards. The active item is a white card
+   with a hairline border and a soft shadow, and icons sit bare, without chips.
+   Groups keep daily work (stamps and reviews) apart from people and money, and
+   from system pages. */
+.ad .app { grid-template-columns: 16.5rem minmax(0, 1fr); gap: 0; padding-top: 0; transition: grid-template-columns 0.25s ease; }
+.ad .side { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem 0.75rem 0; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--canvas); box-shadow: none; overflow: visible; }
+.ad .main { min-width: 0; padding: 1.5rem 2rem 4rem; }
+
+/* Expandable side panel: the toggle row sits above the nav. Collapsed, the panel
+   becomes an icon rail: labels, group names, and footer text hide, while icons,
+   tooltips, count badges, and the stamping dot stay visible. State sticks per browser. */
+.side-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.25rem 0.75rem 0.5rem; }
+.side-top-label { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.side-toggle { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; flex: none; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--body); cursor: pointer; }
+.side-toggle:hover { background: var(--canvas); color: var(--ink); }
+.side-toggle .ic { width: 1.05rem; height: 1.05rem; }
+.side-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Sidebar search, like the reference: a quiet input with a ⌘K hint. */
+.side-search { position: relative; margin: 0 0 1rem; }
+.side-search-ic { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--soft); pointer-events: none; }
+.side-search input[type="search"] { width: 100%; min-height: 2.5rem; padding: 0 2.25rem 0 2.1rem; border: 1px solid var(--line); border-radius: var(--ad-r-md); background: var(--card); color: var(--ink); font: 400 0.875rem var(--sans); }
+.side-search input[type="search"]:focus { outline: 2px solid var(--ink); outline-offset: 1px; background: var(--card); }
+.side-search kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); font: 600 0.6875rem var(--mono); color: var(--soft); }
+@media (min-width: 961px) {
+  body.side-closed .ad .app { grid-template-columns: 4.25rem minmax(0, 1fr); }
+  body.side-closed .ad .side { padding: 0.5rem 0.4rem; }
+  body.side-closed .side-top { justify-content: center; padding: 0.25rem 0.25rem 0.6rem; }
+  body.side-closed .side-top-label, body.side-closed .side-group-label, body.side-closed .side-label, body.side-closed .side-search, body.side-closed .side-foot-links { display: none; }
+  body.side-closed .side-group + .side-group { margin-top: 0.5rem; padding-top: 0.5rem; }
+  body.side-closed .side-nav button { position: relative; grid-template-columns: 1.75rem; justify-content: center; padding: 0; }
+  body.side-closed .side-nav button em { position: absolute; top: 0.2rem; right: 0.15rem; min-width: 1.15rem; height: 1.15rem; padding: 0 0.25rem; border-radius: 999px; font-size: 0.625rem; line-height: 1.15rem; box-shadow: 0 0 0 2px var(--card); }
+  body.side-closed .side-foot { padding: 0.75rem 0 0.5rem; border-top: 1px solid var(--line); background: transparent; }
+  body.side-closed .side-foot-row { justify-content: center; }
+  body.side-closed .side-foot-row > span:last-child, body.side-closed .side-foot-link, body.side-closed .side-foot .ad-muted { display: none; }
+}
+.ad .side-nav { flex: none; overflow: visible; gap: 0.15rem; padding-bottom: 0.75rem; }
+.ad .side-group { display: grid; gap: 0.15rem; }
+.ad .side-group + .side-group { margin-top: 1.25rem; padding-top: 0; border-top: 0; }
+.ad .side-group-label { padding: 0 0.75rem 0.5rem; font: 500 0.6875rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); }
+.ad .side-nav button { grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 0.65rem; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: var(--ad-r-md); font-size: 0.875rem; font-weight: 600; }
+.ad .side-ic { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: 8px; background: transparent; color: var(--soft); }
+.ad .side-ic .ic { width: 1.05rem; height: 1.05rem; color: inherit; }
+.ad .side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad .side-nav button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.ad .side-nav button:hover .side-ic { background: transparent; color: var(--body); }
+.ad .side-nav button.on { background: var(--card); border-color: var(--line); color: var(--ink); font-weight: 700; box-shadow: var(--shadow-1); }
+.ad .side-nav button.on .side-ic { background: transparent; color: var(--ink); }
+.ad .side-nav button.on em { background: var(--canvas); color: var(--ink); }
+.ad .side-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ad .side-nav em.hot { background: var(--red); color: #fff; }
+.ad .side-nav button.on em.hot { background: var(--red); color: #fff; }
+.ad .side-foot { display: grid; gap: 0.55rem; flex: none; margin-top: auto; padding: 1rem 0.75rem 0.75rem; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; font-size: 0.8125rem; font-weight: 600; }
+.side-foot-links { display: flex; gap: 1rem; padding-top: 0.25rem; }
+.side-foot-links a { color: var(--soft); font-weight: 600; text-decoration: none; }
+.side-foot-links a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.ad .side-foot[hidden] { display: none; }
+.ad .side-foot-row { display: flex; align-items: center; gap: 0.55rem; }
+.ad .side-foot-link { justify-self: start; padding: 0; border: 0; background: none; color: var(--amber); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ad .side-foot-link:hover { color: var(--ink); }
 .ad .pane { display: grid; gap: 1rem; min-width: 0; }
 .ad .pane[hidden] { display: none; }
-.ad-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1rem; }
+.ad-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1rem; padding-bottom: 0.9rem; }
+.ad-head h1 { text-wrap: balance; }
 .ad-head > div:first-child { min-width: 0; max-width: 46rem; }
 .ad-head-actions { display: flex; align-items: center; gap: 0.5rem; }
 .ad-col { display: grid; gap: 1rem; min-width: 0; }
 .ad .grid2 { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
 .ad-loading { padding: 2rem 0; color: var(--soft); font-size: 0.9375rem; }
-.ad .panel { box-shadow: var(--shadow-1); }
+.ad .panel { box-shadow: none; border-radius: var(--ad-r-lg); }
 .ad .empty { background: var(--card); }
 
-/* KPI strip */
-.ad-kpis { box-shadow: var(--shadow-1); }
-.ad-kpis b { font-size: 1.625rem; font-variant-numeric: tabular-nums; }
+/* KPI strip: separate cards, like the reference, not one bordered strip. */
+.ad-kpis { gap: 1rem; border: 0; background: transparent; box-shadow: none; }
+.ad-kpis > div { border: 1px solid var(--line); border-radius: var(--ad-r-lg); background: var(--card); padding: 1.25rem; }
+.ad-kpis b { font-size: 1.75rem; font-variant-numeric: tabular-nums; }
+
+/* Focus and disabled states, everywhere, not just the sidebar: every admin
+   button and segment control shows the same ink outline on keyboard focus,
+   and a disabled button reads as disabled instead of just going quiet. */
+.ad button:focus-visible, .ad input:focus-visible, .ad a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ad button:disabled { opacity: 0.6; cursor: default; }
 
 /* Toolbar */
 .ad-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
-.ad-tools input[type="search"] { flex: 1 1 16rem; max-width: 22rem; min-height: 2.5rem; padding: 0.5rem 0.85rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 400 0.9375rem var(--sans); box-shadow: var(--shadow-1); }
+.ad-tools input[type="search"] { flex: 1 1 16rem; max-width: 22rem; min-height: 2.5rem; padding: 0.5rem 0.85rem; border: 1px solid var(--line); border-radius: var(--ad-r-md); background: var(--card); color: var(--ink); font: 400 0.9375rem var(--sans); }
 .ad-tools input[type="search"]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
-.ad-seg { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); box-shadow: var(--shadow-1); }
+.ad-seg { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: var(--ad-r-md); background: var(--card); }
 .ad-seg button { min-height: 2rem; padding: 0 0.75rem; border: 0; border-radius: 7px; background: transparent; color: var(--body); font: 600 0.8125rem var(--sans); cursor: pointer; }
 .ad-seg button:hover { color: var(--ink); }
 .ad-seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
@@ -53,10 +124,10 @@ body.ad-locked { overflow: hidden; }
 .ad-pager span { margin-right: 0.35rem; }
 
 /* Tables */
-.ad-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-1); }
+.ad-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--ad-r-lg); background: var(--card); box-shadow: none; }
 .panel .ad-table-wrap { box-shadow: none; }
 .ad-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.ad-table th { padding: 0.6rem 1rem; border-bottom: 1px solid var(--line); background: var(--canvas); font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; text-align: left; color: var(--soft); white-space: nowrap; }
+.ad-table th { padding: 0.6rem 1rem; border-bottom: 1px solid var(--line); background: transparent; font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; text-align: left; color: var(--soft); white-space: nowrap; }
 .ad-table td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .ad-table tr:last-child td { border-bottom: 0; }
 .ad-table .num { text-align: right; white-space: nowrap; }
@@ -150,15 +221,15 @@ body.ad-locked { overflow: hidden; }
 /* Analytics */
 .an-notes { display: grid; gap: 0.4rem; }
 .an-notes:empty { display: none; }
-.an-notes li { padding: 0.65rem 0.9rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--amber); font-size: 0.875rem; font-weight: 600; }
+.an-notes li { padding: 0.65rem 0.9rem; border: 1px solid var(--line); border-radius: var(--ad-r-md); background: var(--card); color: var(--amber); font-size: 0.875rem; font-weight: 600; }
 .an-body { display: grid; gap: 1rem; transition: opacity 0.2s; }
 .an-body.loading { opacity: 0.55; }
-.an-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow-1); overflow: hidden; }
-.an-tile { display: grid; align-content: start; gap: 0.3rem; padding: 1rem 1.2rem; min-width: 0; border-left: 1px solid var(--line); border-top: 1px solid var(--line); margin: -1px 0 0 -1px; }
+.an-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--ad-r-lg); background: var(--card); box-shadow: none; overflow: hidden; }
+.an-tile { display: grid; align-content: start; gap: 0.3rem; padding: 1.25rem; min-width: 0; border-left: 1px solid var(--line); border-top: 1px solid var(--line); margin: -1px 0 0 -1px; }
 .an-tile-label { font-size: 0.8125rem; font-weight: 600; color: var(--soft); }
-.an-tile-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.an-tile-value { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .an-tile-sub { font-size: 0.8125rem; color: var(--body); }
-.an-card { padding: 1.25rem 1.35rem; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow-1); min-width: 0; }
+.an-card { padding: 1.25rem 1.35rem; border: 1px solid var(--line); border-radius: var(--ad-r-lg); background: var(--card); box-shadow: none; min-width: 0; }
 .an-card-head h3 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
 .an-hint { margin-top: 0.2rem; font-size: 0.8125rem; color: var(--body); }
 .an-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
@@ -192,11 +263,19 @@ body.ad-locked { overflow: hidden; }
   .hide-md { display: none; }
 }
 @media (max-width: 960px) {
-  .ad .app { grid-template-columns: minmax(0, 1fr); padding-top: 0.75rem; }
+  .ad .app { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
   .ad .grid2, .an-grid2 { grid-template-columns: minmax(0, 1fr); }
   .an-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ad .side-nav { margin: 0; padding: 0 0 0.5rem; }
-  .ad .side-nav button.on { box-shadow: inset 0 -2px 0 var(--ink); background: transparent; }
+  .ad .side { position: static; height: auto; overflow: visible; padding: 0.75rem 1rem 0; border: 0; background: transparent; box-shadow: none; }
+  .ad .main { padding: 1rem 1rem 3rem; }
+  .side-top, .side-search { display: none; }
+  .ad .side-group { display: contents; }
+  .ad .side-group + .side-group { margin-top: 0; padding-top: 0; border-top: 0; }
+  .ad .side-group-label, .ad .side-foot { display: none; }
+  .ad .side-nav { display: flex; flex-wrap: nowrap; margin: 0; padding: 0 0 0.5rem; overflow-x: auto; scrollbar-width: none; }
+  .ad .side-nav::-webkit-scrollbar { display: none; }
+  .ad .side-nav button { flex: none; width: auto; }
+  .ad .side-nav button.on { background: var(--card); border-color: var(--line); box-shadow: var(--shadow-1); }
 }
 @media (max-width: 640px) {
   .hide-sm { display: none; }
@@ -206,6 +285,14 @@ body.ad-locked { overflow: hidden; }
   .ad-table th, .ad-table td { padding-left: 0.75rem; padding-right: 0.75rem; }
   .ad-sheet-head, .ad-sheet-body { padding-left: 1rem; padding-right: 1rem; }
 }
-@media (prefers-reduced-motion: reduce) { .ad-sheet, .ad-scrim { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ad-sheet, .ad-scrim { animation: none; } .ad .app { transition: none; } }
 #members, #stamps, #users, #reviews { display: grid; gap: 1rem; min-width: 0; }
 .ad-sheet-body > * { flex: none; }
+
+/* Traffic channels: a labeled bar per channel, sized by share, like the funnel but by source. */
+.an-channels { display: grid; gap: 0.85rem; margin-top: 1rem; }
+.an-channel-head { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.875rem; }
+.an-channel-head strong { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.an-channel-track { margin-top: 0.3rem; height: 8px; border-radius: 4px; background: var(--canvas); overflow: hidden; }
+.an-channel-fill { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
+.an-card .an-table { margin-top: 1rem; }

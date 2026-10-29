@@ -53,6 +53,44 @@ import { barChart, renderAnalytics } from "./analytics.js";
   };
   let key = session.get();
 
+  // Expandable side panel: the collapsed state sticks in this browser.
+  const sideClosed = {
+    get() { try { return localStorage.getItem("smp.side") === "closed"; } catch (_) { return false; } },
+    set(v) { try { v ? localStorage.setItem("smp.side", "closed") : localStorage.removeItem("smp.side"); } catch (_) {} },
+  };
+  function syncSide() {
+    const closed = sideClosed.get();
+    document.body.classList.toggle("side-closed", closed);
+    const t = $("side-toggle");
+    if (!t) return;
+    t.setAttribute("aria-expanded", String(!closed));
+    t.setAttribute("aria-label", closed ? "Expand sidebar" : "Collapse sidebar");
+    t.title = closed ? "Expand sidebar" : "Collapse sidebar";
+    t.replaceChildren(icon(closed ? "chevron-right" : "chevron-left"));
+  }
+  $("side-toggle").onclick = () => { sideClosed.set(!sideClosed.get()); syncSide(); };
+  syncSide();
+
+  // Sidebar search, in the reference shell's style: filters sections, ⌘K / Ctrl+K focuses it.
+  const sideSearch = $("side-search");
+  function applySideFilter() {
+    const q = (sideSearch?.value || "").trim().toLowerCase();
+    for (const g of document.querySelectorAll("#side-nav .side-group")) {
+      let shown = 0;
+      for (const b of g.querySelectorAll("button")) {
+        const hit = !q || (b.querySelector(".side-label")?.textContent || "").toLowerCase().includes(q);
+        b.hidden = !hit;
+        if (hit) shown++;
+      }
+      g.hidden = shown === 0;
+    }
+  }
+  sideSearch?.addEventListener("input", applySideFilter);
+  sideSearch?.addEventListener("keydown", (e) => { if (e.key === "Escape") { sideSearch.value = ""; applySideFilter(); sideSearch.blur(); } });
+  addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); sideSearch?.focus(); }
+  });
+
   async function call(op, body) {
     const r = await fetch(`/api/admin?op=${op}`, body ? { method: "POST", headers: { "x-admin-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) } : { headers: { "x-admin-key": key }, cache: "no-store" });
     const data = await r.json().catch(() => ({}));
@@ -118,25 +156,47 @@ import { barChart, renderAnalytics } from "./analytics.js";
   // Navigation
 
   const PANES = [
-    ["overview", "Overview", "layout-grid"],
-    ["stamps", "Stamps", "stamp"],
-    ["users", "Accounts", "users"],
-    ["members", "Members", "credit-card"],
-    ["payments", "Payments", "activity"],
-    ["reviews", "App reviews", "clipboard-list"],
-    ["analytics", "Analytics", "chart-column"],
-    ["setup", "Setup", "server"],
+    ["overview", "Overview", "layout-grid", "Work"],
+    ["stamps", "Stamps", "stamp", "Work"],
+    ["reviews", "App reviews", "clipboard-list", "Work"],
+    ["users", "Accounts", "users", "People and money"],
+    ["members", "Members", "credit-card", "People and money"],
+    ["payments", "Payments", "activity", "People and money"],
+    ["analytics", "Analytics", "chart-column", "System"],
+    ["setup", "Setup", "server", "System"],
   ];
   const counts = {};
   function renderNav() {
+    const groups = [];
+    for (const [id, label, ic, group] of PANES) {
+      let g = groups.find((x) => x.label === group);
+      if (!g) { g = { label: group, items: [] }; groups.push(g); }
+      const b = el("button", { type: "button", className: id === pane ? "on" : "" }, el("span", { className: "side-ic" }, icon(ic)), el("span", { className: "side-label", textContent: label }), counts[id] != null ? el("em", { className: id === "reviews" && counts[id] ? "hot" : "", textContent: num(counts[id]) }) : null);
+      b.title = label;
+      if (counts[id] != null) b.setAttribute("aria-label", `${label}, ${num(counts[id])}`);
+      if (id === pane) b.setAttribute("aria-current", "page");
+      b.onclick = () => go(id);
+      g.items.push(b);
+    }
     $("side-nav").replaceChildren(
-      ...PANES.map(([id, label, ic]) => {
-        const b = el("button", { type: "button", className: id === pane ? "on" : "" }, icon(ic), el("span", { textContent: label }), counts[id] != null ? el("em", { className: id === "reviews" && counts[id] ? "hot" : "", textContent: num(counts[id]) }) : null);
-        if (id === pane) b.setAttribute("aria-current", "page");
-        b.onclick = () => go(id);
-        return b;
-      })
+      ...groups.map((g) => el("div", { className: "side-group" }, el("p", { className: "side-group-label", textContent: g.label }), ...g.items))
     );
+    const foot = $("side-foot");
+    const items = setup.items || [];
+    const missing = items.filter(([, ok]) => !ok).length;
+    foot.hidden = false;
+    foot.replaceChildren(
+      el("span", { className: "side-foot-row", title: DESK.queueOpen ? "Stamping on" : "Stamping paused" }, el("span", { className: `dot ${DESK.queueOpen ? "ok" : "run"}` }), el("span", { textContent: DESK.queueOpen ? "Stamping on" : "Stamping paused" })),
+      items.length
+        ? (missing
+          ? el("button", { type: "button", className: "side-foot-link", textContent: `${num(missing)} to connect`, onclick: () => go("setup") })
+          : el("span", { className: "ad-muted", textContent: "All connected" }))
+        : null,
+      el("div", { className: "side-foot-links" },
+        el("a", { href: "/", textContent: "View site" }),
+        el("a", { href: "/dashboard", textContent: "Dashboard" }))
+    );
+    applySideFilter();
   }
   const count = (id, n) => { counts[id] = n; renderNav(); };
 
@@ -313,7 +373,13 @@ import { barChart, renderAnalytics } from "./analytics.js";
       cols.push(
         { label: "Failed", cls: "num hide-sm", cell: (r) => el("span", { className: "ad-num", title: r.failed.join(", "), textContent: r.failed.length }) },
         { label: "Main content", cls: "num hide-sm", cell: (r) => lcp(r.lcp) },
-        { label: "Saved by", cls: "hide-md", cell: (r) => (r.owner ? el("span", { className: "ad-ell", textContent: r.owner }) : muted("Not saved")) }
+        { label: "Saved by", cls: "hide-md", cell: (r) => (r.owner ? el("span", { className: "ad-ell", textContent: r.owner }) : muted("Not saved")) },
+        { label: "Claimed by", cls: "hide-md", cell: (r) => (r.claimed ? el("span", { className: "ad-ell", title: `${r.claimed.name ? `${r.claimed.name} · ` : ""}${r.claimed.email}`, textContent: r.claimed.username ? `@${r.claimed.username}` : r.claimed.email }) : muted("Not claimed")) },
+        { label: "Carousel", cls: "hide-md", cell: (r) => {
+          const b = el("button", { type: "button", className: "btn btn-line btn-sm", textContent: r.hidden ? "Show in carousel" : "Hide from carousel" });
+          b.onclick = async () => { b.disabled = true; try { await call(r.hidden ? "carousel-show" : "carousel-hide", { host: r.host }); r.hidden = !r.hidden; renderStamps(); } catch (err) { fail("st-alert", err); b.disabled = false; } };
+          return b;
+        } }
       );
     }
     cols.push({ label: "Stamped", cls: "num hide-sm", cell: (r) => muted(ago(r.createdAt)) });
@@ -348,10 +414,12 @@ import { barChart, renderAnalytics } from "./analytics.js";
   function renderStamps() {
     if (!stData) return;
     const q = $("st-q").value.trim().toLowerCase();
-    const rows = stData.stamps.filter((r) => (!stV || r.verdict === stV) && (!q || `${r.host} ${r.owner} ${r.pageUrl}`.toLowerCase().includes(q)));
-    $("stamps").replaceChildren(table(stampCols(false), rows, { onRow: openStamp, empty: q || stV ? "No stamps on this page match." : "No stamps yet." }));
+    const claimedOnly = $("st-claimed")?.checked;
+    const rows = stData.stamps.filter((r) => (!stV || r.verdict === stV) && (!claimedOnly || r.claimed) && (!q || `${r.host} ${r.owner} ${r.claimed?.username || ""} ${r.claimed?.email || ""} ${r.pageUrl}`.toLowerCase().includes(q)));
+    $("stamps").replaceChildren(table(stampCols(false), rows, { onRow: openStamp, empty: q || stV || claimedOnly ? "No stamps on this page match." : "No stamps yet." }));
   }
 
+  if ($("st-claimed")) $("st-claimed").onchange = () => renderStamps();
   async function openStamp(row) {
     openDrawer(row.host, [el("p", { className: "ad-loading", textContent: "Loading…" })]);
     try {
@@ -379,6 +447,8 @@ import { barChart, renderAnalytics } from "./analytics.js";
       el("dl", { className: "kv" },
         el("div", {}, el("dt", { textContent: "Page" }), el("dd", { className: "ad-break", textContent: r.pageUrl })),
         el("div", {}, el("dt", { textContent: "Saved by" }), el("dd", { textContent: row.owner || "Not saved to an account" })),
+        el("div", {}, el("dt", { textContent: "Claimed by" }), el("dd", { textContent: row.claimed ? `${row.claimed.username ? `@${row.claimed.username}` : row.claimed.email}${row.claimed.name ? ` · ${row.claimed.name}` : ""} (${row.claimed.email})` : "Not claimed" })),
+        el("div", {}, el("dt", { textContent: "Carousel" }), el("dd", { textContent: row.hidden ? "Hidden from the homepage carousel" : "Shown in the homepage carousel" })),
         el("div", {}, el("dt", { textContent: "Checks" }), el("dd", { textContent: `${passed} of ${checks.length} passed` }))
       )
     );
@@ -467,11 +537,11 @@ import { barChart, renderAnalytics } from "./analytics.js";
       table(
         [
           { label: "Member", cell: (m) => person(m.email, `Joined ${date(m.createdAt)}`) },
-          { label: "Kill Sheet", cell: (m) => (m.killSheet ? el("span", { className: "ad-stack" }, chip(m.killSheet.active ? "Active" : "Refunded", m.killSheet.active ? "ink" : "bad"), muted(`since ${date(m.killSheet.since)}`)) : muted("None")) },
+          { label: "Kill Sheet", cell: (m) => (m.killSheet ? el("span", { className: "ad-stack" }, chip(m.killSheet.active ? "Active" : "Refunded", m.killSheet.active ? "ink" : "bad"), muted(`since ${date(m.killSheet.since)}`), m.killSheet.restampsLeft != null ? muted(`${m.killSheet.restampsLeft} re-stamp${m.killSheet.restampsLeft === 1 ? "" : "s"} left`) : "") : muted("None")) },
           { label: "Stay Alive", cell: (m) => (m.stayAlive ? el("span", { className: "ad-stack" }, chip(m.stayAlive.cancelAtPeriodEnd ? "Cancelling" : m.stayAlive.status, m.stayAlive.active && !m.stayAlive.cancelAtPeriodEnd ? "ok" : "warn"), muted(`${(m.stayAlive.seats || 1) > 1 ? `${m.stayAlive.seats} sites, ` : ""}${m.stayAlive.interval === "year" ? "yearly, " : ""}${m.stayAlive.cancelAtPeriodEnd ? "ends" : "renews"} ${date(m.stayAlive.renews)}`)) : muted("None")) },
           { label: "Page", cls: "hide-md", cell: (m) => { const u = m.stayAlive?.url || m.killSheet?.url; return u ? el("a", { className: "ad-ell", href: u, target: "_blank", rel: "noopener noreferrer", textContent: u.replace(/^https?:\/\//, "") }) : muted("No page yet"); } },
           { label: "Stamps", cls: "num hide-sm", cell: (m) => el("span", { className: "ad-num", textContent: m.stamps }) },
-          { label: "", cls: "num", cell: (m) => (m.killSheet?.url ? rescout(m) : "") },
+          { label: "", cls: "num", cell: (m) => (m.killSheet?.active ? el("span", { className: "ad-stack" }, m.killSheet?.url ? rescout(m) : "", grantRestamp(m)) : "") },
         ],
         ms,
         { empty: `No members yet. ${plural(data.accounts || 0, "free account")}.` }
@@ -487,6 +557,22 @@ import { barChart, renderAnalytics } from "./analytics.js";
       try {
         await call("rescout", { email: m.email });
         b.replaceChildren(icon("check"), "Started");
+      } catch (err) {
+        b.disabled = false;
+        b.title = err.message;
+        b.replaceChildren(icon("circle-alert"), "Failed");
+      }
+    };
+    return b;
+  }
+  function grantRestamp(m) {
+    const b = el("button", { type: "button", className: "btn btn-line btn-sm", title: "Give this member one more free re-stamp", textContent: "+1 re-stamp" });
+    b.onclick = async () => {
+      if (!confirm(`Give ${m.email} one more free re-stamp?`)) return;
+      b.disabled = true;
+      try {
+        await call("grant-restamp", { email: m.email });
+        await loadMembers(true);
       } catch (err) {
         b.disabled = false;
         b.title = err.message;

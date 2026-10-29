@@ -4,7 +4,8 @@
 // Env: BLOB_READ_WRITE_TOKEN. Optional: MICROLINK_API_KEY.
 import crypto from "node:crypto";
 import { head, put } from "@vercel/blob";
-import { readResult, resultId } from "./_lib.js";
+import { resultId } from "./_lib.js";
+import { readFullResult } from "./_gate.js";
 import { inspect } from "./_inspect.js";
 import { capture, isBusy } from "./_shot.js";
 import { scorePage } from "./_rules.js";
@@ -130,7 +131,7 @@ export function failReason(msg) {
   return "other";
 }
 
-export async function processStamp(jobId, pageUrl) {
+export async function processStamp(jobId, pageUrl, email = "") {
   const id = resultId(jobId);
   let shot, snapshot;
   try {
@@ -160,12 +161,13 @@ export async function processStamp(jobId, pageUrl) {
     return await publishStamp({
       orderId: jobId,
       pageUrl,
+      email: email || undefined,
       verdict,
       sentence,
       image: clean,
       shot: clean,
       focus: boxes.length ? { top: Math.min(...boxes.map((b) => b.y)) / 1000, bottom: Math.max(...boxes.map((b) => b.y + b.h)) / 1000 } : null,
-      sendMail: false,
+      sendMail: !!email,
       origin: publicOrigin(),
       extra: { snapshot, score, checks, icon },
     });
@@ -181,5 +183,5 @@ export async function stampNow(pageUrl) {
   const job = crypto.randomUUID();
   const out = await processStamp(job, pageUrl);
   if (out?.failed) return { failed: out.failed, reason: failReason(out.failed) };
-  return (await readResult(resultId(job))) || { failed: "The stamp didn't save.", reason: "other" };
+  return (await readFullResult(resultId(job))) || { failed: "The stamp didn't save.", reason: "other" };
 }

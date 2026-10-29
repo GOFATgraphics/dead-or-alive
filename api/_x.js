@@ -7,7 +7,7 @@
 import crypto from "node:crypto";
 import { get, remove, set } from "./_store.js";
 import { ensureUser, startSession, updateUser, validEmail, normEmail } from "./_account.js";
-import { siteOrigin } from "./_lib.js";
+import { readResult, siteOrigin } from "./_lib.js";
 import { SUPABASE } from "./_plans.js";
 
 const direct = () => !!(process.env.X_CLIENT_ID && process.env.X_CLIENT_SECRET);
@@ -22,7 +22,9 @@ export async function xStart(req, res) {
   if (!xReady()) return res.redirect(302, "/dashboard?x=off");
   const state = crypto.randomBytes(24).toString("base64url");
   const verifier = crypto.randomBytes(48).toString("base64url");
-  await set(`xstate:${state}`, { verifier, next: safeNext(String(req.query.next || "")) }, 600);
+  const claimId = String(req.query.claim || "");
+  const claim = /^[A-Za-z0-9_-]{6,40}$/.test(claimId) ? claimId : "";
+  await set(`xstate:${state}`, { verifier, next: safeNext(String(req.query.next || "")), claim }, 600);
   // A short cookie ties the return trip to this browser.
   res.setHeader("Set-Cookie", `${COOKIE}=${state}; Path=/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
   if (viaSupabase()) {
@@ -70,7 +72,7 @@ export async function xCallback(req, res) {
       }
       const xid = tok.user.identities?.find((i) => i.provider === "x")?.id || tok.user.user_metadata?.provider_id || tok.user.id;
       const meta = tok.user.user_metadata || {};
-      return finish(res, { id: String(xid), username: meta.user_name || meta.preferred_username || "", avatar: meta.avatar_url || "", email: tok.user.email }, saved.next, fail);
+      return finish(res, { id: String(xid), username: meta.user_name || meta.preferred_username || "", avatar: meta.avatar_url || "", name: meta.name || meta.full_name || "", verified: meta.verified === true, email: tok.user.email }, saved.next, fail, saved.claim || "");
     }
     const basic = Buffer.from(`${process.env.X_CLIENT_ID}:${process.env.X_CLIENT_SECRET}`).toString("base64");
     const t = await fetch("https://api.x.com/2/oauth2/token", {
@@ -83,25 +85,53 @@ export async function xCallback(req, res) {
       console.error("X token exchange failed:", t.status, tok.error || "");
       return fail("failed");
     }
-    const m = await fetch("https://api.x.com/2/users/me?user.fields=confirmed_email,username,profile_image_url", { headers: { Authorization: `Bearer ${tok.access_token}` } });
+    const m = await fetch("https://api.x.com/2/users/me?user.fields=confirmed_email,username,profile_image_url,verified,name", { headers: { Authorization: `Bearer ${tok.access_token}` } });
     const me = (await m.json().catch(() => ({})))?.data;
     if (!me?.id) return fail("failed");
-    return finish(res, { id: me.id, username: me.username || "", avatar: me.profile_image_url || "", email: me.confirmed_email }, saved.next, fail);
+    return finish(res, { id: me.id, username: me.username || "", avatar: me.profile_image_url || "", name: me.name || "", verified: me.verified === true, email: me.confirmed_email }, saved.next, fail, saved.claim || "");
   } catch (err) {
     console.error("X sign-in failed:", err);
     return fail("failed");
   }
 }
 
+// X's small profile picture, at a size fit for a card. The stored URL is usually the 48px _normal variant.
+const biggerAvatar = (u) => String(u || "").replace("_normal.", "_400x400.");
+
 // Signs in the account for this X identity. An X account linked before signs in to the same account even if
-// its email changed since; a new one needs a confirmed email.
-async function finish(res, x, next, fail) {
+// its email changed since; a new one needs a confirmed email. Name and verified are stored when X gives
+// them, so a stamp can show its owner: a badge is shown only when verified is confirmed true, never from
+// a missing field.
+async function finish(res, x, next, fail, claimId = "") {
   const linked = await get(`xid:${x.id}`);
   const email = linked || normEmail(x.email);
   if (!validEmail(email)) return fail("noemail");
   await ensureUser(email);
-  await updateUser(email, (u) => (u ? { ...u, x: { id: x.id, username: x.username, avatar: x.avatar } } : undefined));
+  await updateUser(email, (u) => (u ? { ...u, x: { id: x.id, username: x.username, avatar: biggerAvatar(x.avatar), name: x.name || "", verified: x.verified === true } } : undefined));
   await set(`xid:${x.id}`, email);
+  // A claim from the result page: connecting X here is the claim itself, even if X was already
+  // used for sign-up. First claimer wins; a later claimer keeps the existing card, never takes it.
+  if (claimId) {
+    const existing = await get(`claim:${claimId}`).catch(() => null);
+    if (!existing) {
+      await set(`claim:${claimId}`, email).catch(() => {});
+      const rr = await readResult(claimId).catch(() => null);
+      if (rr) {
+        const h = String(rr.host || "").toLowerCase().trim();
+        if (h) {
+          const hostClaim = await get(`claimhost:${h}`).catch(() => null);
+          if (!hostClaim) await set(`claimhost:${h}`, email).catch(() => {});
+        }
+        await updateUser(email, (u) => {
+          if (!u) return undefined;
+          if ((u.stamps || []).some((s) => s.id === claimId)) return undefined;
+          const add = { id: rr.id, url: rr.pageUrl, host: rr.host, verdict: rr.verdict, score: rr.score ?? null, icon: rr.icon || "", at: rr.createdAt };
+          u.stamps = [...(u.stamps || []), add].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200);
+          return u;
+        }).catch(() => {});
+      }
+    }
+  }
   await startSession(res, email);
-  return res.redirect(302, `/dashboard${next}`);
+  return res.redirect(302, claimId ? `/v/${claimId}` : `/dashboard${next}`);
 }

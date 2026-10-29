@@ -2,24 +2,35 @@
    1px borders, small radii, no heavy shadows, tight type. Tokens come from result.css; dark mode from theme.css. */
 .dash { display: grid; gap: 1rem; max-width: 60rem; padding-top: 1.5rem; padding-bottom: 4rem; }
 
-.app { display: grid; grid-template-columns: 14.5rem minmax(0, 1fr); gap: 2.5rem; align-items: start; padding-top: 1.25rem; padding-bottom: 4rem; }
-.side { position: sticky; top: 1rem; display: grid; gap: 1.25rem; }
-.side-cta { width: 100%; justify-content: flex-start; }
-.side-nav { display: grid; gap: 2px; }
-.side-nav button { display: grid; grid-template-columns: 1.1rem minmax(0, 1fr) auto; align-items: center; gap: 0.7rem; width: 100%; min-height: 2.4rem; padding: 0 0.75rem; border: 0; border-radius: 8px; background: transparent; color: var(--body); font: 600 0.9rem var(--sans); text-align: left; cursor: pointer; }
-.side-nav button:hover { background: var(--canvas); color: var(--ink); }
-.side-nav button.on { background: var(--canvas); color: var(--ink); box-shadow: inset 2px 0 0 var(--ink); }
+.app { display: grid; grid-template-columns: 16.5rem minmax(0, 1fr); gap: 0; align-items: start; width: 100%; max-width: none; margin: 0; padding-top: 0; padding-bottom: 0; }
+.side { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; gap: 0; padding: 0.75rem; border-right: 1px solid var(--line); background: var(--canvas); overflow: visible; }
+.side-cta { width: 100%; justify-content: flex-start; margin-bottom: 1rem; }
+.side-search { position: relative; margin: 0 0 1rem; }
+.side-search-ic { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--soft); pointer-events: none; }
+.side-search input[type="search"] { width: 100%; min-height: 2.5rem; padding: 0 2.25rem 0 2.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 400 0.875rem var(--sans); box-shadow: var(--shadow-1); }
+.side-search input[type="search"]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.side-search kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); font: 600 0.6875rem var(--mono); color: var(--soft); }
+.side-nav { display: grid; gap: 0.15rem; flex: none; overflow: visible; padding-bottom: 0.75rem; }
+.side-nav button { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; align-items: center; gap: 0.65rem; width: 100%; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--body); font: 600 0.875rem var(--sans); text-align: left; cursor: pointer; }
+.side-ic { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: 8px; color: var(--soft); }
+.side-ic .ic { color: inherit; }
+.side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-nav button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+.side-nav button.on { background: var(--card); border-color: var(--line); color: var(--ink); box-shadow: var(--shadow-1); font-weight: 700; }
+.side-nav button.on .side-ic { color: var(--ink); }
 .side-nav .ic { color: var(--soft); }
 .side-nav button.on .ic { color: var(--ink); }
-.side-nav em { min-width: 1.4rem; padding: 0 0.35rem; border-radius: 6px; background: var(--canvas); font: 600 0.75rem var(--mono); font-style: normal; text-align: center; color: var(--body); }
-.side-nav button.on em { background: var(--card); }
+.side-nav em { min-width: 1.4rem; padding: 0 0.35rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); font: 600 0.75rem var(--mono); font-style: normal; text-align: center; color: var(--body); }
+.side-nav button.on em { background: var(--canvas); }
 .side-lock { opacity: 0.6; }
-.side-plan { display: grid; gap: 0.15rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 12px; font-size: 0.8125rem; }
+.side-plan { display: grid; gap: 0.15rem; flex: none; margin-top: auto; padding: 1rem 0.75rem 0.75rem; border: 0; border-top: 1px solid var(--line); font-size: 0.8125rem; }
+.side-plan-links { display: flex; gap: 1rem; margin-top: 0.35rem; }
 .side-plan p { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
 .side-plan b { font-size: 0.875rem; }
-.side-plan a { margin-top: 0.35rem; font-weight: 700; color: var(--ink); }
+.side-plan a { font-weight: 700; color: var(--ink); }
+.side-plan-links a:last-child { color: var(--soft); }
 
-.main { display: grid; gap: 1rem; min-width: 0; }
+.main { display: grid; gap: 1rem; min-width: 0; max-width: 72rem; padding: 1.5rem 2rem 4rem; }
 .page-head { padding-bottom: 0.25rem; }
 .page-head h1 { font-size: 1.625rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
 .page-head p { margin-top: 0.25rem; color: var(--body); font-size: 0.9375rem; }
@@ -28,7 +39,7 @@
 .avatar { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: 50%; background: var(--ink); color: var(--page); font: 700 0.875rem var(--sans); }
 .who-email { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; color: var(--body); }
 
-.panel { padding: 1.25rem 1.35rem; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.panel { padding: 1.25rem 1.35rem; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: none; }
 .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
 .panel-head h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
 .panel-head h2 .ic { display: none; }
@@ -38,9 +49,9 @@
 .panel h4 { margin: 1rem 0 0.4rem; font-size: 0.875rem; font-weight: 700; }
 
 /* Overview */
-.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
-.kpis > div { display: grid; align-content: start; gap: 0.3rem; padding: 1rem 1.2rem; min-width: 0; }
-.kpis > div + div { border-left: 1px solid var(--line); }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; border: 0; background: transparent; }
+.kpis > div { display: grid; align-content: start; gap: 0.3rem; padding: 1rem 1.2rem; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.kpis > div + div { border-left: 1px solid var(--line); } /* kept for the mobile 2-col layout, overridden below */
 .kpis p { font-size: 0.8125rem; font-weight: 600; color: var(--soft); }
 .kpis b { font-size: 1.375rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kpis b.v-dead { color: var(--dead); }
@@ -51,7 +62,7 @@
 
 /* Table */
 .tbl { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.tr { display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem 3.5rem 6.5rem; gap: 0.75rem; align-items: center; padding: 0.7rem 0.9rem; font-size: 0.875rem; text-decoration: none; color: var(--ink); }
+.tr { display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem 3.5rem 6.5rem auto; gap: 0.75rem; align-items: center; padding: 0.7rem 0.9rem; font-size: 0.875rem; text-decoration: none; color: var(--ink); }
 .tr + .tr { border-top: 1px solid var(--line); }
 a.tr:hover { background: var(--canvas); }
 .tr.th { padding-top: 0.5rem; padding-bottom: 0.5rem; background: var(--canvas); font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
@@ -234,12 +245,13 @@ label.check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color:
 
 @media (max-width: 960px) {
   .app { grid-template-columns: minmax(0, 1fr); gap: 1rem; padding-top: 0.5rem; }
-  .side { position: static; gap: 0.75rem; }
-  .side-cta, .side-plan { display: none; }
+  .side { position: static; height: auto; gap: 0.75rem; min-height: 0; padding: 0.75rem 1rem 0; border-right: 0; background: transparent; overflow: visible; }
+  .main { padding: 1rem 1rem 3rem; }
+  .side-cta, .side-plan, .side-search { display: none; }
   .side-nav { display: flex; gap: 0.25rem; overflow-x: auto; margin: 0 -1rem; padding: 0 1rem 0.5rem; border-bottom: 1px solid var(--line); scrollbar-width: none; }
   .side-nav::-webkit-scrollbar { display: none; }
   .side-nav button { display: inline-flex; width: auto; flex: none; gap: 0.45rem; min-height: 2.25rem; padding: 0 0.8rem; white-space: nowrap; }
-  .side-nav button.on { box-shadow: inset 0 -2px 0 var(--ink); border-radius: 8px 8px 0 0; }
+  .side-nav button.on { background: var(--card); border-color: var(--line); box-shadow: var(--shadow-1); border-radius: 10px; }
   .grid2 { grid-template-columns: minmax(0, 1fr); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpis > div:nth-child(3) { border-left: 0; }
@@ -247,7 +259,7 @@ label.check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color:
   .who-email { display: none; }
 }
 @media (max-width: 560px) {
-  .tr { grid-template-columns: minmax(0, 1fr) 4.8rem 2.6rem; }
+  .tr { grid-template-columns: minmax(0, 1fr) 4.8rem 2.6rem auto; }
   .tr > :nth-child(4) { display: none; }
   .kv > div { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
   .panel { padding: 1rem; }
@@ -302,3 +314,42 @@ select { width: 100%; min-height: 2.9rem; padding: 0.6rem 0.9rem; border: 1px so
   .welcome-steps li { padding: 0.7rem 0.85rem; }
   .welcome-actions { position: sticky; bottom: 0; margin-top: 0.5rem; padding: 0.85rem 0 1.1rem; background: var(--card); }
 }
+
+/* Premium dashboard additions: stamp cards, badge previews, stamp detail */
+.stamp-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.stamp-card { display: grid; gap: 0.6rem; align-content: start; padding: 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.stamp-card-host { display: flex; align-items: center; gap: 0.55rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stamp-card-host img { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+.stamp-card-badge { width: 100%; max-width: 300px; height: auto; border-radius: 8px; }
+.stamp-card .num { font: 600 0.875rem var(--mono); }
+.detail-panel { margin-top: 1rem; }
+.tr .site { text-decoration: none; color: var(--ink); }
+.tr .site:hover { text-decoration: underline; }
+@media (max-width: 800px) { .stamp-cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Stamp detail page: replaces the old panel below the stamps table. */
+.detail-page { display: grid; gap: 1rem; align-content: start; }
+.detail-back { justify-self: start; }
+.detail-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.detail-hero-main { min-width: 0; }
+.detail-hero-main h2 { display: flex; align-items: center; gap: 0.6rem; font-size: 1.375rem; font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.detail-hero-main h2 img { border-radius: 6px; flex: none; }
+.detail-hero-main p { margin-top: 0.35rem; }
+.detail-actions { flex: none; margin-top: 0; }
+@media (max-width: 640px) {
+  .detail-hero { flex-direction: column; }
+}
+
+/* Monitoring history (upgrade 3): trend charts, monthly table. */
+.trend-chart { display: block; width: 100%; max-width: 36rem; height: 90px; margin: 0.5rem 0 1rem; }
+.hist-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.875rem; }
+.hist-table th, .hist-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; }
+.hist-table th { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+
+/* Alert settings (upgrade 4). */
+.alert-form { display: grid; gap: 0.75rem; max-width: 32rem; margin: 0.5rem 0 1rem; }
+.alert-form .check { display: flex; gap: 0.6rem; align-items: center; font-weight: 600; }
+.quiet-row { display: flex; align-items: end; gap: 0.75rem; }
+.quiet-row label { flex: 1; display: grid; gap: 0.3rem; font-size: 0.875rem; font-weight: 600; }
+.quiet-row select { min-height: 2.5rem; padding: 0.5rem 0.75rem; border-radius: 10px; font-size: 0.9375rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
