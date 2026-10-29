@@ -336,46 +336,47 @@ ol, ul { padding: 0; list-style: none; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
-/* Owned by: the owner's X profile on the stamp they claimed. Glass card tinted by the verdict, status ring on the
-   avatar, X's own follow and check. */
+/* Owned by: the owner's X profile on the stamp they claimed. Flat and quiet: one hairline border, solid colours,
+   a thin metal ring for the status, X's own follow and check. */
 .owned-wrap { margin-top: clamp(1.5rem, 3vw, 2.25rem); }
-.owned { position: relative; isolation: isolate; overflow: hidden; max-width: 58rem; margin: 0 auto; padding: 1.25rem clamp(1.1rem, 3vw, 1.75rem) 0; border: 1px solid color-mix(in srgb, var(--v, var(--line)) 22%, var(--line)); border-radius: 24px; background: var(--card); box-shadow: var(--shadow-2), 0 30px 60px -40px color-mix(in srgb, var(--v, #000) 55%, transparent); }
-.owned-glow { position: absolute; inset: 0; z-index: -1; background:
-  radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--v) 16%, transparent), transparent 55%),
-  radial-gradient(80% 70% at 100% 0%, color-mix(in srgb, var(--v) 9%, transparent), transparent 60%),
-  repeating-linear-gradient(135deg, transparent 0 22px, color-mix(in srgb, var(--v) 4%, transparent) 22px 23px); }
+.owned { --ring: var(--v, var(--line)); max-width: 58rem; margin: 0 auto; padding: clamp(1.25rem, 3vw, 1.75rem) clamp(1.25rem, 3vw, 2rem) 0; border: 1px solid var(--line); border-radius: 20px; background: var(--card); box-shadow: 0 1px 2px rgba(15, 20, 25, 0.04), 0 12px 32px -18px rgba(15, 20, 25, 0.18); }
+.owned.tier-steel { --ring: #9aa0a8; }
+.owned.tier-gold { --ring: #b8913a; }
+.owned.tier-obsidian { --ring: #15161a; }
 .owned-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
-.owned-eyebrow { display: inline-flex; align-items: center; gap: 0.45rem; font: 600 0.72rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--soft, #6e6c80); }
-.owned-chip { padding: 0.3rem 0.7rem; border-radius: 999px; background: color-mix(in srgb, var(--v) 12%, var(--card)); color: var(--v); font: 600 0.75rem var(--mono); letter-spacing: 0.06em; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v) 28%, transparent); }
-.owned-chip b { font-weight: 800; }
-.owned-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: clamp(1rem, 2.5vw, 1.5rem); align-items: center; padding: 1.1rem 0 1.25rem; }
-.owned-avatar { position: relative; display: block; width: 5.5rem; height: 5.5rem; padding: 3px; border-radius: 50%; background: conic-gradient(from 210deg, var(--v), color-mix(in srgb, var(--v) 35%, #fff), var(--v)); text-decoration: none; }
-.tier-steel .owned-avatar { background: conic-gradient(from 210deg, #8e939b, #e7e9ec, #9da2aa, #c9cdd3, #8e939b); }
-.tier-gold .owned-avatar { background: conic-gradient(from 210deg, #b58a2e, #f3dea2, #c29a45, #e9cf8a, #b58a2e); }
-.tier-obsidian .owned-avatar { background: conic-gradient(from 210deg, #0e0f12, #c9a24a, #23262c, #e9cf8a, #0e0f12); }
-.owned-avatar img, .owned-avatar > span { display: grid; place-items: center; width: 100%; height: 100%; border: 3px solid var(--card); border-radius: 50%; object-fit: cover; background: var(--canvas); color: var(--ink); font-size: 2rem; font-weight: 800; }
-.owned-avatar i { position: absolute; right: 0; bottom: 2px; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border: 2px solid var(--card); border-radius: 50%; background: #0f1419; color: #fff; }
+.owned-eyebrow { display: inline-flex; align-items: center; gap: 0.5rem; font: 600 0.6875rem var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft, #6e6c80); }
+.owned-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.75rem 0.3rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font: 500 0.75rem var(--mono); letter-spacing: 0.04em; }
+.owned-chip::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--v); }
+.owned-chip b { font-weight: 700; }
+.owned-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: clamp(1.1rem, 2.5vw, 1.75rem); align-items: center; padding: 1.5rem 0 1.6rem; }
+.owned-avatar { position: relative; display: block; width: 5rem; height: 5rem; border-radius: 50%; box-shadow: 0 0 0 3px var(--card), 0 0 0 4.5px var(--ring); text-decoration: none; }
+.owned-avatar img, .owned-avatar > span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: var(--canvas); color: var(--ink); font-size: 1.75rem; font-weight: 700; }
+.owned-avatar i { position: absolute; right: -4px; bottom: -2px; display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 2px solid var(--card); border-radius: 50%; background: #0f1419; color: #fff; }
 .owned-id { min-width: 0; }
-.owned-id h2 { display: flex; align-items: center; gap: 0.35rem; margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.owned-id h2 { display: flex; align-items: center; gap: 0.35rem; margin: 0; font-size: clamp(1.25rem, 2.2vw, 1.5rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
 .owned-id h2 a { overflow: hidden; color: inherit; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
-.owned-id h2 a:hover { text-decoration: underline; }
+.owned-id h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .owned-check { flex: none; }
-.owned-handle { margin-top: 0.2rem; color: var(--soft, #6e6c80); font-size: 0.95rem; }
+.owned-handle { margin-top: 0.15rem; color: var(--soft, #6e6c80); font-size: 0.9375rem; }
 .owned-handle a { color: inherit; text-decoration: none; }
-.owned-handle b { color: var(--ink); }
-.owned-bio { display: -webkit-box; margin-top: 0.5rem; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--body, var(--ink)); font-size: 0.95rem; line-height: 1.45; overflow-wrap: anywhere; }
-.owned-actions { display: flex; flex-direction: column; gap: 0.5rem; }
-.owned-follow { background: #0f1419; color: #fff; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, var(--shadow-1); }
-.owned-follow:hover { background: #272c30; }
-.owned-foot { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; margin: 0 calc(-1 * clamp(1.1rem, 3vw, 1.75rem)); padding: 0.75rem clamp(1.1rem, 3vw, 1.75rem); border-top: 1px solid color-mix(in srgb, var(--v) 14%, var(--line)); background: color-mix(in srgb, var(--v) 4%, transparent); font: 500 0.75rem var(--mono); letter-spacing: 0.04em; color: var(--soft, #6e6c80); }
-.owned-foot span { display: inline-flex; align-items: center; gap: 0.35rem; }
-.owned-foot span:first-child { color: var(--v); font-weight: 600; }
+.owned-handle b { color: var(--ink); font-weight: 600; }
+.owned-bio { display: -webkit-box; max-width: 36rem; margin-top: 0.6rem; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--body, var(--ink)); font-size: 0.9375rem; line-height: 1.5; overflow-wrap: anywhere; }
+.owned-actions { display: flex; flex-direction: column; gap: 0.5rem; min-width: 8.5rem; }
+.owned-actions .btn { min-height: 2.6rem; border-radius: 999px; }
+.owned-follow { background: #0f1419; color: #fff; }
+.owned-follow:hover { background: #2a2f33; }
+.owned-foot { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; padding: 0.9rem 0 1rem; border-top: 1px solid var(--line); font: 500 0.75rem var(--mono); letter-spacing: 0.04em; color: var(--soft, #6e6c80); }
+.owned-foot span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.owned-foot span:first-child { color: var(--ink); }
+.owned-foot .ic { color: var(--v); }
+[data-theme="dark"] .owned { box-shadow: none; }
+[data-theme="dark"] .owned.tier-obsidian { --ring: #c9a24a; }
 [data-theme="dark"] .owned-follow { background: #f2f1f7; color: #0f1419; }
 [data-theme="dark"] .owned-follow:hover { background: #fff; }
 [data-theme="dark"] .owned-avatar i { background: #f2f1f7; color: #0f1419; }
 @media (max-width: 640px) {
   .owned-main { grid-template-columns: auto minmax(0, 1fr); }
-  .owned-avatar { width: 4.5rem; height: 4.5rem; }
+  .owned-avatar { width: 4.25rem; height: 4.25rem; }
   .owned-actions { grid-column: 1 / -1; flex-direction: row; }
   .owned-actions .btn { flex: 1; }
 }

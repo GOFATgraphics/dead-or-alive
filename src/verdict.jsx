@@ -292,7 +292,6 @@ function OwnedBy({ owner, r }) {
   return (
     <section className="wrap owned-wrap" aria-labelledby="owned-h">
       <article className={`owned v-${v}${tier ? ` tier-${tier.key}` : ""}`}>
-        <div className="owned-glow" aria-hidden="true"></div>
         <header className="owned-top">
           <span className="owned-eyebrow"><XLogo size={12} /> Owned by</span>
           <span className="owned-chip"><b>{r.verdict}</b>{r.score != null ? ` ${r.score}/100` : ""}{tier ? ` · ${tier.name}` : ""}</span>
