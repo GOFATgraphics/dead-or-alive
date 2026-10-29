@@ -6,6 +6,7 @@ import { pipeline, redisReady } from "./_redis.js";
 import { list } from "@vercel/blob";
 import { set } from "./_store.js";
 import { snapshotRows } from "../src/snapshot.js";
+import { notePage } from "./_rivals.js";
 
 const COLOR = { DEAD: "#d92d33", COPE: "#c26a05", ALIVE: "#138a43" };
 
@@ -142,6 +143,8 @@ export async function publishStamp({ orderId, email, pageUrl, verdict, sentence,
   }
   await put(p.json, JSON.stringify(record), { ...opts, contentType: "application/json" });
   await noteRecent(record);
+  // Every stamped page joins the word index the competitor scan matches against (_rivals.js).
+  await notePage({ host: record.host, url: record.pageUrl, title: snap?.title, h1: snap?.content?.h1, description: snap?.content?.description, subhead: snap?.content?.subhead });
   const link = `${origin}/v/${id}`;
   const mail = sendMail && email ? await sendEmail(email, { ...record, snapshot: snap, link }) : { emailed: false };
   return { url: link, ...mail };

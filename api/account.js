@@ -12,6 +12,7 @@
 //   POST restamp                 uses the Kill Sheet's free re-stamp: re-runs the scout
 //   POST cancel | resume         Stay Alive at the end of the paid month
 //   POST ks-done { title, done } ticks a Kill Sheet fix; ks-rival { url } stamps one competitor next to it
+//   POST find-rivals { url }      finds competitors for a Kill Sheet page or a Stay Alive site (_rivals.js)
 //   POST must-have { url, phrases } words a watched page must show; test-webhook { webhook } sends a test alert
 //   POST review { ... }          submits an app review; POST revoke { id } deletes its test login
 import crypto from "node:crypto";
@@ -33,6 +34,7 @@ import { PORTAL } from "./_plans.js";
 import { checkPageUrl, pageKind } from "../src/url.js";
 import { checkDomain, ensureToken } from "./_gate.js";
 import { precheck } from "./_inspect.js";
+import { findCompetitors } from "./_rivals.js";
 
 const mailReady = () => !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
 const origin = () => (process.env.SITE_URL || "https://stampmypage.com").replace(/\/$/, "");
@@ -665,6 +667,26 @@ export default async function handler(req, res) {
       if (!hasKillSheet(u)) return res.status(403).json({ error: "The Kill Sheet isn't on this account." });
       await markFix(email, String(b.title || ""), !!b.done);
       return res.status(200).json(await me(email));
+    }
+    // Competitors found for the member: { url } is their Kill Sheet page or one of their Stay Alive sites. Up to 10
+    // scans a day per account; the same page is answered from a day's cache.
+    if (op === "find-rivals") {
+      const u = await getUser(email);
+      const page = checkPageUrl(b.url);
+      const report = hasKillSheet(u) ? await readReport(email) : null;
+      const mine = [report?.url, ...(hasStayAlive(u) ? sitesOf(u) : [])].filter(Boolean);
+      if (!page.url || !mine.includes(page.url)) return res.status(403).json({ error: "Competitor scans are for your Kill Sheet page and your Stay Alive sites." });
+      const day = `rivalscan:${email}:${new Date().toISOString().slice(0, 10)}`;
+      const used = (await get(day)) || 0;
+      if (used >= 10) return res.status(429).json({ error: "That's 10 scans today. Try again tomorrow, or paste a competitor you know." });
+      await set(day, used + 1, 86400);
+      const known = [...mine, ...((await get(rivalsKey(email)).catch(() => null)) || []).map((x) => x.url), report?.rival?.url].filter(Boolean);
+      try {
+        return res.status(200).json(await findCompetitors(page.url, { exclude: known }));
+      } catch (e) {
+        console.error("Competitor scan failed:", page.url, e);
+        return res.status(502).json({ error: "We couldn't read your page just now, so the scan didn't run. Try again in a minute." });
+      }
     }
     // One competitor stamped next to the Kill Sheet page, once: { url }.
     if (op === "ks-rival") {

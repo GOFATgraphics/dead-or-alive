@@ -546,6 +546,58 @@ function BeforeAfter({ before, after }) {
   );
 }
 
+// "Find competitors for me": scans for pages like the member's, shows each match with why it matched, and hands the
+// one they choose to pick(url).
+function FindRivals({ url, pick, pickLabel, picking }) {
+  const [s, setS] = useState({ status: "idle" });
+  const scan = async () => {
+    setS({ status: "scanning" });
+    track("rival_scan");
+    try { setS({ status: "done", ...(await api("find-rivals", { url })) }); }
+    catch (x) { setS({ status: "error", error: x.message }); }
+  };
+  if (s.status === "idle" || s.status === "error") {
+    return (
+      <div className="finder">
+        <div>
+          <b>Don't know your competitors?</b>
+          <p>We read your page, search for products that say the same thing, and check each one live. About 20 seconds.</p>
+          {s.error && <p className="alert" role="alert">{s.error}</p>}
+        </div>
+        <button type="button" className="btn btn-dark btn-sm" onClick={scan}><Icon name="search" /> Find competitors for me</button>
+      </div>
+    );
+  }
+  if (s.status === "scanning") return <Working text="Reading your page, searching launches and the web, then loading each match to check it. About 20 seconds." />;
+  return (
+    <div className="finder-results">
+      {s.about?.length > 0 && <p className="fine">Your page is about: {s.about.map((a) => <span key={a} className="about-chip">{a}</span>)}</p>}
+      {s.found?.length ? (
+        <ul className="found">
+          {s.found.map((f) => (
+            <li key={f.url}>
+              <span className="found-ic" aria-hidden="true">{f.host.slice(0, 1).toUpperCase()}</span>
+              <div className="found-main">
+                <div className="found-top">
+                  <a href={f.url} target="_blank" rel="noopener noreferrer"><b>{f.host}</b></a>
+                  <span className="found-match" title="How much of what this page says matches yours"><i><b style={{ width: `${f.match}%` }}></b></i>{f.match}% match</span>
+                </div>
+                <p className="found-title">{f.title}</p>
+                {f.description && f.description !== f.title && <p className="fine">{f.description}</p>}
+                <p className="found-why">Both say: {f.shared.map((w) => <span key={w} className="about-chip">{w}</span>)}{f.from?.length ? <small> · {f.from.join(", ")}</small> : null}</p>
+              </div>
+              <button type="button" className="btn btn-line btn-sm" disabled={!!picking} onClick={() => pick(f.url)}>{picking === f.url ? "Adding…" : pickLabel}</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="note">{s.note || "No close matches this time: nothing we found says enough of the same things as your page. If you know one, paste it above."}</p>
+      )}
+      <p className="fine">Matches are found by the words on each page, not by AI, and every one was loaded just now. Results stay the same for a day.</p>
+    </div>
+  );
+}
+
 // One competitor stamped with the same rules, check by check next to the member's page.
 function KsRival({ report, onChange }) {
   const [url, setUrl] = useState("");
@@ -553,10 +605,12 @@ function KsRival({ report, onChange }) {
   const [err, setErr] = useState("");
   const r = report.rival;
   const mine = report.stamp;
-  const go = async (e) => {
-    e.preventDefault(); setBusy(true); setErr("");
-    try { onChange(await api("ks-rival", { url })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
+  const [picking, setPicking] = useState("");
+  const compare = async (target) => {
+    setBusy(true); setErr(""); setPicking(target);
+    try { onChange(await api("ks-rival", { url: target })); } catch (x) { setErr(x.message); } finally { setBusy(false); setPicking(""); }
   };
+  const go = (e) => { e.preventDefault(); compare(url); };
   const host = (u) => u.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return (
     <>
@@ -566,9 +620,10 @@ function KsRival({ report, onChange }) {
           <p className="fine">Stamp one competitor's page with the same 13 checks and see where they beat you, check by check. One comparison is included.{r?.failed ? ` The last try couldn't stamp ${host(r.url)}: ${r.failed}` : ""}</p>
           <form className="row-actions" onSubmit={go}>
             <input className="inline-input" type="text" inputMode="url" value={url} maxLength={300} onChange={(e) => setUrl(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor's page" />
-            <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !url.trim()}>{busy ? "Checking…" : "Compare"}</button>
+            <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !url.trim()}>{busy && !picking ? "Checking…" : "Compare"}</button>
           </form>
           {err && <p className="alert" role="alert">{err}</p>}
+          <FindRivals url={report.url} pick={compare} pickLabel="Compare with mine" picking={picking} />
         </>
       ) : r.running ? (
         <Working text={`Stamping ${host(r.url)} with the same checks. About a minute.`} />
@@ -742,10 +797,11 @@ function Rivals({ rivals, monitors, onChange }) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const save = async (urls) => {
-    setBusy(true); setErr("");
+  const [picking, setPicking] = useState("");
+  const save = async (urls, picked = "") => {
+    setBusy(true); setErr(""); setPicking(picked);
     try { onChange(await api("rivals", { urls })); setDraft(""); }
-    catch (x) { setErr(x.message); } finally { setBusy(false); }
+    catch (x) { setErr(x.message); } finally { setBusy(false); setPicking(""); }
   };
   const last = (rs) => [...(rs || [])].reverse().find((r) => !r.failed && r.score != null);
   const rows = [
@@ -772,10 +828,11 @@ function Rivals({ rivals, monitors, onChange }) {
       {list.length < 2 && (
         <form className="row-actions" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) save([...list.map((y) => y.url), draft.trim()]); }}>
           <input className="inline-input" type="text" inputMode="url" value={draft} maxLength={300} onChange={(e) => setDraft(e.target.value)} placeholder="https://competitor.com" aria-label="Competitor site" />
-          <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !draft.trim()}>{busy ? "Checking…" : "Add competitor"}</button>
+          <button type="submit" className="btn btn-dark btn-sm" disabled={busy || !draft.trim()}>{busy && !picking ? "Checking…" : "Add competitor"}</button>
         </form>
       )}
       {err && <p className="alert" role="alert">{err}</p>}
+      {list.length < 2 && monitors?.[0]?.url && <FindRivals url={monitors[0].url} pick={(u) => save([...list.map((y) => y.url), u], u)} pickLabel="Add" picking={picking} />}
     </Panel>
   );
 }
