@@ -296,3 +296,36 @@ body.ad-locked { overflow: hidden; }
 .an-channel-track { margin-top: 0.3rem; height: 8px; border-radius: 4px; background: var(--canvas); overflow: hidden; }
 .an-channel-fill { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
 .an-card .an-table { margin-top: 1rem; }
+
+/* Visible redesign, 2026-10-29: bolder hierarchy, same Shadcn style. The
+   previous polish was too subtle to see, so this layer changes sizes,
+   spacing, and emphasis you can actually notice, without changing any
+   data, navigation, or action. */
+/* Top bar: the Admin tag reads as a solid pill, not a faint outline. */
+.ad-bar { padding: 0.85rem 1.5rem; }
+.ad-tag { background: var(--ink); border-color: var(--ink); color: var(--page); }
+/* Page header: bigger title, and a hairline that separates it from the work. */
+.ad-head { padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.ad-head h1 { font-size: 2rem; }
+/* KPI cards: bigger numbers, uppercase labels, more air inside the card. */
+.ad-kpis > div { gap: 0.5rem; padding: 1.5rem; }
+.ad-kpis p { font: 500 0.6875rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.ad-kpis b { font-size: 2rem; }
+.an-tile-value { font-size: 2rem; }
+/* Panels: more padding, bigger section titles. */
+.ad .panel { padding: 1.5rem; }
+.ad .panel-head h2 { font-size: 1.125rem; }
+/* Sidebar: taller, slightly larger nav items, more room between groups. */
+.ad .side-nav button { min-height: 2.75rem; font-size: 0.9375rem; }
+.ad .side-group + .side-group { margin-top: 1.5rem; }
+/* Tables: a tinted header row, taller rows, larger site marks, so a stamp
+   row reads at a glance instead of as a wall of small text. */
+.ad-table th { padding: 0.75rem 1rem; background: var(--canvas); font-size: 0.75rem; }
+.ad-table td { padding: 0.85rem 1rem; }
+.ad-site > img, .ad-site > i { width: 24px; height: 24px; }
+.ad-site .avatar { width: 2rem; height: 2rem; font-size: 0.8125rem; }
+/* Verdict and plan chips: larger, so the status is the first thing you see. */
+.ad-chip { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+/* Toolbar: taller search and segment controls, matching the taller nav. */
+.ad-tools input[type="search"] { min-height: 2.75rem; }
+.ad-seg button { min-height: 2.25rem; padding: 0 0.9rem; }
